@@ -151,6 +151,28 @@ contract AegisChannel is ReentrancyGuard {
         _payout(uint256(cumulativeAmount) - pen, pen, false);
     }
 
+    /// @notice Cooperative close: kedua pihak menandatangani Close(seq, toProvider); sisa ke klien; seketika (FR-11).
+    function closeCooperative(uint64 seq_, uint128 toProvider, bytes calldata sigClient, bytes calldata sigProvider)
+        external nonReentrant
+    {
+        if (state != State.OPEN && state != State.CLOSING) revert WrongState();
+        if (seq_ > MAX_SEQ) revert SeqTooLarge();
+        if (seq_ < seq) revert StaleCheckpoint();
+        _requireBothSigned(hashClose(seq_, toProvider), sigClient, sigProvider);
+        if (toProvider > budget()) revert ExceedsBudget();
+        seq = seq_;
+        hasProof = false;
+        _payout(toProvider, 0, true);
+    }
+
+    /// @notice Setelah SETTLED: dana yang masuk belakangan → payoutClient (FR-6). Siapa pun boleh memanggil.
+    function sweep() external nonReentrant {
+        if (state != State.SETTLED) revert WrongState();
+        uint256 b = budget();
+        if (b > 0) IERC20(cfg.token).safeTransfer(cfg.payoutClient, b);
+        emit Swept(b);
+    }
+
     /// @dev toProvider = min(owed, budget); sisa selalu ke klien (FR-17). Efek sebelum interaksi.
     function _payout(uint256 owedToProvider, uint256 penalty, bool cooperative) internal {
         uint256 b = budget();
