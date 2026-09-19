@@ -12,6 +12,8 @@ template DivBps() {
     q <-- x \ 10000;
     r <-- x % 10000;
     x === q * 10000 + r;
+    component rb = Num2Bits(14);
+    rb.in <== r;
     component rlt = LessThan(14);
     rlt.in[0] <== r;
     rlt.in[1] <== 10000;
@@ -78,8 +80,11 @@ template SlaSettlement(N, DEPTH) {
     component upB = Num2Bits(32); upB.in <== unitPrice;
     component mxB = Num2Bits(32); mxB.in <== maxM1;
     component mnB = Num2Bits(32); mnB.in <== minM2;
+    component penB = Num2Bits(14); penB.in <== penaltyBps;
     component penLe = LessEqThan(14); penLe.in[0] <== penaltyBps; penLe.in[1] <== 10000; penLe.out === 1;
+    component capB = Num2Bits(14); capB.in <== capBps;
     component capLe = LessEqThan(14); capLe.in[0] <== capBps;     capLe.in[1] <== 10000; capLe.out === 1;
+    component seqB = Num2Bits(8); seqB.in <== seq;
     component seqLe = LessEqThan(8);  seqLe.in[0] <== seq;        seqLe.in[1] <== N;     seqLe.out === 1;
     component cumB = Num2Bits(64); cumB.in <== cumulativeAmount;
 
