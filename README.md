@@ -193,10 +193,21 @@ cast send $USDG "mint(address,uint256)" "$(cast wallet address --private-key $PK
 
 ### (c) Jalankan test integrasi terhadap testnet
 
+Jalankan dari **root repo** (`pnpm --filter` mengeksekusi script `test` dengan cwd pindah ke `sdk/`, tetapi `DEPLOY_FILE` di `sdk/test/integration.test.ts` diresolve terhadap root repo — bukan cwd proses — jadi path relatif di bawah ini valid dari root repo apa adanya):
+
 ```bash
 DEPLOY_FILE=contracts/deployments/testnet-46630.json CHAIN_ID=46630 RPC_URL=$RPC_URL \
   pnpm --filter @aegisclear/sdk test -- integration
 ```
+
+Alternatif dengan path absolut (setara, kalau ragu soal direktori mana yang jadi acuan):
+
+```bash
+DEPLOY_FILE="$(pwd)/contracts/deployments/testnet-46630.json" CHAIN_ID=46630 RPC_URL=$RPC_URL \
+  pnpm --filter @aegisclear/sdk test -- integration
+```
+
+Jika `DEPLOY_FILE` salah eja/tidak ada, test tidak diam-diam ter-skip — konsol mencetak `integration: deploy file not found at <path> — suite skipped` sebelum vitest melaporkan 0 test.
 
 Hasil yang diharapkan: test "kooperatif" (`PK_CLIENT_A`) dan "sengketa" (`PK_CLIENT_B`, termasuk bukti ZK asli + `settle()`) **PASS** di chain `46630`, ±3–4 menit karena jendela tantangan 120 s ditunggu secara nyata (bukan `evm_increaseTime`). Tx hash channel B (test sengketa) adalah bukti liveness untuk submission. Test lain di file ini (`/close`, tiket keluar unilateral, watcher in-process) memakai akun Anvil hardcode di luar `PK_CLIENT_A/B` dan **tidak** dirancang untuk lulus di testnet tanpa pendanaan tambahan — ini konsisten dengan cakupan Task 17.
 

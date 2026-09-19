@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { createPublicClient, createWalletClient, defineChain, http, type Address, type Hex } from "viem";
@@ -13,7 +15,16 @@ import {
   rootHex, predictChannel, merkleRoot, submitCheckpointTx, type ChainCtx, type ChannelConfig,
 } from "../src/index.js";
 
-const DEPLOY = process.env.DEPLOY_FILE ?? new URL("../../contracts/deployments/local.json", import.meta.url).pathname;
+// DEPLOY_FILE (env) diresolve relatif terhadap REPO ROOT, bukan cwd proses: `pnpm --filter
+// @aegisclear/sdk test` menjalankan vitest dengan cwd = sdk/, jadi string relatif mentah (mis.
+// "contracts/deployments/testnet-46630.json", seperti didokumentasikan README) akan salah resolve
+// jadi sdk/contracts/... dan diam-diam bikin describe.skipIf men-skip seluruh suite tanpa error.
+// path.resolve(REPO_ROOT, x) membuat x relatif selalu dari root repo, dan membiarkan x absolut tetap
+// absolut (path.resolve mengabaikan REPO_ROOT begitu segmen berikutnya sudah absolut).
+const REPO_ROOT = fileURLToPath(new URL("../..", import.meta.url));
+const DEPLOY = process.env.DEPLOY_FILE
+  ? path.resolve(REPO_ROOT, process.env.DEPLOY_FILE)
+  : path.join(REPO_ROOT, "contracts", "deployments", "local.json");
 const RPC = process.env.RPC_URL ?? "http://127.0.0.1:8545";
 const CHAIN_ID = Number(process.env.CHAIN_ID ?? 31337);
 const chain = CHAIN_ID === 31337 ? foundry : defineChain({ id: CHAIN_ID, name: "robinhood-testnet", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: [RPC] } } });
@@ -28,7 +39,10 @@ const PK = {
 const art = defaultArtifacts(new URL("../..", import.meta.url).pathname);
 const j = (o: unknown) => JSON.parse(JSON.stringify(o, (_, v) => (typeof v === "bigint" ? v.toString() : v)));
 
-describe.skipIf(!existsSync(DEPLOY))("integrasi Anvil: provider ↔ klien ↔ AegisChannel", () => {
+const DEPLOY_EXISTS = existsSync(DEPLOY);
+if (!DEPLOY_EXISTS) console.warn(`integration: deploy file not found at ${DEPLOY} — suite skipped`);
+
+describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisChannel", () => {
   let d: { usdg: Address; factory: Address };
   let server: ReturnType<typeof serve>;
   let latestCoSigned: ReturnType<typeof createProviderApp>["latestCoSigned"];
