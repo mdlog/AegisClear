@@ -6,16 +6,22 @@
 import { Hono } from "hono";
 import { randomBytes } from "node:crypto";
 import type { Address, Hex, PrivateKeyAccount } from "viem";
-import { type Terms, type Receipt, ReceiptTree, commitTerms, makeReceipt, MAX_SEQ, merkleRoot } from "../core/index.js";
+import { type Terms, type Receipt, ReceiptTree, commitTerms, makeReceipt, MAX_SEQ, merkleRoot, randomNonce } from "../core/index.js";
 import {
-  type ChannelConfig, type Checkpoint, signCheckpoint, verifyCheckpointSig,
-  signChannelTerms, verifyChannelTermsSig, signClose, rootHex,
+  type ChannelConfig, type Checkpoint, signCheckpoint, signChannelTerms, signClose, rootHex, makeTypedDataVerifier,
 } from "../core/typedData.js";
 import { type ChainCtx, predictChannel, openChannel, erc20Balance } from "../chain/channel.js";
 import { Watcher } from "../watcher/watcher.js";
 
 export interface ProviderOptions {
-  ctx: ChainCtx; account: PrivateKeyAccount; usdg: Address; terms: Terms;
+  ctx: ChainCtx; account: PrivateKeyAccount; usdg: Address;
+  /**
+   * Syarat komersial (harga, ambang, penalti, cap). `nonce` DIABAIKAN: setiap sesi memakai nonce
+   * CSPRNG baru (`randomNonce()`), sehingga `termsCommitment` berbeda per channel — satu nonce untuk
+   * semua sesi membuat setiap klien (yang memang menerima `terms` lengkap di 402) bisa mengenali
+   * channel klien lain dengan `termsCommitment` identik on-chain dan membaca harga/ambangnya (§6.7).
+   */
+  terms: Omit<Terms, "nonce"> & { nonce?: bigint };
   unitQty: bigint; deposit: bigint; challengeWindow: number; responseWindow: number;
   /** metrik per unit (demo: injeksi pelanggaran) */
   metrics: (seq: number) => { m1: bigint; m2: bigint };
@@ -23,6 +29,8 @@ export interface ProviderOptions {
 export interface CoSigned { cp: Checkpoint; sigProvider: Hex; sigClient?: Hex }
 export interface Session {
   cfg: ChannelConfig; predicted: Address; channel?: Address; termsSigProvider: Hex;
+  /** terms sesi ini (nonce per sesi) — dasar `cfg.termsCommitment`, harga receipt, dan `terms` di 402. */
+  terms: Terms;
   /** tiket keluar unilateral: Checkpoint(0,0,merkleRoot([])) ditandatangani provider di muka (T-exit0) */
   exitSigProvider: Hex;
   tree: ReceiptTree; cumulativeAmount: bigint; checkpoints: Map<number, CoSigned>;
@@ -33,20 +41,24 @@ export function createProviderApp(o: ProviderOptions) {
   const app = new Hono();
   const sessions = new Map<string, Session>();
   const chainId = o.ctx.chainId;
+  // Verifikasi tanda tangan klien sadar ERC-1271/6492 (klien boleh smart account) — konsisten dengan
+  // `SignatureChecker.isValidSignatureNow` yang dipakai AegisChannel; ecrecover murni menolak akun kontrak.
+  const verify = makeTypedDataVerifier(o.ctx.publicClient);
 
   async function session(client: Address): Promise<Session> {
     const key = client.toLowerCase();
     const found = sessions.get(key);
     if (found) return found;
+    const terms: Terms = { ...o.terms, nonce: randomNonce() };   // nonce per sesi (lihat ProviderOptions.terms)
     const cfg: ChannelConfig = {
-      client, provider: o.account.address, token: o.usdg, termsCommitment: rootHex(await commitTerms(o.terms)),
+      client, provider: o.account.address, token: o.usdg, termsCommitment: rootHex(await commitTerms(terms)),
       challengeWindow: o.challengeWindow, responseWindow: o.responseWindow,
       payoutClient: client, payoutProvider: o.account.address, salt: ("0x" + randomBytes(32).toString("hex")) as Hex,
     };
     const predicted = await predictChannel(o.ctx, cfg);
     const cp0: Checkpoint = { seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };
     const s: Session = {
-      cfg, predicted, termsSigProvider: await signChannelTerms(o.account, predicted, chainId, cfg),
+      cfg, predicted, terms, termsSigProvider: await signChannelTerms(o.account, predicted, chainId, cfg),
       exitSigProvider: await signCheckpoint(o.account, predicted, chainId, cp0),
       tree: new ReceiptTree(), cumulativeAmount: 0n, checkpoints: new Map(),
     };
@@ -55,11 +67,12 @@ export function createProviderApp(o: ProviderOptions) {
   }
 
   // 402 x402-compatible: payTo = alamat channel (§10.2). Terms dikirim ke klien saja — privat dari chain, bukan dari lawan.
+  // `unitQty` diiklankan agar klien bisa menolak receipt yang menagih qty lebih besar dari yang disepakati (ClientPolicy).
   const challenge = (s: Session) => ({
     x402Version: 1,
     accepts: [{
       scheme: "exact", network: `eip155:${chainId}`, asset: o.usdg, payTo: s.predicted, maxAmountRequired: o.deposit.toString(),
-      extra: { aegis: { config: j(s.cfg), sigProvider: s.termsSigProvider, terms: j(o.terms), exitSig: s.exitSigProvider } },
+      extra: { aegis: { config: j(s.cfg), sigProvider: s.termsSigProvider, terms: j(s.terms), unitQty: o.unitQty.toString(), exitSig: s.exitSigProvider } },
     }],
   });
   const clientOf = (c: any) => c.req.header("Aegis-Client") as Address | undefined;
@@ -81,7 +94,7 @@ export function createProviderApp(o: ProviderOptions) {
     // (1) buka channel saat ack pertama membawa tanda tangan ChannelTerms klien (D7)
     if (!s.channel) {
       const sigClient = c.req.header("Aegis-Terms-Signature") as Hex | undefined;
-      if (!sigClient || !(await verifyChannelTermsSig(client, s.predicted, chainId, s.cfg, sigClient)))
+      if (!sigClient || !(await verify.verifyChannelTermsSig(client, s.predicted, chainId, s.cfg, sigClient)))
         return c.json({ error: "terms-signature-required" }, 402);
       const { channel } = await openChannel(o.ctx, s.cfg, sigClient, "0x"); // provider = msg.sender
       s.channel = channel;
@@ -93,18 +106,18 @@ export function createProviderApp(o: ProviderOptions) {
       if (!pending.sigClient) {
         const hdr = c.req.header("Aegis-Ack");
         const ack = hdr ? (JSON.parse(hdr) as { seq: number; signature: Hex }) : undefined;
-        if (!ack || ack.seq !== n || !(await verifyCheckpointSig(client, s.channel, chainId, pending.cp, ack.signature)))
+        if (!ack || ack.seq !== n || !(await verify.verifyCheckpointSig(client, s.channel, chainId, pending.cp, ack.signature)))
           return c.json({ error: "ack-required", seq: n }, 409);
         pending.sigClient = ack.signature;
       }
     }
     if (n >= MAX_SEQ) return c.json({ error: "epoch-full" }, 409);
     // (3) tidak melayani melebihi deposit (FR-24)
-    const due = o.unitQty * o.terms.unitPrice;
+    const due = o.unitQty * s.terms.unitPrice;
     if ((await erc20Balance(o.ctx, o.usdg, s.channel)) < s.cumulativeAmount + due) return c.json(challenge(s), 402);
     // (4) layani unit n; receipt + checkpoint n+1 ditandatangani provider
     const { m1, m2 } = o.metrics(n);
-    const r: Receipt = makeReceipt(n, o.unitQty, m1, m2, o.terms.unitPrice);
+    const r: Receipt = makeReceipt(n, o.unitQty, m1, m2, s.terms.unitPrice);
     await s.tree.append(r);
     s.cumulativeAmount += due;
     const cp: Checkpoint = { seq: n + 1, cumulativeAmount: s.cumulativeAmount, receiptsRoot: await s.tree.root() };
@@ -118,7 +131,7 @@ export function createProviderApp(o: ProviderOptions) {
     if (!s?.channel) return c.json({ error: "no channel" }, 409);
     const { seq, signature } = (await c.req.json()) as { seq: number; signature: Hex };
     const pending = s.checkpoints.get(seq);
-    if (!pending || !(await verifyCheckpointSig(client!, s.channel, chainId, pending.cp, signature))) return c.json({ error: "bad-ack" }, 400);
+    if (!pending || !(await verify.verifyCheckpointSig(client!, s.channel, chainId, pending.cp, signature))) return c.json({ error: "bad-ack" }, 400);
     pending.sigClient = signature;
     return c.json({ ok: true });
   });

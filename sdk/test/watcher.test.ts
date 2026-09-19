@@ -81,6 +81,53 @@ describe.skipIf(!existsSync(DEPLOY))("watcher", () => {
     expect((await erc20Balance(ctx(PK_C), d.usdg, provider.address)) - p0).toBe(140_000n);
   });
 
+  it("F1: responder tetap menjawab SETELAH deadline asli lewat (kontrak menerima seq lebih tinggi sampai settle) dan tidak men-settle state basi di tick yang sama", async () => {
+    const d = JSON.parse(readFileSync(DEPLOY, "utf8")) as { usdg: Address; factory: Address };
+    const publicClient = createPublicClient({ chain: foundry, transport: http(RPC) });
+    const ctx = (pk: Hex): ChainCtx => ({ publicClient, chainId: 31337, factory: d.factory, walletClient: createWalletClient({ account: privateKeyToAccount(pk), chain: foundry, transport: http(RPC) }) });
+    const client = privateKeyToAccount(PK_C), provider = privateKeyToAccount(PK_P);
+    const cfg: ChannelConfig = { client: client.address, provider: provider.address, token: d.usdg, termsCommitment: ("0x" + "42".padStart(64, "0")) as Hex,
+      challengeWindow: 60, responseWindow: 30, payoutClient: client.address, payoutProvider: provider.address, salt: ("0x" + randomBytes(32).toString("hex")) as Hex };
+    const predicted = await predictChannel(ctx(PK_C), cfg);
+    const sigP = await signChannelTerms(provider, predicted, 31337, cfg);
+    const { channel } = await openChannel(ctx(PK_C), cfg, "0x", sigP);
+    await erc20Transfer(ctx(PK_C), d.usdg, channel, 500_000n);
+    const bothSign = async (cp: Checkpoint) => ({
+      cp, sigClient: await signCheckpoint(client, channel, 31337, cp), sigProvider: await signCheckpoint(provider, channel, 31337, cp),
+    });
+    const stale = await bothSign({ seq: 3, cumulativeAmount: 60_000n, receiptsRoot: 5n });
+    const latest = await bothSign({ seq: 7, cumulativeAmount: 140_000n, receiptsRoot: 9n });
+
+    // klien men-submit checkpoint BASI (seq 3) → CLOSING, deadline = t0 + 60
+    await submitCheckpointTx(ctx(PK_C), channel, stale.cp, stale.sigClient, stale.sigProvider);
+    const v0 = await readChannel(ctx(PK_P), channel);
+    expect(v0.seq).toBe(3);
+
+    // watcher provider BARU tidak tick sama sekali sebelum deadline asli lewat (mis. proses provider
+    // sempat mati / RPC putus). Kode lama: `now >= deadline` → langsung settle(seq 3) tanpa merespons.
+    await publicClient.request({ method: "evm_increaseTime", params: [61] } as any);
+    await publicClient.request({ method: "evm_mine", params: [] } as any);
+    expect(Number((await publicClient.getBlock()).timestamp)).toBeGreaterThanOrEqual(v0.deadline);
+
+    const w = new Watcher({ ctx: ctx(PK_P), coSigned: (ch) => (ch.toLowerCase() === channel.toLowerCase() ? latest : undefined) });
+    const r1 = await w.tick();
+    expect(r1.responded).toContain(channel);
+    expect(r1.settled).not.toContain(channel);          // deadline diperpanjang responseWindow oleh respons → belum boleh settle
+    const v1 = await readChannel(ctx(PK_P), channel);
+    expect(v1.state).toBe("CLOSING");
+    expect(v1.seq).toBe(7);
+    expect(v1.deadline).toBeGreaterThan(v0.deadline);
+
+    // lewati deadline BARU → tick berikutnya men-settle dan membayar seq 7 (140.000), bukan seq 3 (60.000)
+    await publicClient.request({ method: "evm_increaseTime", params: [31] } as any);
+    await publicClient.request({ method: "evm_mine", params: [] } as any);
+    const p0 = await erc20Balance(ctx(PK_C), d.usdg, provider.address);
+    const r2 = await w.tick();
+    expect(r2.settled).toContain(channel);
+    expect((await readChannel(ctx(PK_P), channel)).state).toBe("SETTLED");
+    expect((await erc20Balance(ctx(PK_C), d.usdg, provider.address)) - p0).toBe(140_000n);
+  });
+
   it("Task 15 fix round 1: tick() tetap memproses channel yang sudah dikenal walau scan() gagal", async () => {
     const d = JSON.parse(readFileSync(DEPLOY, "utf8")) as { usdg: Address; factory: Address };
     const publicClient = createPublicClient({ chain: foundry, transport: http(RPC) });

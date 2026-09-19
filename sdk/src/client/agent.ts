@@ -1,8 +1,8 @@
 import type { Address, Hex, PrivateKeyAccount } from "viem";
-import { type Terms, type Receipt, ReceiptTree, settle, buildCircuitInput, commitTerms, merkleRoot } from "../core/index.js";
+import { type Terms, type Receipt, ReceiptTree, settle, buildCircuitInput, commitTerms, merkleRoot, leafHash } from "../core/index.js";
 import {
-  type ChannelConfig, type Checkpoint, signCheckpoint, verifyCheckpointSig, signChannelTerms, verifyChannelTermsSig,
-  signClose, verifyCloseSig, rootHex,
+  type ChannelConfig, type Checkpoint, type TypedDataVerifier, signCheckpoint, signChannelTerms, signClose, rootHex,
+  makeTypedDataVerifier,
 } from "../core/typedData.js";
 import {
   type ChainCtx, erc20Transfer, predictChannel, openChannel, submitCheckpointTx, claimPenaltyTx, settleTx,
@@ -10,6 +10,23 @@ import {
 } from "../chain/channel.js";
 import { prove, toCalldata, type Artifacts } from "../core/prover.js";
 
+/**
+ * Pagar ekonomi klien. Tanpa ini klien SDK menerima berapa pun deposit, jendela tantangan, dan qty per
+ * unit yang provider tawarkan — setiap unit tetap butuh ack (tanda tangan) klien, tetapi klien otomatis
+ * yang tidak membandingkan tawaran dengan batasnya sendiri akan mendanai dan meng-ack apa saja.
+ */
+export interface ClientPolicy {
+  /** deposit (402 `maxAmountRequired`) maksimum yang bersedia klien kunci di channel. */
+  maxDeposit?: bigint;
+  /** `cfg.challengeWindow` maksimum (detik) — lamanya dana klien bisa tertahan setelah checkpoint. */
+  maxChallengeWindow?: number;
+  /**
+   * qty maksimum per receipt yang bersedia klien ack. Default: `unitQty` yang provider iklankan di
+   * 402 (`extra.aegis.unitQty`); bila 402 tidak memuatnya dan ini tidak diisi, `start()` menolak
+   * (klien tidak boleh mendanai channel tanpa batas tagihan per unit yang ia ketahui).
+   */
+  maxQtyPerUnit?: bigint;
+}
 export interface ClientOptions {
   ctx: ChainCtx; account: PrivateKeyAccount; providerUrl: string; usdg: Address; artifacts: Artifacts;
   /** alamat yang berhak menerima sisa dana klien (cfg.payoutClient). Default: account.address. */
@@ -18,6 +35,8 @@ export interface ClientOptions {
   expectedProvider?: Address;
   /** kebijakan ack: false = tolak unit (tidak dibayar). Default: terima semua metrik yang provider laporkan. */
   accept?: (r: Receipt) => boolean;
+  /** batas ekonomi (deposit, jendela tantangan, qty per unit). Lihat `ClientPolicy`. */
+  policy?: ClientPolicy;
 }
 export interface TxLog { label: string; hash: Hex; gasUsed: bigint }
 const bi = (x: string | number | bigint) => BigInt(x);
@@ -34,8 +53,12 @@ export class AegisClient {
   private providerTermsSig?: Hex;
   /** tiket keluar unilateral: sigProvider(Checkpoint(0,0,merkleRoot([]))) dari 402. */
   private exitSigProvider?: Hex;
+  /** batas qty per receipt yang berlaku: policy.maxQtyPerUnit ?? unitQty yang diiklankan provider (402). */
+  private maxQtyPerUnit?: bigint;
+  /** verifikasi tanda tangan sadar ERC-1271/6492 (provider boleh smart account) — konsisten dengan kontrak. */
+  private readonly verify: TypedDataVerifier;
 
-  constructor(private readonly o: ClientOptions) {}
+  constructor(private readonly o: ClientOptions) { this.verify = makeTypedDataVerifier(o.ctx.publicClient); }
   private hdr(extra: Record<string, string> = {}) {
     return { "Aegis-Client": this.o.account.address, "content-type": "application/json", ...extra };
   }
@@ -61,18 +84,36 @@ export class AegisClient {
     // offer.payTo mentah, atau provider bisa mengarahkan dana ke alamat sembarang (mis. EOA-nya sendiri).
     const predicted = await predictChannel(this.o.ctx, cfg);
     if (predicted.toLowerCase() !== String(offer.payTo).toLowerCase()) throw new Error("payTo != predictChannel(cfg) (T19)");
-    if (!(await verifyChannelTermsSig(cfg.provider, predicted, this.chainId, cfg, a.sigProvider))) throw new Error("bad provider terms signature (T19)");
+    if (!(await this.verify.verifyChannelTermsSig(cfg.provider, predicted, this.chainId, cfg, a.sigProvider))) throw new Error("bad provider terms signature (T19)");
     // Tiket keluar unilateral (seq 0): harus tervalidasi SEBELUM klien mendanai channel (§6.2/T-exit0).
     const cp0: Checkpoint = { seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };
-    if (!(await verifyCheckpointSig(cfg.provider, predicted, this.chainId, cp0, a.exitSig))) throw new Error("bad provider exit ticket (seq-0)");
-    this.cfg = cfg; this.channel = predicted; this.terms = terms; this.deposit = bi(offer.maxAmountRequired);
+    if (!(await this.verify.verifyCheckpointSig(cfg.provider, predicted, this.chainId, cp0, a.exitSig))) throw new Error("bad provider exit ticket (seq-0)");
+    // Pagar ekonomi (ClientPolicy) — SEBELUM transfer apa pun. Tanpa ini klien mendanai berapa pun yang
+    // diminta dan menerima jendela tantangan sepanjang apa pun (dana tertahan selama itu bila sengketa).
+    const deposit = bi(offer.maxAmountRequired);
+    const policy = this.o.policy ?? {};
+    if (policy.maxDeposit !== undefined && deposit > policy.maxDeposit)
+      throw new Error(`deposit ${deposit} exceeds policy.maxDeposit ${policy.maxDeposit}`);
+    if (policy.maxChallengeWindow !== undefined && cfg.challengeWindow > policy.maxChallengeWindow)
+      throw new Error(`challengeWindow ${cfg.challengeWindow} exceeds policy.maxChallengeWindow ${policy.maxChallengeWindow}`);
+    const advertisedUnitQty = a.unitQty !== undefined ? bi(a.unitQty) : undefined;
+    const maxQtyPerUnit = policy.maxQtyPerUnit ?? advertisedUnitQty;
+    if (maxQtyPerUnit === undefined) throw new Error("402 offer has no unitQty and policy.maxQtyPerUnit is unset — refusing to fund without a per-unit qty bound");
+    this.cfg = cfg; this.channel = predicted; this.terms = terms; this.deposit = deposit; this.maxQtyPerUnit = maxQtyPerUnit;
     this.providerTermsSig = a.sigProvider as Hex; this.exitSigProvider = a.exitSig as Hex;
     // MVP: transfer langsung ke alamat channel. Rel x402/Permit2 menghasilkan efek identik (Task 11).
     this.txs.push({ label: "fund", ...(await erc20Transfer(this.o.ctx, this.o.usdg, predicted, this.deposit)) });
     this.termsSig = await signChannelTerms(this.o.account, predicted, this.chainId, cfg);
   }
 
-  /** POST /job dengan ack sebelumnya; verifikasi receipt, root, jumlah, tanda tangan provider; tanda tangani checkpoint baru */
+  /**
+   * POST /job dengan ack sebelumnya; verifikasi receipt, root, jumlah, tanda tangan provider; tanda tangani checkpoint baru.
+   * SEMUA pemeriksaan (seq, due, kebijakan, rekomputasi checkpoint atas pohon TENTATIF, tanda tangan
+   * provider) dilakukan SEBELUM `this.tree` disentuh — satu balasan provider yang cacat tidak boleh
+   * meninggalkan pohon lokal satu langkah di depan checkpoint co-signed tertinggi (dulu itu membuat
+   * `dispute()`/`closeCooperative()` tidak bisa dipakai: tree.size = k+1 tapi checkpoint k+1 tidak ada).
+   * Invarian setelah return/throw: `tree.size` == seq checkpoint co-signed tertinggi di `checkpoints`.
+   */
   async requestUnit(): Promise<Receipt> {
     const headers = this.hdr() as Record<string, string>;
     if (this.termsSig) { headers["Aegis-Terms-Signature"] = this.termsSig; }
@@ -84,12 +125,17 @@ export class AegisClient {
     const r: Receipt = { seq: Number(b.receipt.seq), qty: bi(b.receipt.qty), m1: bi(b.receipt.m1), m2: bi(b.receipt.m2), due: bi(b.receipt.due) };
     if (r.seq !== this.tree.size) throw new Error("seq mismatch");
     if (r.due !== r.qty * this.terms.unitPrice) throw new Error("due mismatch");
+    if (this.maxQtyPerUnit !== undefined && r.qty > this.maxQtyPerUnit)
+      throw new Error(`receipt ${r.seq} qty ${r.qty} exceeds maxQtyPerUnit ${this.maxQtyPerUnit}`);
     if (this.o.accept && !this.o.accept(r)) throw new Error(`receipt ${r.seq} rejected by policy`);
-    await this.tree.append(r);
     const cp: Checkpoint = { seq: Number(b.checkpoint.seq), cumulativeAmount: bi(b.checkpoint.cumulativeAmount), receiptsRoot: bi(b.checkpoint.receiptsRoot) };
-    const local = settle(this.tree.receipts, this.terms);
-    if (cp.seq !== this.tree.size || cp.receiptsRoot !== (await this.tree.root()) || cp.cumulativeAmount !== local.cumulativeAmount) throw new Error("checkpoint mismatch");
-    if (!(await verifyCheckpointSig(this.cfg.provider, this.channel, this.chainId, cp, b.sigProvider))) throw new Error("bad provider checkpoint signature");
+    // Rekomputasi atas pohon tentatif (leaves + leaf(r), receipts + r) — belum ada mutasi.
+    const tentativeRoot = await merkleRoot([...this.tree.leaves, await leafHash(r)]);
+    const tentativeCumulative = settle([...this.tree.receipts, r], this.terms).cumulativeAmount;
+    if (cp.seq !== this.tree.size + 1 || cp.receiptsRoot !== tentativeRoot || cp.cumulativeAmount !== tentativeCumulative) throw new Error("checkpoint mismatch");
+    if (!(await this.verify.verifyCheckpointSig(this.cfg.provider, this.channel, this.chainId, cp, b.sigProvider))) throw new Error("bad provider checkpoint signature");
+    // Semua cek lolos — baru sekarang pohon disentuh, ditandatangani, dan disimpan.
+    await this.tree.append(r);
     const sigClient = await signCheckpoint(this.o.account, this.channel, this.chainId, cp);
     this.checkpoints.set(cp.seq, { cp, sigProvider: b.sigProvider, sigClient });
     this.pendingAck = { seq: cp.seq, signature: sigClient };
@@ -110,16 +156,18 @@ export class AegisClient {
     const b = (await res.json()) as any;
     const toProvider = bi(b.toProvider);
     if (toProvider !== settle(this.tree.receipts, this.terms).cumulativeAmount) throw new Error("close amount mismatch");
-    if (!(await verifyCloseSig(this.cfg.provider, this.channel, this.chainId, { seq, toProvider }, b.sigProvider))) throw new Error("bad provider close signature");
+    if (!(await this.verify.verifyCloseSig(this.cfg.provider, this.channel, this.chainId, { seq, toProvider }, b.sigProvider))) throw new Error("bad provider close signature");
     const sigClient = await signClose(this.o.account, this.channel, this.chainId, { seq, toProvider });
     this.txs.push({ label: "closeCooperative", ...(await closeCooperativeTx(this.o.ctx, this.channel, seq, toProvider, sigClient, b.sigProvider)) });
   }
 
-  /** Unilateral: checkpoint co-signed terakhir, lalu bukti penalti bila ada (§6.4) */
+  /** Unilateral: checkpoint co-signed TERTINGGI yang dipegang, lalu bukti penalti bila ada (§6.4) */
   async dispute(): Promise<{ payToClient: bigint }> {
-    const seq = this.tree.size;
-    const cs = this.checkpoints.get(seq);
-    if (!cs) throw new Error("no co-signed checkpoint");
+    if (this.checkpoints.size === 0) throw new Error("no co-signed checkpoint");
+    // Kunci tertinggi di `checkpoints`, bukan `tree.size` — keduanya sama berkat invarian requestUnit(),
+    // tetapi jalur keluar tidak boleh bergantung pada pohon yang mungkin tidak sinkron.
+    const seq = Math.max(...this.checkpoints.keys());
+    const cs = this.checkpoints.get(seq)!;
     this.txs.push({ label: "submitCheckpoint", ...(await submitCheckpointTx(this.o.ctx, this.channel, cs.cp, cs.sigClient, cs.sigProvider)) });
     const s = settle(this.tree.receipts, this.terms);
     if (s.payToClient > 0n) {

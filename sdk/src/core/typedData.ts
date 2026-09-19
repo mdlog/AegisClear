@@ -1,4 +1,4 @@
-import { type Address, type Hex, type PrivateKeyAccount, verifyTypedData, toHex } from "viem";
+import { type Address, type Hex, type PrivateKeyAccount, type PublicClient, verifyTypedData, toHex } from "viem";
 
 export const EIP712_NAME = "AegisClear";
 export const EIP712_VERSION = "1";
@@ -47,4 +47,29 @@ export function signClose(a: PrivateKeyAccount, channel: Address, chainId: numbe
 }
 export function verifyCloseSig(signer: Address, channel: Address, chainId: number, m: CloseMsg, signature: Hex): Promise<boolean> {
   return verifyTypedData({ address: signer, domain: domain(channel, chainId), types: CLOSE_TYPES, primaryType: "Close", message: closeMsg(m), signature });
+}
+
+/**
+ * Verifier tanda tangan EIP-712 yang SADAR KONTRAK. `verifyChannelTermsSig`/`verifyCheckpointSig`/
+ * `verifyCloseSig` murni di atas hanya melakukan ecrecover (EOA), sedangkan `AegisChannel` menerima
+ * tanda tangan ERC-1271 (`SignatureChecker.isValidSignatureNow`, T12) — smart account / brankas
+ * ERC-4337 sah di kontrak tetapi akan ditolak SDK bila SDK hanya ecrecover. Factory ini memakai
+ * `publicClient.verifyTypedData` (viem): EOA lewat ecrecover, akun kontrak lewat `isValidSignature`
+ * (eth_call on-chain), termasuk pembungkus ERC-6492 untuk akun yang belum di-deploy. `false` untuk
+ * tanda tangan tidak sah; melempar hanya bila RPC gagal. Fungsi murni tetap tersedia untuk EOA/offline.
+ */
+export interface TypedDataVerifier {
+  verifyChannelTermsSig(signer: Address, channel: Address, chainId: number, c: ChannelConfig, signature: Hex): Promise<boolean>;
+  verifyCheckpointSig(signer: Address, channel: Address, chainId: number, cp: Checkpoint, signature: Hex): Promise<boolean>;
+  verifyCloseSig(signer: Address, channel: Address, chainId: number, m: CloseMsg, signature: Hex): Promise<boolean>;
+}
+export function makeTypedDataVerifier(publicClient: PublicClient): TypedDataVerifier {
+  return {
+    verifyChannelTermsSig: (signer, channel, chainId, c, signature) =>
+      publicClient.verifyTypedData({ address: signer, domain: domain(channel, chainId), types: CHANNEL_TERMS_TYPES, primaryType: "ChannelTerms", message: { ...c }, signature }),
+    verifyCheckpointSig: (signer, channel, chainId, cp, signature) =>
+      publicClient.verifyTypedData({ address: signer, domain: domain(channel, chainId), types: CHECKPOINT_TYPES, primaryType: "Checkpoint", message: cpMsg(cp), signature }),
+    verifyCloseSig: (signer, channel, chainId, m, signature) =>
+      publicClient.verifyTypedData({ address: signer, domain: domain(channel, chainId), types: CLOSE_TYPES, primaryType: "Close", message: closeMsg(m), signature }),
+  };
 }

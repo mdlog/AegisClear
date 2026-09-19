@@ -11,9 +11,11 @@ export interface WatcherOptions {
   /**
    * Challenge responder (fund safety provider, Task 15): lookup provider atas co-signed checkpoint
    * TERTINGGI miliknya untuk sebuah channel (mis. `latestCoSignedByChannel` dari `createProviderApp`).
-   * Bila checkpoint on-chain (CLOSING) lebih basi dari ini dan window respons belum lewat, tick()
-   * meng-counter-submit checkpoint ini — inilah yang membuat provider aman dari checkpoint basi klien
-   * (termasuk tiket keluar seq-0 dari Task 14).
+   * Bila checkpoint on-chain (CLOSING) lebih basi dari ini, tick() meng-counter-submit checkpoint ini
+   * — inilah yang membuat provider aman dari checkpoint basi klien (termasuk tiket keluar seq-0 dari
+   * Task 14). Respons dikirim TANPA memandang `deadline`: `AegisChannel.submitCheckpoint` menerima seq
+   * lebih tinggi di CLOSING sampai `settle()` benar-benar dipanggil (tidak ada cek deadline di sana),
+   * jadi selama belum ada yang men-settle, respons yang "terlambat" tetap sah dan tetap menang.
    */
   coSigned?: (channel: Address) => { cp: Checkpoint; sigClient: Hex; sigProvider: Hex } | undefined;
 }
@@ -46,13 +48,22 @@ export class Watcher {
       try {
         const v = await readChannel(this.o.ctx, ch);
         if (v.state === "CLOSING") {
+          // Responder dulu, settle kemudian — dan JANGAN pernah men-settle state basi hanya karena
+          // `now >= deadline`: kontrak masih menerima checkpoint seq lebih tinggi di CLOSING sampai
+          // settle(), jadi respons wajib dikirim dulu (tanpa syarat deadline). Setelah merespons, view
+          // dibaca ulang: submitCheckpoint memperpanjang deadline (≤ responseWindow), sehingga settle di
+          // tick yang sama hanya terjadi bila deadline HASIL BACA ULANG pun sudah lewat. Bila respons
+          // gagal (throw), settle dilewati untuk channel ini di tick ini — dicoba lagi tick berikutnya,
+          // karena men-settle state basi adalah hasil terburuk bagi pemegang checkpoint yang lebih baru.
           const mine = this.o.coSigned?.(ch);
-          if (mine && mine.cp.seq > v.seq && now < v.deadline) {
+          let view = v;
+          if (mine && mine.cp.seq > v.seq) {
             await submitCheckpointTx(this.o.ctx, ch, mine.cp, mine.sigClient, mine.sigProvider);
             responded.push(ch);
             this.o.log?.(`responded ${ch} seq ${mine.cp.seq}`);
+            view = await readChannel(this.o.ctx, ch);
           }
-          if (now >= v.deadline) { await settleTx(this.o.ctx, ch); settled.push(ch); this.o.log?.(`settled ${ch}`); }
+          if (view.state === "CLOSING" && now >= view.deadline) { await settleTx(this.o.ctx, ch); settled.push(ch); this.o.log?.(`settled ${ch}`); }
         } else if (v.state === "SETTLED" && v.budget > 0n) {
           await sweepTx(this.o.ctx, ch); swept.push(ch); this.o.log?.(`swept ${ch}`);
         }

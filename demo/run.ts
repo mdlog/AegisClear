@@ -30,7 +30,8 @@ async function marketB(pk: Hex, dispute: boolean) {
     await c.settle();
   } else await c.closeCooperative();
   const gasTotal = c.txs.reduce((s, t) => s + t.gasUsed, 0n);
-  return { channel: c.channel, txs: c.txs, gasTotal, provingMs: c.provingMs, clientDelta: c0 - (await erc20Balance(ctx(pk), d.usdg, me)), providerDelta: (await erc20Balance(ctx(pk), d.usdg, provider.address)) - p0, local: settle(c.tree.receipts, c.terms) };
+  // c.terms = terms sesi ini (nonce per sesi dari provider, bukan TERMS.nonce) — dipakai leak-check agar nilai privat yang dipindai adalah yang benar-benar ter-commit.
+  return { channel: c.channel, txs: c.txs, gasTotal, provingMs: c.provingMs, clientDelta: c0 - (await erc20Balance(ctx(pk), d.usdg, me)), providerDelta: (await erc20Balance(ctx(pk), d.usdg, provider.address)) - p0, local: settle(c.tree.receipts, c.terms), terms: c.terms };
 }
 
 async function marketA(pk: Hex, accept: boolean) {
@@ -62,7 +63,8 @@ async function main() {
     ];
     console.table(table);
     mkdirSync(new URL("./out", import.meta.url), { recursive: true });
-    const priv = [TERMS.unitPrice, TERMS.maxM1, TERMS.minM2, TERMS.penaltyBps, TERMS.capBps, TERMS.nonce, 1200n, 300n, 95n].map(String);
+    const T = bDisp.terms;   // terms sesi channel B sengketa (nonce per sesi) — nilai privat yang benar-benar di-commit on-chain
+    const priv = [T.unitPrice, T.maxM1, T.minM2, T.penaltyBps, T.capBps, T.nonce, 1200n, 300n, 95n].map(String);
     writeFileSync(new URL("./out/result.json", import.meta.url), JSON.stringify({ channelB: bDisp.channel, factory: d.factory, txs: bDisp.txs.map((t) => t.hash), private: priv, table }, null, 2));
     console.log("ditulis: demo/out/result.json");
   } finally { server.close(); }

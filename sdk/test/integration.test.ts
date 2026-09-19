@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { createPublicClient, createWalletClient, defineChain, http, type Address, type Hex } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { foundry } from "viem/chains";
 import { createProviderApp } from "../src/provider/server.js";
 import { AegisClient } from "../src/client/agent.js";
@@ -259,5 +259,127 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
     } finally {
       server2.close();
     }
+  });
+
+  it("F5: nonce/termsCommitment berbeda per sesi — dua klien di provider yang sama tidak berbagi komitmen", async () => {
+    const get = async (addr: Address) => {
+      const res = await fetch("http://127.0.0.1:4020/job", { headers: { "Aegis-Client": addr } });
+      expect(res.status).toBe(402);
+      return ((await res.json()) as any).accepts[0].extra.aegis;
+    };
+    const a1 = await get(privateKeyToAccount(generatePrivateKey()).address);
+    const a2 = await get(privateKeyToAccount(generatePrivateKey()).address);
+    expect(a1.config.termsCommitment).not.toBe(a2.config.termsCommitment);
+    expect(a1.terms.nonce).not.toBe(a2.terms.nonce);
+    // harga/ambang/penalti/cap tetap sama (hanya nonce yang per sesi), dan komitmen tiap sesi konsisten dengan terms-nya
+    for (const k of ["unitPrice", "maxM1", "minM2", "penaltyBps", "capBps"]) expect(a1.terms[k]).toBe(a2.terms[k]);
+    for (const a of [a1, a2]) {
+      const t = { unitPrice: BigInt(a.terms.unitPrice), maxM1: BigInt(a.terms.maxM1), minM2: BigInt(a.terms.minM2), penaltyBps: BigInt(a.terms.penaltyBps), capBps: BigInt(a.terms.capBps), nonce: BigInt(a.terms.nonce) };
+      expect(rootHex(await commitTerms(t))).toBe(a.config.termsCommitment);
+    }
+    expect(a1.unitQty).toBe("1");   // F3: provider mengiklankan qty per unit
+  });
+
+  it("F2: balasan provider dengan tanda tangan checkpoint SALAH ditolak SEBELUM pohon disentuh; dispute() tetap bisa memakai checkpoint co-signed sebelumnya", async () => {
+    // Provider ASLI (jujur) dipanggil in-process; proxy di port 4041 meneruskan semuanya apa adanya,
+    // kecuali balasan POST /job ke-K: `sigProvider` diganti tanda tangan atas checkpoint yang sama dari
+    // KUNCI LAIN (anvil #6) — format sah, penandatangan salah.
+    const K = 4;
+    const terms = { unitPrice: 20_000n, maxM1: 800n, minM2: 90n, penaltyBps: 5000n, capBps: 3000n, nonce: randomNonce() };
+    const honest = createProviderApp({
+      ctx: ctxOf(PK.provider), account: providerAccount, usdg: d.usdg, terms,
+      unitQty: 1n, deposit: 1_000_000n, challengeWindow: 60, responseWindow: 30,
+      metrics: () => ({ m1: 300n, m2: 95n }),   // tanpa pelanggaran — dispute() tanpa bukti
+    });
+    const wrongSigner = privateKeyToAccount("0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e"); // anvil #6
+    let posts = 0;
+    const tamper = new Hono();
+    tamper.all("/*", async (c) => {
+      const url = new URL(c.req.url);
+      const headers: Record<string, string> = {};
+      for (const h of ["Aegis-Client", "Aegis-Terms-Signature", "Aegis-Ack", "content-type"]) { const v = c.req.header(h); if (v) headers[h] = v; }
+      const init: RequestInit = { method: c.req.method, headers };
+      if (c.req.method === "POST") init.body = await c.req.text();
+      const res = await honest.app.request(url.pathname, init);
+      if (c.req.method === "POST" && url.pathname === "/job" && res.status === 200 && ++posts === K) {
+        const body = (await res.json()) as any;
+        const cp = { seq: Number(body.checkpoint.seq), cumulativeAmount: BigInt(body.checkpoint.cumulativeAmount), receiptsRoot: BigInt(body.checkpoint.receiptsRoot) };
+        body.sigProvider = await signCheckpoint(wrongSigner, body.channel, CHAIN_ID, cp);
+        return c.json(body, 200);
+      }
+      return new Response(res.body, { status: res.status, headers: res.headers });
+    });
+    const tamperServer = serve({ fetch: tamper.fetch, port: 4041 });
+    try {
+      const c = new AegisClient({ ctx: ctxOf(PK.clientD), account: privateKeyToAccount(PK.clientD), providerUrl: "http://127.0.0.1:4041", usdg: d.usdg, artifacts: art });
+      const me = privateKeyToAccount(PK.clientD).address;
+      const c0 = await bal(me); const p0 = await bal(providerAddr);
+      await c.start();
+      for (let i = 0; i < K - 1; i++) await c.requestUnit();
+      expect(c.tree.size).toBe(K - 1);
+      const txsBefore = c.txs.length;
+
+      await expect(c.requestUnit()).rejects.toThrow(/bad provider checkpoint signature/);
+      // Tidak ada mutasi: pohon, checkpoint co-signed, dan tx klien persis seperti sebelum balasan cacat.
+      expect(c.tree.size).toBe(K - 1);
+      expect(c.checkpoints.size).toBe(K - 1);
+      expect(Math.max(...c.checkpoints.keys())).toBe(K - 1);
+      expect(c.txs.length).toBe(txsBefore);
+
+      // Jalur keluar tetap hidup: dispute() memakai checkpoint co-signed tertinggi (K-1), bukan tree.size+1 yang tidak ada.
+      const { payToClient } = await c.dispute();
+      expect(payToClient).toBe(0n);
+      const v = await c.view();
+      expect(v.state).toBe("CLOSING");
+      expect(v.seq).toBe(K - 1);
+      if (CHAIN_ID === 31337) { await publicClient.request({ method: "evm_increaseTime", params: [61] } as any); await publicClient.request({ method: "evm_mine", params: [] } as any); }
+      else await new Promise((r) => setTimeout(r, 65_000));
+      await c.settle();
+      expect((await c.view()).state).toBe("SETTLED");
+      expect((await bal(providerAddr)) - p0).toBe(BigInt(K - 1) * 20_000n);   // hanya unit yang di-ack klien yang dibayar
+      expect(c0 - (await bal(me))).toBe(BigInt(K - 1) * 20_000n);
+    } finally { tamperServer.close(); }
+  });
+
+  it("F3: ClientPolicy — maxDeposit menolak 402 sebelum transfer; maxQtyPerUnit menolak receipt qty 5 tanpa tanda tangan, lalu klien keluar lewat tiket seq-0", async () => {
+    const terms = { unitPrice: 20_000n, maxM1: 800n, minM2: 90n, penaltyBps: 5000n, capBps: 3000n, nonce: randomNonce() };
+    const { app: app3, latestCoSigned: lcs3, sessions: sessions3 } = createProviderApp({
+      ctx: ctxOf(PK.provider), account: providerAccount, usdg: d.usdg, terms,
+      unitQty: 5n, deposit: 1_000_000n, challengeWindow: 60, responseWindow: 30,   // provider menagih qty 5 per unit
+      metrics: () => ({ m1: 300n, m2: 95n }),
+    });
+    const server3 = serve({ fetch: app3.fetch, port: 4042 });
+    try {
+      // (a) deposit yang diminta (1.000.000) > policy.maxDeposit (500.000) → start() menolak, saldo tidak berubah
+      const a = new AegisClient({ ctx: ctxOf(PK.clientA), account: privateKeyToAccount(PK.clientA), providerUrl: "http://127.0.0.1:4042", usdg: d.usdg, artifacts: art, policy: { maxDeposit: 500_000n } });
+      const meA = privateKeyToAccount(PK.clientA).address;
+      const a0 = await bal(meA);
+      await expect(a.start()).rejects.toThrow(/maxDeposit/);
+      expect(await bal(meA)).toBe(a0);
+      expect(a.txs.length).toBe(0);
+      // (a') jendela tantangan 60 s > policy.maxChallengeWindow 30 → juga ditolak sebelum transfer
+      const a2 = new AegisClient({ ctx: ctxOf(PK.clientA), account: privateKeyToAccount(PK.clientA), providerUrl: "http://127.0.0.1:4042", usdg: d.usdg, artifacts: art, policy: { maxChallengeWindow: 30 } });
+      await expect(a2.start()).rejects.toThrow(/maxChallengeWindow/);
+      expect(await bal(meA)).toBe(a0);
+
+      // (b) provider unitQty 5 vs klien maxQtyPerUnit 1 → start() lolos (deposit/jendela OK), requestUnit() menolak
+      //     receipt qty 5: tidak ada tanda tangan klien yang dibuat, pohon tidak berubah.
+      const b = new AegisClient({ ctx: ctxOf(PK.clientB), account: privateKeyToAccount(PK.clientB), providerUrl: "http://127.0.0.1:4042", usdg: d.usdg, artifacts: art, policy: { maxQtyPerUnit: 1n } });
+      const meB = privateKeyToAccount(PK.clientB).address;
+      const b0 = await bal(meB);
+      await b.start();
+      await expect(b.requestUnit()).rejects.toThrow(/qty 5 exceeds maxQtyPerUnit 1/);
+      expect(b.tree.size).toBe(0);
+      expect(b.checkpoints.size).toBe(0);
+      expect(lcs3(meB)).toBeUndefined();                                        // provider tidak pernah menerima ack/tanda tangan klien
+      expect(sessions3.get(meB.toLowerCase())!.checkpoints.get(1)!.sigClient).toBeUndefined();
+      // Klien keluar: tanpa checkpoint co-signed, tiket keluar seq-0 sah → seluruh deposit kembali.
+      await b.exitUnilateral();
+      if (CHAIN_ID === 31337) { await publicClient.request({ method: "evm_increaseTime", params: [61] } as any); await publicClient.request({ method: "evm_mine", params: [] } as any); }
+      else await new Promise((r) => setTimeout(r, 65_000));
+      await b.settle();
+      expect((await b.view()).state).toBe("SETTLED");
+      expect(await bal(meB)).toBe(b0);
+    } finally { server3.close(); }
   });
 });
