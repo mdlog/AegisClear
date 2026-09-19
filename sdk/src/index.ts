@@ -5,3 +5,4 @@ export * from "./chain/abi.js";
 export * from "./chain/channel.js";
 export * from "./provider/server.js";
 export * from "./client/agent.js";
+export * from "./watcher/watcher.js";

@@ -161,5 +161,22 @@ export function createProviderApp(o: ProviderOptions) {
     return best?.sigClient ? { cp: best.cp, sigClient: best.sigClient, sigProvider: best.sigProvider, channel: s.channel } : undefined;
   }
 
-  return { app, sessions, latestCoSigned };
+  /**
+   * Sama seperti `latestCoSigned`, tapi diindeks per alamat channel (bukan per klien) — untuk Watcher
+   * (Task 15): sebuah provider bisa memasang `coSigned: latestCoSignedByChannel` langsung sebagai
+   * callback challenge responder.
+   */
+  function latestCoSignedByChannel(channel: Address): { cp: Checkpoint; sigClient: Hex; sigProvider: Hex; channel: Address } | undefined {
+    const key = channel.toLowerCase();
+    let best: CoSigned | undefined;
+    for (const s of sessions.values()) {
+      if (!s.channel || s.channel.toLowerCase() !== key) continue;
+      for (const cs of s.checkpoints.values()) {
+        if (cs.sigClient && (!best || cs.cp.seq > best.cp.seq)) best = cs;
+      }
+    }
+    return best?.sigClient ? { cp: best.cp, sigClient: best.sigClient, sigProvider: best.sigProvider, channel } : undefined;
+  }
+
+  return { app, sessions, latestCoSigned, latestCoSignedByChannel };
 }
