@@ -39,6 +39,13 @@ contract CheckpointTest is AegisTestBase {
         ch.submitCheckpoint(129, 1, ROOT, sc, sp);
     }
 
+    /// Optional boundary (Task 12 brief): seq_ == MAX_SEQ (128) is accepted, not rejected.
+    function test_seq_128_accepted_at_boundary() public {
+        (bytes memory sc, bytes memory sp) = checkpointSigs(ch, 128, 1_000_000, ROOT);
+        ch.submitCheckpoint(128, 1_000_000, ROOT, sc, sp);
+        assertEq(ch.seq(), 128);
+    }
+
     function test_stale_seq_reverts_in_closing() public {
         _cp(50, 1_000_000);
         (bytes memory sc, bytes memory sp) = checkpointSigs(ch, 50, 1_000_000, ROOT);

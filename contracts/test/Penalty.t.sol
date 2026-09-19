@@ -102,6 +102,22 @@ contract PenaltyTest is AegisTestBase {
         assertEq(usdg.balanceOf(provider) - p0, 2_020_000);
     }
 
+    /// Controller-mandated (Task 12 review carry-over): even resubmitting the SAME real proof
+    /// after a newer checkpoint must revert InvalidProof — proves the void is cryptographic
+    /// (verifyProof rejects because the current on-chain seq/cumulativeAmount/receiptsRoot no
+    /// longer match what the proof's public inputs commit to), not merely `hasProof` bookkeeping.
+    function test_stale_proof_rejected_after_newer_checkpoint() public {
+        _checkpointEx1(bytes32(inputs[2]));
+        vm.prank(client);
+        ch.claimPenalty(proof, 70_000);
+        (bytes memory sc, bytes memory sp) = checkpointSigs(ch, 101, 2_020_000, bytes32(uint256(2)));
+        ch.submitCheckpoint(101, 2_020_000, bytes32(uint256(2)), sc, sp);
+        assertFalse(ch.hasProof());
+        vm.prank(client);
+        vm.expectRevert(AegisChannel.InvalidProof.selector);
+        ch.claimPenalty(proof, 70_000);
+    }
+
     function test_fr18_exceeds_cumulative_reverts_even_if_verifier_says_true() public {
         // factory dari Base memakai MockVerifier(true)
         AegisChannel m = openByClient(defaultConfig());

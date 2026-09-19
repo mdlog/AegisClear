@@ -48,6 +48,16 @@ contract CooperativeTest is AegisTestBase {
         ch.closeCooperative(1, 5_000_001, sc, sp);
     }
 
+    /// Optional boundary (Task 12 brief): toProvider == budget() leaves client's take at 0.
+    function test_close_toProvider_equals_budget_leaves_client_zero() public {
+        uint128 b = uint128(usdg.balanceOf(address(ch)));
+        uint256 c0 = usdg.balanceOf(client); uint256 p0 = usdg.balanceOf(provider);
+        _close(1, b);
+        assertEq(usdg.balanceOf(provider) - p0, b);
+        assertEq(usdg.balanceOf(client) - c0, 0);
+        assertEq(usdg.balanceOf(address(ch)), 0);
+    }
+
     function test_close_requires_both_sigs() public {
         (bytes memory sc,) = closeSigs(ch, 1, 1);
         vm.expectRevert(AegisChannel.BadSignature.selector);
