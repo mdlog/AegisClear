@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import { createPublicClient, createWalletClient, http, type Address, type Hex } from "viem";
+import { createPublicClient, createWalletClient, defineChain, http, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { foundry } from "viem/chains";
 import { createProviderApp } from "../src/provider/server.js";
@@ -13,15 +13,17 @@ import {
   rootHex, predictChannel, merkleRoot, submitCheckpointTx, type ChainCtx, type ChannelConfig,
 } from "../src/index.js";
 
-const DEPLOY = new URL("../../contracts/deployments/local.json", import.meta.url).pathname;
+const DEPLOY = process.env.DEPLOY_FILE ?? new URL("../../contracts/deployments/local.json", import.meta.url).pathname;
 const RPC = process.env.RPC_URL ?? "http://127.0.0.1:8545";
+const CHAIN_ID = Number(process.env.CHAIN_ID ?? 31337);
+const chain = CHAIN_ID === 31337 ? foundry : defineChain({ id: CHAIN_ID, name: "robinhood-testnet", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: [RPC] } } });
 const PK = {
   deployer: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" as Hex, // anvil #0
-  provider: "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a" as Hex, // anvil #2
-  clientA: "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d" as Hex,  // anvil #1
-  clientB: "0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6" as Hex,  // anvil #3
-  clientC: "0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba" as Hex,  // anvil #5 — uji gating /close
-  clientD: "0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a" as Hex,  // anvil #4 — uji tiket keluar unilateral
+  provider: (process.env.PK_PROVIDER ?? "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a") as Hex, // anvil #2
+  clientA: (process.env.PK_CLIENT_A ?? "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d") as Hex,  // anvil #1
+  clientB: (process.env.PK_CLIENT_B ?? "0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6") as Hex,  // anvil #3
+  clientC: "0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba" as Hex,  // anvil #5 — uji gating /close (lokal saja, tidak diparametrisasi PK_*)
+  clientD: "0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a" as Hex,  // anvil #4 — uji tiket keluar unilateral (lokal saja, tidak diparametrisasi PK_*)
 };
 const art = defaultArtifacts(new URL("../..", import.meta.url).pathname);
 const j = (o: unknown) => JSON.parse(JSON.stringify(o, (_, v) => (typeof v === "bigint" ? v.toString() : v)));
@@ -31,10 +33,10 @@ describe.skipIf(!existsSync(DEPLOY))("integrasi Anvil: provider ↔ klien ↔ Ae
   let server: ReturnType<typeof serve>;
   let latestCoSigned: ReturnType<typeof createProviderApp>["latestCoSigned"];
   let latestCoSignedByChannel: ReturnType<typeof createProviderApp>["latestCoSignedByChannel"];
-  const publicClient = createPublicClient({ chain: foundry, transport: http(RPC) });
+  const publicClient = createPublicClient({ chain, transport: http(RPC) });
   const ctxOf = (pk: Hex): ChainCtx => ({
-    publicClient, chainId: 31337, factory: d.factory,
-    walletClient: createWalletClient({ account: privateKeyToAccount(pk), chain: foundry, transport: http(RPC) }),
+    publicClient, chainId: CHAIN_ID, factory: d.factory,
+    walletClient: createWalletClient({ account: privateKeyToAccount(pk), chain, transport: http(RPC) }),
   });
   const mkClient = (pk: Hex) => new AegisClient({ ctx: ctxOf(pk), account: privateKeyToAccount(pk), providerUrl: "http://127.0.0.1:4020", usdg: d.usdg, artifacts: art });
   const bal = (who: Address) => erc20Balance(ctxOf(PK.provider), d.usdg, who);
@@ -57,8 +59,14 @@ describe.skipIf(!existsSync(DEPLOY))("integrasi Anvil: provider ↔ klien ↔ Ae
 
   beforeAll(async () => {
     d = JSON.parse(readFileSync(DEPLOY, "utf8"));
-    await mintUsdg(privateKeyToAccount(PK.clientC).address, 100_000_000n);
-    await mintUsdg(privateKeyToAccount(PK.clientD).address, 100_000_000n);
+    // clientC/clientD tetap kunci Anvil hardcode (di luar scope PK_* Task 17) dan hanya dipakai tes
+    // lokal (gating /close, tiket keluar unilateral) — mint ini memakai PK.deployer (kunci publik
+    // Anvil #0), yang tidak punya ETH gas nyata di testnet; lewati di luar 31337 agar beforeAll tidak
+    // gagal sebelum tes kooperatif/sengketa (clientA/clientB, PK_* asli) sempat berjalan.
+    if (CHAIN_ID === 31337) {
+      await mintUsdg(privateKeyToAccount(PK.clientC).address, 100_000_000n);
+      await mintUsdg(privateKeyToAccount(PK.clientD).address, 100_000_000n);
+    }
     const terms = { unitPrice: 20_000n, maxM1: 800n, minM2: 90n, penaltyBps: 5000n, capBps: 3000n, nonce: randomNonce() };
     const { app, latestCoSigned: lcs, latestCoSignedByChannel: lcsByChannel } = createProviderApp({
       ctx: ctxOf(PK.provider), account: privateKeyToAccount(PK.provider), usdg: d.usdg, terms,
@@ -92,8 +100,8 @@ describe.skipIf(!existsSync(DEPLOY))("integrasi Anvil: provider ↔ klien ↔ Ae
     const { payToClient } = await c.dispute();
     expect(payToClient).toBe(10_000n);
     expect((await c.view()).hasProof).toBe(true);
-    await publicClient.request({ method: "evm_increaseTime", params: [121] } as any);
-    await publicClient.request({ method: "evm_mine", params: [] } as any);
+    if (CHAIN_ID === 31337) { await publicClient.request({ method: "evm_increaseTime", params: [121] } as any); await publicClient.request({ method: "evm_mine", params: [] } as any); }
+    else await new Promise((r) => setTimeout(r, 125_000));   // jendela demo 120 s nyata di testnet
     await c.settle();
     expect((await bal(providerAddr)) - p0).toBe(190_000n);
     expect(c0 - (await bal(me))).toBe(190_000n);
@@ -143,11 +151,11 @@ describe.skipIf(!existsSync(DEPLOY))("integrasi Anvil: provider ↔ klien ↔ Ae
     const me = privateKeyToAccount(PK.clientB).address; // sesi asli klien ini sudah SETTLED; app jahat ini terpisah/tidak menyentuhnya
     const { cfg, terms } = await buildCfgAndTerms(me);
     const fakePayTo = providerAddr; // jahat: arahkan dana ke EOA provider sendiri, bukan alamat channel CREATE2
-    const sigProvider = await signChannelTerms(providerAccount, fakePayTo, 31337, cfg); // sah, tapi ditandatangani di atas domain yang SALAH
+    const sigProvider = await signChannelTerms(providerAccount, fakePayTo, CHAIN_ID, cfg); // sah, tapi ditandatangani di atas domain yang SALAH
     const evilApp = new Hono();
     evilApp.get("/job", (c) => c.json({
       x402Version: 1,
-      accepts: [{ scheme: "exact", network: "eip155:31337", asset: d.usdg, payTo: fakePayTo, maxAmountRequired: "1000000",
+      accepts: [{ scheme: "exact", network: `eip155:${CHAIN_ID}`, asset: d.usdg, payTo: fakePayTo, maxAmountRequired: "1000000",
         extra: { aegis: { config: j(cfg), sigProvider, terms: j(terms), exitSig: "0x" } } }],
     }, 402));
     const evilServer = serve({ fetch: evilApp.fetch, port: 4023 });
@@ -164,11 +172,11 @@ describe.skipIf(!existsSync(DEPLOY))("integrasi Anvil: provider ↔ klien ↔ Ae
     const { cfg, terms } = await buildCfgAndTerms(me);
     const tamperedCfg: ChannelConfig = { ...cfg, payoutClient: providerAddr }; // jahat: sisa dana klien diarahkan ke provider
     const realPayTo = await predictChannel(ctxOf(PK.provider), tamperedCfg); // payTo tetap benar untuk cfg yang sudah ditempel ini
-    const sigProvider = await signChannelTerms(providerAccount, realPayTo, 31337, tamperedCfg);
+    const sigProvider = await signChannelTerms(providerAccount, realPayTo, CHAIN_ID, tamperedCfg);
     const evilApp = new Hono();
     evilApp.get("/job", (c) => c.json({
       x402Version: 1,
-      accepts: [{ scheme: "exact", network: "eip155:31337", asset: d.usdg, payTo: realPayTo, maxAmountRequired: "1000000",
+      accepts: [{ scheme: "exact", network: `eip155:${CHAIN_ID}`, asset: d.usdg, payTo: realPayTo, maxAmountRequired: "1000000",
         extra: { aegis: { config: j(tamperedCfg), sigProvider, terms: j(terms), exitSig: "0x" } } }],
     }, 402));
     const evilServer = serve({ fetch: evilApp.fetch, port: 4024 });
@@ -185,8 +193,8 @@ describe.skipIf(!existsSync(DEPLOY))("integrasi Anvil: provider ↔ klien ↔ Ae
     const c0 = await bal(me);
     await c.start(); // hanya danai + verifikasi tiket keluar — TIDAK ada requestUnit() (provider dianggap tidak pernah menjawab)
     await c.exitUnilateral();
-    await publicClient.request({ method: "evm_increaseTime", params: [121] } as any);
-    await publicClient.request({ method: "evm_mine", params: [] } as any);
+    if (CHAIN_ID === 31337) { await publicClient.request({ method: "evm_increaseTime", params: [121] } as any); await publicClient.request({ method: "evm_mine", params: [] } as any); }
+    else await new Promise((r) => setTimeout(r, 125_000));   // jendela demo 120 s nyata di testnet
     await c.settle();
     expect((await c.view()).state).toBe("SETTLED");
     expect(await bal(me)).toBe(c0);
@@ -224,8 +232,8 @@ describe.skipIf(!existsSync(DEPLOY))("integrasi Anvil: provider ↔ klien ↔ Ae
         expect(r1.responded).toContain(c.channel);
         expect((await c.view()).seq).toBe(10);
 
-        await publicClient.request({ method: "evm_increaseTime", params: [61] } as any);
-        await publicClient.request({ method: "evm_mine", params: [] } as any);
+        if (CHAIN_ID === 31337) { await publicClient.request({ method: "evm_increaseTime", params: [61] } as any); await publicClient.request({ method: "evm_mine", params: [] } as any); }
+        else await new Promise((r) => setTimeout(r, 65_000));   // jendela 60 s nyata di testnet (challengeWindow tes ini)
         const p0 = await bal(providerAddr);
         const r2 = await w.tick();
         expect(r2.settled).toContain(c.channel);
