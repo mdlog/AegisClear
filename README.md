@@ -4,7 +4,7 @@ Escrow & penyelesaian sengketa privacy-preserving untuk pembayaran agen-ke-agen 
 
 Spesifikasi lengkap: [`prd-arsitektur.md`](./prd-arsitektur.md). Log toolchain & pengukuran per-task: [`docs/TOOLCHAIN.md`](./docs/TOOLCHAIN.md).
 
-**Status implementasi:** kontrak, sirkuit, dan SDK lengkap dan lulus seluruh suite lokal (Anvil + Foundry + circuits). **Deploy ke testnet 46630 sudah di-broadcast dan 7/7 kontrak terverifikasi di Blockscout (20 Sep 2026, blok 121.731.938 = `0x7417b62`)**; test integrasi "kooperatif" dan "sengketa" (bukti Groth16 asli + `settle()`) **lulus di chain 46630** — tx bukti liveness ada di tabel [Alamat kontrak](#alamat-kontrak). Yang belum: unggah release `v0.1.0-zkey` dan pengukuran gas Stylus on-chain untuk menutup D2 (lihat `docs/benchmarks/poseidon.md`).
+**Status implementasi:** kontrak, sirkuit, dan SDK lengkap dan lulus seluruh suite lokal (Anvil + Foundry + circuits). **Deploy ke testnet 46630 sudah di-broadcast dan 7/7 kontrak terverifikasi di Blockscout (20 Sep 2026, blok 121.731.938 = `0x7417b62`)**; test integrasi "kooperatif" dan "sengketa" (bukti Groth16 asli + `settle()`) **lulus di chain 46630** — tx bukti liveness ada di tabel [Alamat kontrak](#alamat-kontrak). Release proving key: [`v0.1.0-zkey`](https://github.com/mdlog/AegisClear/releases/tag/v0.1.0-zkey). Gas Stylus vs Yul terukur on-chain (`docs/benchmarks/poseidon.md`) — D2 ditutup: Stylus hanya untuk anchored mode (P1).
 
 ## Daftar isi
 - [Ringkasan produk](#ringkasan-produk)
@@ -69,12 +69,14 @@ Diverifikasi ada di `4663` **dan** `46630` (spec §10.1, §19).
 Prasyarat (versi yang diverifikasi, lihat [`docs/TOOLCHAIN.md`](./docs/TOOLCHAIN.md)): Node 22, pnpm 9.15, Foundry (`forge`/`anvil`/`cast`) 1.5.1, circom 2.2.3.
 
 ```bash
+git clone --recurse-submodules https://github.com/mdlog/AegisClear.git && cd AegisClear   # submodule: contracts/lib/*
 pnpm install
 
 # Artefak sirkuit yang TIDAK di-commit (circuits/build/* kecuali verification_key.json): r1cs + wasm witness generator
 pnpm --filter @aegisclear/circuits build
 
-# Proving key: unduh `sla_final.zkey` dari release `v0.1.0-zkey` ke circuits/build/ (lihat "Release artefacts").
+# Proving key: unduh `sla_final.zkey` dari release `v0.1.0-zkey` ke circuits/build/ (lihat "Release artefacts"):
+gh release download v0.1.0-zkey --repo mdlog/AegisClear -p sla_final.zkey -D circuits/build/
 # ALTERNATIF: `bash circuits/scripts/setup.sh` — tetapi ini membangkitkan kunci BARU (entropi /dev/urandom) yang
 # TIDAK cocok dengan contracts/src/SLASettlementVerifier.sol, circuits/build/verification_key.json, dan fixture bukti
 # contracts/test/fixtures/ex1_verifier.json yang di-commit; ketiganya harus dibangkitkan ulang dan di-commit BERSAMA
@@ -298,4 +300,16 @@ RPC_URL=$RPC_URL FACTORY=<alamat "factory" dari deployments/testnet-46630.json> 
 - `circuits/build/verification_key.json` — sudah ter-commit di repo; disertakan lagi di rilis agar bundel self-contained.
 - `contracts/src/SLASettlementVerifier.sol` — sudah ter-commit di repo; disertakan lagi agar konsumen rilis bisa memverifikasi kecocokan verifier on-chain vs `verification_key.json` tanpa checkout repo.
 
-**Tautan rilis:** _(diisi setelah pemilik repo mengunggah `v0.1.0-zkey` — langkah ini di luar cakupan yang bisa dijalankan tanpa akses GitHub dari lingkungan implementasi)._
+**Tautan rilis:** <https://github.com/mdlog/AegisClear/releases/tag/v0.1.0-zkey> (dibuat 20 Sep 2026 dari commit `0e24687`). Selain tiga berkas di atas, rilis juga melampirkan `sla_settlement.r1cs` (61 MB) dan `pot17_final.ptau` (151 MB, Powers of Tau 2^17 **lokal** — mirror publik 403 saat setup, §19 V14) supaya siapa pun bisa memverifikasi zkey, plus `SHA256SUMS`:
+
+```bash
+gh release download v0.1.0-zkey --repo mdlog/AegisClear -D /tmp/aegis-rel && (cd /tmp/aegis-rel && sha256sum -c SHA256SUMS)
+npx snarkjs zkey verify circuits/build/sla_settlement.r1cs /tmp/aegis-rel/pot17_final.ptau /tmp/aegis-rel/sla_final.zkey
+```
+
+| Berkas | SHA-256 |
+|---|---|
+| `sla_final.zkey` | `dfb8395623080e403b8521efa8a26eb8886c7f277c87e303cdfb05d4728d1552` |
+| `verification_key.json` | `9d915a7ecb7ed065d2b8330e00eac83bf98f51f83d1b6d9ac83f246f2ed8ec8e` |
+| `SLASettlementVerifier.sol` | `03b5061a36f17cb3737d71c725562ec455bd3b002f2353a956361d325115eb1e` |
+| `sla_settlement.r1cs` | `473f1e4cb2a9c89f65356e59d2a4d79fa9046bf0d0648908dd62079f6af4e1fb` |
