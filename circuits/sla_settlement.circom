@@ -3,24 +3,7 @@ pragma circom 2.1.6;
 include "circomlib/circuits/poseidon.circom";
 include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/bitify.circom";
-
-// floor(x / 10000) dengan witness (q, r): x == 10000*q + r, r < 10000, q < 2^64
-template DivBps() {
-    signal input x;
-    signal output q;
-    signal r;
-    q <-- x \ 10000;
-    r <-- x % 10000;
-    x === q * 10000 + r;
-    component rb = Num2Bits(14);
-    rb.in <== r;
-    component rlt = LessThan(14);
-    rlt.in[0] <== r;
-    rlt.in[1] <== 10000;
-    rlt.out === 1;
-    component qb = Num2Bits(64);
-    qb.in <== q;
-}
+include "lib/divbps.circom";
 
 // Root pohon biner penuh kedalaman DEPTH; node = Poseidon(kiri, kanan)
 template MerkleRoot(DEPTH) {

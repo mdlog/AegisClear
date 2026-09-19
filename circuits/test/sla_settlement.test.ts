@@ -15,6 +15,10 @@ async function getCircuit() {
   return circuit;
 }
 
+const PROBE = path.join(here, "circuits", "divbps_probe.circom");
+let probe: any;
+async function getProbe() { if (!probe) probe = await wasmTester(PROBE, { include: [path.join(here, "..", "node_modules")] }); return probe; }
+
 for (const name of ["EX1_7_latency_breaches", "EX2_cap_binds_80_breaches", "EX3_qty5_2_quality_breaches", "EDGE_seq0", "EDGE_seq128_all_breach", "EDGE_cap0"]) {
   test(`witness valid untuk ${name}`, async () => {
     const c = await getCircuit();
@@ -58,34 +62,40 @@ test("nonce salah → termsCommitment tidak cocok (C1)", async () => {
   await assert.rejects(c.calculateWitness(input, true), /Assert Failed|Error/);
 });
 
-// Regression untuk fix round 1 (finding #1): DivBps() dulu hanya membatasi r via
+// Regression untuk fix round 1/2 (finding #1): DivBps dulu hanya membatasi r via
 // LessThan(14) tanpa Num2Bits(14) pada r, sehingga r bisa "negatif" (elemen field
-// dekat p) dan quotient q bisa digelembungkan +1 (payToClient naik). Tes ini
-// menyusun ulang witness valid, menaikkan (q, r) di main.div[0] ke pasangan yang
-// masih memenuhi `x === q*10000 + r` secara aritmetika field tapi tidak lagi
-// merepresentasikan pembagian bilangan bulat yang sah, dan menuntut checkConstraints
-// menolaknya (fix: Num2Bits(14) pada r, ditambahkan sebelum LessThan(14)).
-test("DivBps r tergelembung (q+1, r-10000) → constraint gagal (C8 fix round 1)", async () => {
-  const c = await getCircuit();
-  const v = loadVector("EX1_7_latency_breaches");
-  const input = await buildCircuitInput(CHANNEL, v.terms, v.receipts);
-  const w = await c.calculateWitness(input, true);
-  await c.checkConstraints(w); // baseline: witness valid lulus sebelum di-tamper
-
-  await c.loadSymbols();
-  await c.loadConstraints();
-  const qIdx = c.symbols["main.div[0].q"].varIdx;
-  const rIdx = c.symbols["main.div[0].r"].varIdx;
-  const origQ: bigint = w[qIdx];
-  const origR: bigint = w[rIdx];
-
-  // due[0]*penaltyBps = 20000*5000 = 100_000_000 → q=10000, r=0 untuk EX1.
-  // (q+1, r-10000 mod p) tetap memenuhi x === q*10000+r secara field:
-  // (10000+1)*10000 + (p-10000) ≡ 100_000_000 + p ≡ 100_000_000 (mod p).
-  const tampered = w.slice();
-  tampered[qIdx] = origQ + 1n;
-  tampered[rIdx] = ((origR - 10000n) % FIELD_PRIME + FIELD_PRIME) % FIELD_PRIME;
-
-  await assert.rejects(c.checkConstraints(tampered), /Constraint doesn't match|Error/);
-  await c.checkConstraints(w); // witness asli (belum di-tamper) tetap lulus
+// dekat p) dan quotient q bisa digelembungkan +1 (payToClient naik).
+//
+// Fix round 1's test tampered (q, r) langsung di witness array sla_settlement penuh
+// setelah calculateWitness — review menemukan tes itu TIDAK diskriminatif: mengubah
+// q/r di situ tanpa memperbarui bit-bit dekomposisi terkait (qb.out[], rlt.n2b.out[])
+// membuat constraint LAIN (bukan rb) yang gagal duluan, sehingga tes tetap "pass"
+// (menolak witness) walau baris rb dihapus. Fix round 2: DivBps dipecah menjadi
+// DivBpsConstraints({x,q,r} sebagai input sirkuit) di lib/divbps.circom, diuji lewat
+// sirkuit probe test/circuits/divbps_probe.circom. Karena x,q,r adalah INPUT (bukan
+// witness turunan), calculateWitness menghitung ULANG semua bit turunan (rb.out[],
+// qb.out[], rlt.n2b.out[]) secara konsisten untuk nilai yang diserang — tidak ada
+// bit basi yang mencemari constraint lain. Ini yang membuat tes benar-benar
+// menguji khusus baris `rb = Num2Bits(14)` (lihat task-4-report.md § Fix round 2
+// untuk bukti diskriminasi: tes GAGAL ketika rb sengaja dihapus, PASS setelah
+// dikembalikan).
+test("DivBps: pembagian jujur diterima", async () => {
+  const c = await getProbe();
+  const w = await c.calculateWitness({ x: "13616", q: "1", r: "3616" }, true);
+  await c.checkConstraints(w);
 });
+
+test("DivBps: sisa negatif (q+1, r−10000 mod p) DITOLAK — hanya karena Num2Bits(14) pada r", async () => {
+  const c = await getProbe();
+  // Tanpa rb, LessThan(14) menerima r = p − 6384 (r + 6384 = p ≡ 0 < 2^14) — celah soundness yang ditemukan review.
+  await assert.rejects(c.calculateWitness({ x: "13616", q: "2", r: (FIELD_PRIME - 6384n).toString() }, true), /Assert Failed|Error/);
+});
+
+// Catatan (fix round 2): tes ketiga yang disarankan controller (q di luar 64-bit,
+// x=0, r = p − ((2^64·10000) mod p)) DIHAPUS setelah diverifikasi empiris — r hasil
+// konstruksi itu adalah bilangan ~254-bit (p − 1.8e23), jauh di luar [0,2^14), jadi
+// ia menggelontor rb/rlt (celah r yang SAMA dengan tes di atas), bukan qb (batas
+// 64-bit pada q) yang ingin diuji secara terisolasi. Diverifikasi: calculateWitness
+// menolak dengan "Assert Failed" tapi tidak bisa dipastikan constraint qb yang
+// gagal duluan — redundan dengan tes "sisa negatif" di atas. Dijatuhkan sesuai
+// izin eksplisit controller ("the first two are the required ones").
