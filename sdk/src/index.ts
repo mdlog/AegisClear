@@ -3,3 +3,5 @@ export * from "./core/typedData.js";
 export * from "./core/prover.js";
 export * from "./chain/abi.js";
 export * from "./chain/channel.js";
+export * from "./provider/server.js";
+export * from "./client/agent.js";

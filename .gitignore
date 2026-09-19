@@ -8,6 +8,7 @@ circuits/ptau/
 contracts/out/
 contracts/cache/
 contracts/broadcast/
+contracts/deployments/local.json
 demo/out/
 stylus/**/target/
 vectors/RAND_*.json
