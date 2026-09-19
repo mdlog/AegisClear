@@ -32,7 +32,13 @@ export class Watcher {
   }
 
   async tick(): Promise<{ settled: Address[]; swept: Address[]; responded: Address[] }> {
-    await this.scan();
+    // scan() gagal (mis. RPC turun sesaat) tidak boleh menghentikan tick sepenuhnya — channel yang
+    // sudah dikenal dari scan sebelumnya tetap diproses (Task 15 fix round 1).
+    try {
+      await this.scan();
+    } catch (e) {
+      this.o.log?.(`scan error: ${String(e)}`);
+    }
     const now = Number((await this.o.ctx.publicClient.getBlock()).timestamp);
     const settled: Address[] = [], swept: Address[] = [], responded: Address[] = [];
     for (const ch of this.channels) {

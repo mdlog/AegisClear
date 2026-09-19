@@ -12,6 +12,7 @@ import {
   signChannelTerms, verifyChannelTermsSig, signClose, rootHex,
 } from "../core/typedData.js";
 import { type ChainCtx, predictChannel, openChannel, erc20Balance } from "../chain/channel.js";
+import { Watcher } from "../watcher/watcher.js";
 
 export interface ProviderOptions {
   ctx: ChainCtx; account: PrivateKeyAccount; usdg: Address; terms: Terms;
@@ -178,5 +179,20 @@ export function createProviderApp(o: ProviderOptions) {
     return best?.sigClient ? { cp: best.cp, sigClient: best.sigClient, sigProvider: best.sigProvider, channel } : undefined;
   }
 
-  return { app, sessions, latestCoSigned, latestCoSignedByChannel };
+  /**
+   * Fix round 1 (Task 15 review): menjalankan challenge responder WAJIB dilakukan in-process oleh
+   * provider itu sendiri — `sessions`/co-signed store hanya hidup di memori proses ini, jadi hanya
+   * proses ini yang bisa mengisi `coSigned` untuk `Watcher`. `watcher/cli.ts` yang berjalan sebagai
+   * proses terpisah TIDAK memiliki akses ke store ini: itu hanyalah bot settle/sweep permissionless
+   * (siapa pun boleh menjalankannya) dan TIDAK BISA merespons tantangan (T1) atas nama provider.
+   * Panggil ini di proses provider untuk mendapatkan perlindungan T1; pemanggil bertanggung jawab
+   * memanggil `.stop()` pada `Watcher` yang dikembalikan saat proses berhenti.
+   */
+  function startProviderWatcher(opts?: { intervalMs?: number; fromBlock?: bigint; log?: (s: string) => void }): Watcher {
+    const w = new Watcher({ ctx: o.ctx, coSigned: latestCoSignedByChannel, ...opts });
+    w.start();
+    return w;
+  }
+
+  return { app, sessions, latestCoSigned, latestCoSignedByChannel, startProviderWatcher };
 }

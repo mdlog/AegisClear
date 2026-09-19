@@ -80,4 +80,30 @@ describe.skipIf(!existsSync(DEPLOY))("watcher", () => {
     expect((await readChannel(ctx(PK_P), channel)).state).toBe("SETTLED");
     expect((await erc20Balance(ctx(PK_C), d.usdg, provider.address)) - p0).toBe(140_000n);
   });
+
+  it("Task 15 fix round 1: tick() tetap memproses channel yang sudah dikenal walau scan() gagal", async () => {
+    const d = JSON.parse(readFileSync(DEPLOY, "utf8")) as { usdg: Address; factory: Address };
+    const publicClient = createPublicClient({ chain: foundry, transport: http(RPC) });
+    const ctx = (pk: Hex): ChainCtx => ({ publicClient, chainId: 31337, factory: d.factory, walletClient: createWalletClient({ account: privateKeyToAccount(pk), chain: foundry, transport: http(RPC) }) });
+    const client = privateKeyToAccount(PK_C), provider = privateKeyToAccount(PK_P);
+    const cfg: ChannelConfig = { client: client.address, provider: provider.address, token: d.usdg, termsCommitment: ("0x" + "42".padStart(64, "0")) as Hex,
+      challengeWindow: 60, responseWindow: 30, payoutClient: client.address, payoutProvider: provider.address, salt: ("0x" + randomBytes(32).toString("hex")) as Hex };
+    const predicted = await predictChannel(ctx(PK_C), cfg);
+    const sigP = await signChannelTerms(provider, predicted, 31337, cfg);
+    const { channel } = await openChannel(ctx(PK_C), cfg, "0x", sigP);
+    await erc20Transfer(ctx(PK_C), d.usdg, channel, 500_000n);
+    const cp = { seq: 3, cumulativeAmount: 60_000n, receiptsRoot: 5n };
+    await submitCheckpointTx(ctx(PK_P), channel, cp, await signCheckpoint(client, channel, 31337, cp), await signCheckpoint(provider, channel, 31337, cp));
+
+    const w = new Watcher({ ctx: ctx(PK_P) });
+    await w.scan();                              // populate w.channels secara normal dulu (berisi `channel`)
+    expect(w.channels).toContain(channel);
+    w.scan = async () => { throw new Error("rpc down"); };  // simulasikan getContractEvents gagal pada tick berikutnya
+
+    await publicClient.request({ method: "evm_increaseTime", params: [61] } as any);
+    await publicClient.request({ method: "evm_mine", params: [] } as any);
+    const r = await w.tick();                    // tidak boleh throw walau scan() gagal
+    expect(r.settled).toContain(channel);         // channel yang sudah dikenal tetap diproses & di-settle
+    expect((await readChannel(ctx(PK_P), channel)).state).toBe("SETTLED");
+  });
 });
