@@ -119,6 +119,53 @@ contract AegisChannel is ReentrancyGuard {
         return keccak256(abi.encode(CLOSE_TYPEHASH, seq_, toProvider));
     }
 
+    // ---------- checkpoint & settle ----------
+    /// @notice Checkpoint co-signed. OPEN → mulai jendela; CLOSING → hanya seq lebih tinggi, perpanjang ≤ responseWindow (FR-12/13).
+    function submitCheckpoint(uint64 seq_, uint128 amount, bytes32 root, bytes calldata sigClient, bytes calldata sigProvider)
+        external
+    {
+        if (state != State.OPEN && state != State.CLOSING) revert WrongState();
+        if (seq_ > MAX_SEQ) revert SeqTooLarge();
+        if (state == State.CLOSING && seq_ <= seq) revert StaleCheckpoint();
+        _requireBothSigned(hashCheckpoint(seq_, amount, root), sigClient, sigProvider);
+        seq = seq_;
+        cumulativeAmount = amount;
+        receiptsRoot = root;
+        hasProof = false; // FR-15: bukti lama gugur
+        uint64 nowTs = uint64(block.timestamp);
+        if (state == State.OPEN) {
+            state = State.CLOSING;
+            deadline = nowTs + cfg.challengeWindow;
+        } else {
+            uint64 ext = nowTs + cfg.responseWindow;
+            if (ext > deadline) deadline = ext;
+        }
+        emit CheckpointSubmitted(seq_, amount, root, deadline);
+    }
+
+    /// @notice Permissionless setelah deadline (FR-16). Penalti hanya dari bukti atas state saat ini.
+    function settle() external nonReentrant {
+        if (state != State.CLOSING) revert WrongState();
+        if (block.timestamp < deadline) revert TooEarly();
+        uint256 pen = (hasProof && proofSeq == seq) ? payToClient : 0;
+        _payout(uint256(cumulativeAmount) - pen, pen, false);
+    }
+
+    /// @dev toProvider = min(owed, budget); sisa selalu ke klien (FR-17). Efek sebelum interaksi.
+    function _payout(uint256 owedToProvider, uint256 penalty, bool cooperative) internal {
+        uint256 b = budget();
+        uint256 toProvider = owedToProvider < b ? owedToProvider : b;
+        uint256 toClient = b - toProvider;
+        state = State.SETTLED;
+        IERC20 t = IERC20(cfg.token);
+        if (toProvider > 0) t.safeTransfer(cfg.payoutProvider, toProvider);
+        if (toClient > 0) t.safeTransfer(cfg.payoutClient, toClient);
+        uint256 jobId = channelIdField();
+        emit Settled(seq, cumulativeAmount, penalty, toProvider, toClient, cooperative);
+        emit PaymentReleased(jobId, cfg.provider, toProvider);
+        emit Refunded(jobId, cfg.client, toClient);
+    }
+
     // ---------- internal ----------
     function _digest(bytes32 structHash) internal view returns (bytes32) {
         return keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
