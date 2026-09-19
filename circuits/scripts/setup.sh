@@ -23,16 +23,19 @@ if [ ! -f ptau/pot${POWER}_final.ptau ]; then
 fi
 
 [ -f build/sla_settlement.r1cs ] || bash scripts/build.sh
-npx snarkjs groth16 setup build/sla_settlement.r1cs ptau/pot${POWER}_final.ptau build/sla_0000.zkey
-npx snarkjs zkey contribute build/sla_0000.zkey build/sla_0001.zkey --name="aegisclear-phase2-1" -v -e="$(entropy)"
-npx snarkjs zkey beacon build/sla_0001.zkey build/sla_final.zkey $BEACON 10 -n="phase2 beacon"
-npx snarkjs zkey verify build/sla_settlement.r1cs ptau/pot${POWER}_final.ptau build/sla_final.zkey
-npx snarkjs zkey export verificationkey build/sla_final.zkey build/verification_key.json
+if [ -f build/sla_final.zkey ] && [ "${FORCE_SETUP:-0}" != "1" ]; then
+  echo ">> build/sla_final.zkey sudah ada — phase-2 dilewati (FORCE_SETUP=1 untuk regenerasi; regenerasi MENGUBAH verifier/vkey/fixture yang di-commit dan wajib di-commit ulang bersama fixture EX1 baru)"
+else
+  npx snarkjs groth16 setup build/sla_settlement.r1cs ptau/pot${POWER}_final.ptau build/sla_0000.zkey
+  npx snarkjs zkey contribute build/sla_0000.zkey build/sla_0001.zkey --name="aegisclear-phase2-1" -v -e="$(entropy)"
+  npx snarkjs zkey beacon build/sla_0001.zkey build/sla_final.zkey $BEACON 10 -n="phase2 beacon"
+  npx snarkjs zkey verify build/sla_settlement.r1cs ptau/pot${POWER}_final.ptau build/sla_final.zkey
+  npx snarkjs zkey export verificationkey build/sla_final.zkey build/verification_key.json
 
-mkdir -p ../contracts/src/interfaces
-npx snarkjs zkey export solidityverifier build/sla_final.zkey ../contracts/src/SLASettlementVerifier.sol
-sed -i 's/contract Groth16Verifier/contract SLASettlementVerifier/' ../contracts/src/SLASettlementVerifier.sol
-cat > ../contracts/src/interfaces/ISLASettlementVerifier.sol <<'SOL'
+  mkdir -p ../contracts/src/interfaces
+  npx snarkjs zkey export solidityverifier build/sla_final.zkey ../contracts/src/SLASettlementVerifier.sol
+  sed -i 's/contract Groth16Verifier/contract SLASettlementVerifier/' ../contracts/src/SLASettlementVerifier.sol
+  cat > ../contracts/src/interfaces/ISLASettlementVerifier.sol <<'SOL'
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
@@ -43,4 +46,5 @@ interface ISLASettlementVerifier {
         external view returns (bool);
 }
 SOL
+fi
 echo ">> setup selesai: build/sla_final.zkey, build/verification_key.json, contracts/src/SLASettlementVerifier.sol"
