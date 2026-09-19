@@ -1,3 +1,8 @@
+/**
+ * Fund safety for the provider REQUIRES running the challenge responder (Task 15 Watcher): a client
+ * can submit a stale co-signed checkpoint (incl. the seq-0 exit ticket) and the provider must
+ * counter-submit `latestCoSigned` within `challengeWindow`.
+ */
 import { Hono } from "hono";
 import { randomBytes } from "node:crypto";
 import type { Address, Hex, PrivateKeyAccount } from "viem";
@@ -141,5 +146,20 @@ export function createProviderApp(o: ProviderOptions) {
     return c.json(j({ channel: s.channel, predicted: s.predicted, seq: s.tree.size, cumulativeAmount: s.cumulativeAmount }));
   });
 
-  return { app, sessions };
+  /**
+   * Untuk Task 15 (challenge responder): checkpoint co-signed TERTINGGI milik klien ini (bila ada),
+   * plus alamat channel-nya — inilah yang harus di-counter-submit provider bila melihat seq on-chain
+   * lebih rendah dari ini (termasuk saat klien mencoba tiket keluar seq-0 setelah unit terkonsumsi).
+   */
+  function latestCoSigned(client: Address): { cp: Checkpoint; sigClient: Hex; sigProvider: Hex; channel: Address } | undefined {
+    const s = sessions.get(client.toLowerCase());
+    if (!s?.channel) return undefined;
+    let best: CoSigned | undefined;
+    for (const cs of s.checkpoints.values()) {
+      if (cs.sigClient && (!best || cs.cp.seq > best.cp.seq)) best = cs;
+    }
+    return best?.sigClient ? { cp: best.cp, sigClient: best.sigClient, sigProvider: best.sigProvider, channel: s.channel } : undefined;
+  }
+
+  return { app, sessions, latestCoSigned };
 }

@@ -140,6 +140,13 @@ export class AegisClient {
    * tantangan lalu mengembalikan seluruh deposit ke klien.
    */
   async exitUnilateral(): Promise<void> {
+    // Guard (Task 14 fix round 2): sekali ada checkpoint co-signed (unit terkonsumsi), tiket keluar
+    // seq-0 tidak lagi boleh dipakai — itu hanya memperluas balapan checkpoint basi yang sudah ada
+    // (klien bisa submit checkpoint k lama mana pun selagi OPEN) ke k=0. Mitigasi sebenarnya adalah
+    // provider menjalankan challenge responder (Task 15 Watcher) yang meng-counter dengan
+    // latestCoSigned() dalam challengeWindow; di sini kita hanya menutup jalan paling mudah.
+    if (this.checkpoints.size > 0)
+      throw new Error("exitUnilateral: co-signed checkpoints exist — use dispute() or closeCooperative()");
     const code = await this.o.ctx.publicClient.getCode({ address: this.channel });
     if (!code || code === "0x") {
       const { hash, gasUsed } = await openChannel(this.o.ctx, this.cfg, "0x", this.providerTermsSig!);

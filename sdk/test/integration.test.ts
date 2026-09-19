@@ -29,6 +29,7 @@ const j = (o: unknown) => JSON.parse(JSON.stringify(o, (_, v) => (typeof v === "
 describe.skipIf(!existsSync(DEPLOY))("integrasi Anvil: provider ↔ klien ↔ AegisChannel", () => {
   let d: { usdg: Address; factory: Address };
   let server: ReturnType<typeof serve>;
+  let latestCoSigned: ReturnType<typeof createProviderApp>["latestCoSigned"];
   const publicClient = createPublicClient({ chain: foundry, transport: http(RPC) });
   const ctxOf = (pk: Hex): ChainCtx => ({
     publicClient, chainId: 31337, factory: d.factory,
@@ -58,11 +59,12 @@ describe.skipIf(!existsSync(DEPLOY))("integrasi Anvil: provider ↔ klien ↔ Ae
     await mintUsdg(privateKeyToAccount(PK.clientC).address, 100_000_000n);
     await mintUsdg(privateKeyToAccount(PK.clientD).address, 100_000_000n);
     const terms = { unitPrice: 20_000n, maxM1: 800n, minM2: 90n, penaltyBps: 5000n, capBps: 3000n, nonce: randomNonce() };
-    const { app } = createProviderApp({
+    const { app, latestCoSigned: lcs } = createProviderApp({
       ctx: ctxOf(PK.provider), account: privateKeyToAccount(PK.provider), usdg: d.usdg, terms,
       unitQty: 1n, deposit: 1_000_000n, challengeWindow: 120, responseWindow: 60,
       metrics: (seq) => ({ m1: seq === 3 ? 1200n : 300n, m2: 95n }),   // satu pelanggaran latensi di seq 3
     });
+    latestCoSigned = lcs;
     server = serve({ fetch: app.fetch, port: 4020 });
   });
   afterAll(() => { server?.close(); });
@@ -103,6 +105,17 @@ describe.skipIf(!existsSync(DEPLOY))("integrasi Anvil: provider ↔ klien ↔ Ae
     await c.start();
     for (let i = 0; i < 10; i++) await c.requestUnit();
     await c.finalAck();
+    // latestCoSigned (Task 15 hook): checkpoint co-signed tertinggi milik klien ini, kedua tanda tangan ada.
+    const latest = latestCoSigned(me);
+    expect(latest?.cp.seq).toBe(c.tree.size);
+    expect(latest?.sigClient).toBeTruthy();
+    expect(latest?.sigProvider).toBeTruthy();
+    expect(latest?.channel).toBe(c.channel);
+    // Fix round 2: setelah unit terkonsumsi, tiket keluar seq-0 harus ditolak (bukan lagi jalan keluar
+    // yang sah) — tidak ada tx yang terkirim akibat percobaan ini.
+    const txCountBeforeExit = c.txs.length;
+    await expect(c.exitUnilateral()).rejects.toThrow(/co-signed checkpoints exist/);
+    expect(c.txs.length).toBe(txCountBeforeExit);
     const hdr = { "Aegis-Client": me, "content-type": "application/json" };
     const r0 = await fetch("http://127.0.0.1:4020/close", { method: "POST", headers: hdr, body: JSON.stringify({ seq: 0 }) });
     expect(r0.status).toBe(409);
