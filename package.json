@@ -1,0 +1,16 @@
+{
+  "name": "aegisclear",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "test:sdk": "pnpm --filter @aegisclear/sdk test",
+    "test:circuits": "pnpm --filter @aegisclear/circuits test",
+    "test:contracts": "cd contracts && forge test -vv",
+    "test": "pnpm test:sdk && pnpm test:circuits && pnpm test:contracts"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3"
+  }
+}
