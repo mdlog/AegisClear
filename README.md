@@ -4,13 +4,15 @@ Escrow & penyelesaian sengketa privacy-preserving untuk pembayaran agen-ke-agen 
 
 Spesifikasi lengkap: [`prd-arsitektur.md`](./prd-arsitektur.md). Log toolchain & pengukuran per-task: [`docs/TOOLCHAIN.md`](./docs/TOOLCHAIN.md).
 
-**Status implementasi:** kontrak, sirkuit, dan SDK sudah lengkap dan lulus seluruh suite lokal (Anvil + Foundry + circuits, lihat "Menjalankan secara lokal" di bawah). **Deploy ke testnet 46630 belum di-broadcast** — skrip sudah divalidasi lewat dry-run simulation terhadap RPC testnet yang hidup (lihat `.superpowers/sdd/2026-09-19-aegisclear-mvp/task-17-report.md`), tetapi transaksi nyata memerlukan private key yang didanai ETH uji, yang merupakan keputusan pemilik repo untuk dijalankan sendiri. Bagian ["Deploy ke testnet 46630"](#deploy-ke-testnet-46630) berisi perintah persis yang perlu dijalankan.
+**Status implementasi:** kontrak, sirkuit, dan SDK sudah lengkap dan lulus seluruh suite lokal (Anvil + Foundry + circuits, lihat "Menjalankan secara lokal" di bawah). **Deploy ke testnet 46630 belum di-broadcast** — skrip sudah divalidasi lewat dry-run simulation (`forge script` tanpa `--broadcast`) terhadap RPC testnet yang hidup, tetapi transaksi nyata memerlukan private key yang didanai ETH uji, yang merupakan keputusan pemilik repo untuk dijalankan sendiri. Bagian ["Deploy ke testnet 46630"](#deploy-ke-testnet-46630) berisi perintah persis yang perlu dijalankan.
 
 ## Daftar isi
 - [Ringkasan produk](#ringkasan-produk)
 - [Alamat kontrak](#alamat-kontrak)
 - [Menjalankan secara lokal](#menjalankan-secara-lokal)
 - [Peran & kendali (matriks akses)](#peran--kendali-matriks-akses)
+- [Semantik kontrak yang perlu diketahui](#semantik-kontrak-yang-perlu-diketahui)
+- [Keterbatasan SDK referensi yang diketahui](#keterbatasan-sdk-referensi-yang-diketahui)
 - [Apa yang tetap bocor — dan apa yang tidak](#apa-yang-tetap-bocor--dan-apa-yang-tidak)
 - [Trusted setup & regenerasi zkey](#trusted-setup--regenerasi-zkey)
 - [Prior art](#prior-art)
@@ -24,8 +26,8 @@ Spesifikasi lengkap: [`prd-arsitektur.md`](./prd-arsitektur.md). Log toolchain &
 AegisClear adalah evaluator itu. Ia adalah **sirkuit**, bukan manusia atau LLM:
 
 1. **Micro-escrow state channel** — klien mendanai satu channel USDG per pasangan agen; setiap unit layanan menghasilkan *receipt* yang ditandatangani kedua pihak dan terakumulasi off-chain. Chain hanya melihat komitmen.
-2. **ZK settlement** — jika klien menuntut penalti SLA, ia mengirim bukti Groth16 bahwa *"di bawah syarat yang berkomitmen di `termsCommitment` dan receipt di bawah `receiptsRoot` yang kami berdua tanda tangani, penalti yang sah adalah X"*. Kontrak memverifikasi (~194k gas) dan membagi dana **proporsional** — tanpa pernah melihat harga, ambang, atau metrik.
-3. **Treasury routing** — payout diarahkan ke brankas armada / smart account ERC-4337, bukan ke hot wallet agen.
+2. **ZK settlement** — jika klien menuntut penalti SLA, ia mengirim bukti Groth16 bahwa *"di bawah syarat yang berkomitmen di `termsCommitment` dan receipt di bawah `receiptsRoot` yang kami berdua tanda tangani, penalti yang sah adalah X"*. Kontrak memverifikasi (**229.241 gas** terukur untuk verifier Groth16 dengan 6 input publik — `contracts/test/Verifier.t.sol`, bukti EX1 asli; lihat `docs/TOOLCHAIN.md` Task 6) dan membagi dana **proporsional** — tanpa pernah melihat harga, ambang, atau metrik.
+3. **Payout ke alamat bebas** — `payoutClient`/`payoutProvider` ditetapkan saat `open` dan boleh berupa brankas armada, Safe, atau smart account ERC-4337, bukan hot wallet agen. **Hanya itu yang ada di P0/repo ini.** `AegisTreasuryRouter` (pemetaan agen → treasury per armada, spec §8.4, P1) **belum diimplementasikan** — ia bagian dari Plan 2 (`docs/superpowers/plans/2026-09-19-aegisclear-mvp.md`, "Scope plan ini").
 
 Konteks singkat: agen otonom di Robinhood Chain sudah saling membayar hari ini lewat rel x402/MPP `exact` (bayar dulu, terima kemudian, tanpa recourse). Untuk pekerjaan mesin bernilai puluhan–ribuan dolar, pola *pay-first* itu membuat pembeli menanggung seluruh risiko wanprestasi. AegisClear menyisipkan escrow + bukti ZK di antara deposit dan pelepasan dana, tanpa membuka harga satuan, ambang SLA, atau telemetri ke chain publik (§6.7).
 
@@ -59,6 +61,16 @@ Prasyarat (versi yang diverifikasi, lihat [`docs/TOOLCHAIN.md`](./docs/TOOLCHAIN
 
 ```bash
 pnpm install
+
+# Artefak sirkuit yang TIDAK di-commit (circuits/build/* kecuali verification_key.json): r1cs + wasm witness generator
+pnpm --filter @aegisclear/circuits build
+
+# Proving key: unduh `sla_final.zkey` dari release `v0.1.0-zkey` ke circuits/build/ (lihat "Release artefacts").
+# ALTERNATIF: `bash circuits/scripts/setup.sh` — tetapi ini membangkitkan kunci BARU (entropi /dev/urandom) yang
+# TIDAK cocok dengan contracts/src/SLASettlementVerifier.sol, circuits/build/verification_key.json, dan fixture bukti
+# contracts/test/fixtures/ex1_verifier.json yang di-commit; ketiganya harus dibangkitkan ulang dan di-commit BERSAMA
+# (lihat "Trusted setup & regenerasi zkey"). Dibutuhkan oleh: sdk (test prover/sengketa), circuits (test), dan
+# contracts (Penalty.t.sol membuat bukti asli lewat vm.ffi → circuits/scripts/prove.ts).
 
 # Terminal 1: chain lokal
 anvil
@@ -95,6 +107,26 @@ Sub-suite satuan bila perlu debug lebih sempit: `pnpm test:sdk`, `pnpm test:circ
 
 Tidak ada `owner`, `pause`, proxy, atau `upgradeTo` di jalur dana.
 
+## Semantik kontrak yang perlu diketahui
+
+Perilaku `AegisChannel` berikut disengaja (lihat `contracts/src/AegisChannel.sol`, FR-12–FR-16) tetapi mudah disalahpahami oleh integrator; SDK referensi dan watcher-nya ditulis dengan asumsi ini:
+
+- **`deadline` hanya menggerbangi `settle()`.** `submitCheckpoint` (seq lebih tinggi, co-signed) dan `claimPenalty` **tetap bisa dipanggil setelah `deadline` lewat, selama belum ada yang memanggil `settle()`** — tidak ada pemeriksaan `deadline` di kedua fungsi itu. Konsekuensi: (i) respons tantangan yang "terlambat" masih sah dan masih menang sampai state benar-benar di-settle, sehingga responder provider (`Watcher`) selalu merespons dulu tanpa memandang `deadline`, membaca ulang state, dan baru men-settle bila deadline hasil baca ulang pun sudah lewat; (ii) siapa pun yang ingin hasil final harus benar-benar memanggil `settle()` — `deadline` lewat tidak "mengunci" apa pun dengan sendirinya.
+- **`claimPenalty`: klaim valid terakhir yang menang.** Setiap klaim valid atas state saat ini menimpa `payToClient`/`proofSeq` sebelumnya; tidak ada aturan "klaim pertama" atau "penalti terbesar". Karena fungsi penalti deterministik (§6.3), semua bukti valid atas `(T, R, seq, A)` yang sama menghasilkan `payToClient` yang identik, jadi urutan tidak mengubah hasil — kecuali `seq` berubah: checkpoint baru (`submitCheckpoint`) membatalkan bukti yang tertunda (`hasProof = false`, FR-15) dan klaim harus diulang atas root baru.
+- **`settle()` hanya memakai bukti atas `seq` saat ini** (`hasProof && proofSeq == seq`); bukti atas seq lama diabaikan.
+
+## Keterbatasan SDK referensi yang diketahui
+
+`sdk/` adalah implementasi referensi protokol (§11) untuk demo dan test, bukan server produksi. Yang berikut **diketahui dan belum ditutup**; tidak satu pun mengubah keamanan dana di kontrak (§12), tetapi memengaruhi layanan/UX provider dan klien:
+
+- **Autentikasi request.** Header `Aegis-Client` **tidak diautentikasi**: siapa pun yang tahu alamat sebuah klien dapat memanggil `POST /job` atas namanya selama checkpoint terakhir sesi itu sudah di-ack (provider hanya menahan unit berikutnya sampai ack checkpoint *terakhir* diterima — mis. setelah `finalAck()`). Dampak terbatas: provider melayani paling banyak **satu unit** tanpa ack (FR-24/T2 — unit itu tidak pernah dibayar, dan checkpoint berikutnya tidak akan pernah di-ack), dan sesi klien korban tidak bisa lanjut (request berikutnya ditolak `409 ack-required` untuk checkpoint yang tidak pernah ia lihat) sehingga klien harus keluar: `closeCooperative()` tetap bisa (provider menandatangani `Close` di seq ter-ack tertinggi) atau `dispute()` dengan checkpoint co-signed tertingginya (klien menyimpan invarian "pohon lokal = checkpoint co-signed tertinggi", diuji: satu balasan cacat tidak menyentuh pohon). Perbaikan yang direncanakan: header per-request yang ditandatangani klien (mis. EIP-712 atas `(channel, seq, nonce)`), bukan sekadar alamat.
+- **`Aegis-Client` tidak divalidasi sebagai alamat** — nilai bukan-alamat baru gagal di `predictChannel`/tanda tangan, bukan ditolak lebih awal dengan 400.
+- **Tidak ada serialisasi per sesi.** Dua `POST /job` paralel untuk klien yang sama berlomba di `s.tree`/`s.checkpoints` (handler async tanpa mutex); klien referensi mengirim request secara berurutan sehingga tidak terpicu, tetapi server tidak memaksakannya.
+- **Sesi tidak pernah dievict.** `sessions` (termasuk sesi yang sudah `SETTLED`) hidup selama proses; `GET /job` dari alamat baru membuat sesi (dan dua tanda tangan) tanpa batas — tanpa rate limit, ini vektor kehabisan memori pada provider publik.
+- **Provider membuka channel sebelum memeriksa pendanaan.** `POST /job` pertama yang membawa tanda tangan `ChannelTerms` sah langsung `factory.open` (gas provider) sebelum memeriksa saldo channel; klien yang tidak pernah mendanai membuat provider membayar gas `open` sia-sia (dana klien tidak pernah berisiko: tanpa dana tidak ada unit yang dilayani).
+- **Pagar ekonomi klien harus dikonfigurasi.** `ClientPolicy` (`maxDeposit`, `maxChallengeWindow`, `maxQtyPerUnit`) menolak tawaran 402/receipt di luar batas **sebelum** transfer/ack; tanpa `maxQtyPerUnit`, batas qty per unit adalah `unitQty` yang provider iklankan sendiri di 402 (klien menolak mendanai bila keduanya tidak ada). `accept(receipt)` tetap satu-satunya tempat klien membandingkan metrik dengan pengamatannya sendiri (§11.3) — defaultnya menerima semua.
+- **Verifikasi tanda tangan ERC-1271/6492** memakai `publicClient.verifyTypedData` (eth_call ke validator universal) — konsisten dengan kontrak, tetapi berarti setiap verifikasi off-chain adalah satu panggilan RPC; fungsi murni `verify*Sig` (ecrecover) tetap tersedia untuk EOA/offline.
+
 ## Apa yang tetap bocor — dan apa yang tidak
 
 *(spec §6.7 — disalin apa adanya)*
@@ -112,11 +144,11 @@ Inferensi yang **masih mungkin**: `A / seq` = harga rata-rata per receipt (bukan
 
 *(spec §9.4)*
 
-Pipeline: `powersOfTau28_hez_final_17.ptau` (Hermez, atau ptau 2¹⁷ lokal bila mirror publik tidak tersedia — lihat catatan di bawah) → `snarkjs groth16 setup` → kontribusi phase-2 → beacon → `zkey`. **Untuk hackathon ini: satu kontributor (penulis).** Konsekuensinya nyata: pemegang *toxic waste* dari ceremony ini bisa memalsukan bukti Groth16 dan menuntut penalti palsu — tetapi kontrak membatasi kerugian maksimum: `AegisChannel.claimPenalty`/`settle` menegakkan **`payToClient ≤ A`** (`A` = `cumulativeAmount`, jumlah yang sudah di-ack kedua pihak) secara on-chain, terlepas dari apa yang dikatakan verifier (FR-18; diuji `test_fr18_exceeds_cumulative_reverts_even_if_verifier_says_true` di `contracts/test/Penalty.t.sol`) — bukti palsu tidak bisa mencetak dana di luar deposit channel yang bersangkutan.
+Pipeline yang dirancang spec: `powersOfTau28_hez_final_17.ptau` (Hermez, phase-1 publik) → `snarkjs groth16 setup` → kontribusi phase-2 → beacon → `zkey`. **Yang benar-benar terjadi di repo ini (lihat `docs/TOOLCHAIN.md`, Task 5): kedua mirror publik ptau Hermez (`storage.googleapis.com/zkevm/ptau`, `hermez.s3-eu-west-1.amazonaws.com`) mengembalikan HTTP 403 pada 19 Sep 2026, sehingga `circuits/scripts/setup.sh` membangkitkan Powers of Tau 2¹⁷ secara lokal — artinya BAIK phase-1 (ptau) MAUPUN phase-2 (zkey) dihasilkan secara lokal oleh SATU pihak (penulis), bukan dari ceremony publik.** Konsekuensinya nyata: pemegang *toxic waste* dari ceremony ini bisa memalsukan bukti Groth16 dan menuntut penalti palsu — tetapi kontrak membatasi kerugian maksimum: `AegisChannel.claimPenalty`/`settle` menegakkan **`payToClient ≤ A`** (`A` = `cumulativeAmount`, jumlah yang sudah di-ack kedua pihak) secara on-chain, terlepas dari apa yang dikatakan verifier (FR-18; diuji `test_fr18_exceeds_cumulative_reverts_even_if_verifier_says_true` di `contracts/test/Penalty.t.sol`) — bukti palsu tidak bisa mencetak dana di luar deposit channel yang bersangkutan.
 
 Mitigasi sebelum ada dana non-demo di mainnet:
-1. Transkrip ceremony — ptau final dan zkey final yang ada di repo/rilis (`circuits/ptau/`, `circuits/build/`) — dapat direproduksi ulang persis dari `circuits/scripts/setup.sh`, termasuk nilai *beacon* publik yang dipakai (`0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f`, hardcoded di skrip). **Catatan jujur:** untuk hackathon ini beacon tersebut adalah nilai tetap/placeholder, bukan diambil dari sumber acak publik (mis. hash blok Bitcoin/Ethereum masa depan) — bukan ceremony production-grade.
-2. Sebelum ada dana non-demo di mainnet: ceremony ≥ 3 kontributor independen.
+1. **Prosedurnya** terdokumentasi dan dapat diulang (`circuits/scripts/setup.sh`: `powersoftau new/contribute/beacon/prepare phase2/verify` → `groth16 setup` → `zkey contribute/beacon/verify`), termasuk nilai *beacon* yang dipakai (`0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f`, hardcoded di skrip). **Artefaknya TIDAK dapat direproduksi bit-per-bit:** kedua langkah `contribute` (ptau dan zkey) menarik entropi dari `/dev/urandom` (`entropy()` di skrip), jadi menjalankan ulang skrip menghasilkan ptau/zkey/verifier yang **berbeda** — yang bisa diverifikasi pihak lain adalah konsistensi artefak yang dirilis (`snarkjs powersoftau verify`, `snarkjs zkey verify` terhadap `sla_settlement.r1cs`, dan kecocokan `verification_key.json` ↔ `SLASettlementVerifier.sol`), bukan bahwa *toxic waste*-nya telah dibuang. **Catatan jujur:** beacon tersebut adalah nilai tetap/placeholder, bukan diambil dari sumber acak publik (mis. hash blok Bitcoin/Ethereum masa depan) — bukan ceremony production-grade.
+2. **Wajib sebelum ada dana non-demo di mainnet:** ceremony phase-1 dari sumber publik yang terverifikasi (atau ptau Hermez asli begitu mirror bisa diakses) **dan** phase-2 dengan ≥ 3 kontributor independen — atau
 3. Alternatif D6 (belum diimplementasikan): PLONK universal (snarkjs, tanpa phase-2 khusus sirkuit), dengan biaya verifikasi ≈ +50–100% gas.
 
 **Nyatakan ini di pitch sebelum ditanya.**
@@ -134,7 +166,7 @@ Perilaku default: jika `build/sla_final.zkey` sudah ada, phase-2 **dilewati** (i
 FORCE_SETUP=1 bash scripts/setup.sh
 ```
 
-**Peringatan:** `FORCE_SETUP=1` menjalankan phase-2 baru dengan entropi acak baru → menghasilkan `sla_final.zkey`, `verification_key.json`, **dan** `contracts/src/SLASettlementVerifier.sol` yang **berbeda** dari yang sebelumnya (kunci Groth16 baru = verifier Solidity baru). Setiap kontrak `AegisChannelFactory` yang sudah di-deploy dengan verifier lama **tidak kompatibel** dengan zkey baru, dan fixture uji (`contracts/test/fixtures/ex1_verifier.json`, vektor `EX1` dkk. di `vectors/`) harus dibangkitkan ulang bersamanya sebelum di-commit. Jangan jalankan `FORCE_SETUP=1` setelah deploy testnet/mainnet tanpa berencana men-deploy ulang seluruh factory.
+**Peringatan:** `FORCE_SETUP=1` menjalankan phase-2 baru dengan entropi acak baru → menghasilkan `sla_final.zkey`, `verification_key.json`, **dan** `contracts/src/SLASettlementVerifier.sol` yang **berbeda** dari yang sebelumnya (kunci Groth16 baru = verifier Solidity baru). Setiap kontrak `AegisChannelFactory` yang sudah di-deploy dengan verifier lama **tidak kompatibel** dengan zkey baru, dan **fixture bukti** `contracts/test/fixtures/ex1_verifier.json` (snapshot bukti EX1 + input publik yang dipakai `Verifier.t.sol`) harus dibangkitkan ulang bersamanya sebelum di-commit — bukti lama tidak akan lolos verifier baru. Vektor settlement di `vectors/` (EX1 dkk.) **tidak** bergantung pada zkey (mereka hanya menguji fungsi penalti §6.3 di Python/SDK/sirkuit) dan tidak perlu diubah. `circuits/ptau/` juga di-`.gitignore`; skrip memakai ptau lokal yang ada bila sudah ada, dan membangkitkan yang baru bila tidak. Jangan jalankan `FORCE_SETUP=1` setelah deploy testnet/mainnet tanpa berencana men-deploy ulang seluruh factory.
 
 `circuits/build/sla_final.zkey` (≈101 MB) sengaja **tidak** ter-commit (`.gitignore`) — lihat [Release artefacts](#release-artefacts) untuk cara mendapatkannya tanpa menjalankan ulang setup.
 
@@ -233,20 +265,25 @@ const { app, startProviderWatcher } = createProviderApp({
   unitQty: 1n, deposit: 1_000_000n, challengeWindow: 120, responseWindow: 60,
   metrics: (seq) => ({ m1: 300n, m2: 95n }),
 });
-startProviderWatcher({ intervalMs: 60_000 });   // T1: responder challenge in-process
+// T1: responder challenge in-process. fromBlock = blok deployment factory (lihat contracts/broadcast/DeployTestnet.s.sol/46630/run-latest.json
+// atau explorer): Watcher.scan() memanggil eth_getLogs(ChannelOpened) dari fromBlock sampai latest pada SETIAP tick; default 0n
+// memindai seluruh riwayat chain, dan RPC publik umumnya membatasi rentang blok per eth_getLogs (mis. 10k–50k blok) atau
+// jumlah log per respons — tanpa fromBlock yang benar scan() akan gagal (tick tetap memproses channel yang sudah dikenal, tapi
+// channel baru tidak pernah ditemukan).
+startProviderWatcher({ intervalMs: 60_000, fromBlock: BigInt(process.env.FACTORY_BLOCK!) });
 serve({ fetch: app.fetch, port: 4020 });
 ```
 
-Watcher permissionless terpisah (`sdk/src/watcher/cli.ts`) — settle setelah deadline + sweep dana telat, boleh dijalankan siapa pun (klien, provider, atau pihak ketiga), **tidak** menggantikan `startProviderWatcher` di atas — keempat env var wajib ada:
+Watcher permissionless terpisah (`sdk/src/watcher/cli.ts`) — settle setelah deadline + sweep dana telat, boleh dijalankan siapa pun (klien, provider, atau pihak ketiga), **tidak** menggantikan `startProviderWatcher` di atas — keempat env var wajib ada (`FROM_BLOCK` opsional tetapi disarankan di RPC publik, alasan yang sama seperti `fromBlock` di atas; default 0):
 
 ```bash
 RPC_URL=$RPC_URL FACTORY=<alamat "factory" dari deployments/testnet-46630.json> PRIVATE_KEY=$PK_PROVIDER CHAIN_ID=46630 \
-  npx tsx sdk/src/watcher/cli.ts
+  FROM_BLOCK=<blok deployment factory> npx tsx sdk/src/watcher/cli.ts
 ```
 
 ## Release artefacts
 
-`circuits/build/sla_final.zkey` (≈101 MB, 100.834.787 byte) **tidak di-commit** ke git (lihat `.gitignore`) — terlalu besar untuk repo dan dihasilkan deterministik dari `circuits/scripts/setup.sh`. Untuk mendapatkannya tanpa menjalankan ulang ceremony (~7–8 menit lokal), unggah sebagai GitHub Release bertag **`v0.1.0-zkey`** dengan tiga berkas terlampir:
+`circuits/build/sla_final.zkey` (≈101 MB, 100.834.787 byte) **tidak di-commit** ke git (lihat `.gitignore`) — terlalu besar untuk repo, dan **tidak bisa dibangkitkan ulang secara identik** dari `circuits/scripts/setup.sh` (kontribusi menarik entropi dari `/dev/urandom`; menjalankan ulang setup menghasilkan zkey + verifier baru yang tidak cocok dengan yang di-commit — lihat "Trusted setup & regenerasi zkey"). Karena itu berkas ini harus didistribusikan, bukan diregenerasi: unggah sebagai GitHub Release bertag **`v0.1.0-zkey`** dengan tiga berkas terlampir:
 
 - `circuits/build/sla_final.zkey` (≈101 MB) — satu-satunya dari ketiganya yang **tidak** ada di git; wajib diunggah agar pihak lain bisa membangkitkan bukti (`snarkjs groth16 fullprove` / `circuits/scripts/prove.ts`) tanpa re-run trusted setup.
 - `circuits/build/verification_key.json` — sudah ter-commit di repo; disertakan lagi di rilis agar bundel self-contained.
