@@ -1,14 +1,21 @@
 import type { Address, Hex, PrivateKeyAccount } from "viem";
-import { type Terms, type Receipt, ReceiptTree, settle, buildCircuitInput, commitTerms } from "../core/index.js";
+import { type Terms, type Receipt, ReceiptTree, settle, buildCircuitInput, commitTerms, merkleRoot } from "../core/index.js";
 import {
   type ChannelConfig, type Checkpoint, signCheckpoint, verifyCheckpointSig, signChannelTerms, verifyChannelTermsSig,
   signClose, verifyCloseSig, rootHex,
 } from "../core/typedData.js";
-import { type ChainCtx, erc20Transfer, submitCheckpointTx, claimPenaltyTx, settleTx, closeCooperativeTx, readChannel } from "../chain/channel.js";
+import {
+  type ChainCtx, erc20Transfer, predictChannel, openChannel, submitCheckpointTx, claimPenaltyTx, settleTx,
+  closeCooperativeTx, readChannel,
+} from "../chain/channel.js";
 import { prove, toCalldata, type Artifacts } from "../core/prover.js";
 
 export interface ClientOptions {
   ctx: ChainCtx; account: PrivateKeyAccount; providerUrl: string; usdg: Address; artifacts: Artifacts;
+  /** alamat yang berhak menerima sisa dana klien (cfg.payoutClient). Default: account.address. */
+  payoutTo?: Address;
+  /** bila diisi, cfg.provider dari tawaran 402 WAJIB sama dengan ini. */
+  expectedProvider?: Address;
   /** kebijakan ack: false = tolak unit (tidak dibayar). Default: terima semua metrik yang provider laporkan. */
   accept?: (r: Receipt) => boolean;
 }
@@ -23,6 +30,10 @@ export class AegisClient {
   provingMs = 0;
   private termsSig?: Hex;
   private pendingAck?: { seq: number; signature: Hex };
+  /** sigProvider(ChannelTerms) dari 402 — disimpan agar klien bisa membuka channel sendiri (exitUnilateral). */
+  private providerTermsSig?: Hex;
+  /** tiket keluar unilateral: sigProvider(Checkpoint(0,0,merkleRoot([]))) dari 402. */
+  private exitSigProvider?: Hex;
 
   constructor(private readonly o: ClientOptions) {}
   private hdr(extra: Record<string, string> = {}) {
@@ -30,7 +41,7 @@ export class AegisClient {
   }
   private get chainId() { return this.o.ctx.chainId; }
 
-  /** GET /job → 402 → verifikasi sigProvider(ChannelTerms) (T19) → danai → siapkan tanda tangan ChannelTerms */
+  /** GET /job → 402 → verifikasi cfg/payTo/sigProvider(ChannelTerms) (T19) → danai → siapkan tanda tangan ChannelTerms */
   async start(): Promise<void> {
     const res = await fetch(`${this.o.providerUrl}/job`, { headers: this.hdr() });
     if (res.status !== 402) throw new Error(`expected 402, got ${res.status}`);
@@ -39,11 +50,23 @@ export class AegisClient {
     const cfg: ChannelConfig = { ...a.config, challengeWindow: Number(a.config.challengeWindow), responseWindow: Number(a.config.responseWindow) };
     if (cfg.client.toLowerCase() !== this.o.account.address.toLowerCase()) throw new Error("config.client mismatch");
     if (cfg.token.toLowerCase() !== this.o.usdg.toLowerCase()) throw new Error("config.token mismatch");
+    // Sisa dana klien (payoutClient) tidak boleh diarahkan ke pihak lain (mis. provider) tanpa sepengetahuan klien.
+    const payoutTo = this.o.payoutTo ?? this.o.account.address;
+    if (cfg.payoutClient.toLowerCase() !== payoutTo.toLowerCase()) throw new Error("config.payoutClient mismatch");
+    if (this.o.expectedProvider && cfg.provider.toLowerCase() !== this.o.expectedProvider.toLowerCase())
+      throw new Error("config.provider mismatch");
     const terms: Terms = { unitPrice: bi(a.terms.unitPrice), maxM1: bi(a.terms.maxM1), minM2: bi(a.terms.minM2), penaltyBps: bi(a.terms.penaltyBps), capBps: bi(a.terms.capBps), nonce: bi(a.terms.nonce) };
     if (rootHex(await commitTerms(terms)) !== cfg.termsCommitment) throw new Error("termsCommitment mismatch");
-    const predicted = offer.payTo as Address;
+    // T19: payTo yang diklaim provider WAJIB persis predictChannel(cfg) on-chain — jangan pernah percaya
+    // offer.payTo mentah, atau provider bisa mengarahkan dana ke alamat sembarang (mis. EOA-nya sendiri).
+    const predicted = await predictChannel(this.o.ctx, cfg);
+    if (predicted.toLowerCase() !== String(offer.payTo).toLowerCase()) throw new Error("payTo != predictChannel(cfg) (T19)");
     if (!(await verifyChannelTermsSig(cfg.provider, predicted, this.chainId, cfg, a.sigProvider))) throw new Error("bad provider terms signature (T19)");
+    // Tiket keluar unilateral (seq 0): harus tervalidasi SEBELUM klien mendanai channel (§6.2/T-exit0).
+    const cp0: Checkpoint = { seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };
+    if (!(await verifyCheckpointSig(cfg.provider, predicted, this.chainId, cp0, a.exitSig))) throw new Error("bad provider exit ticket (seq-0)");
     this.cfg = cfg; this.channel = predicted; this.terms = terms; this.deposit = bi(offer.maxAmountRequired);
+    this.providerTermsSig = a.sigProvider as Hex; this.exitSigProvider = a.exitSig as Hex;
     // MVP: transfer langsung ke alamat channel. Rel x402/Permit2 menghasilkan efek identik (Task 11).
     this.txs.push({ label: "fund", ...(await erc20Transfer(this.o.ctx, this.o.usdg, predicted, this.deposit)) });
     this.termsSig = await signChannelTerms(this.o.account, predicted, this.chainId, cfg);
@@ -106,6 +129,25 @@ export class AegisClient {
       this.txs.push({ label: "claimPenalty", ...(await claimPenaltyTx(this.o.ctx, this.channel, await toCalldata(proof, publicSignals))) });
     }
     return { payToClient: s.payToClient };
+  }
+
+  /**
+   * Keluar unilateral di seq 0 (§6.2/T-exit0): jika provider menghilang sebelum unit pertama pernah
+   * dilayani, tidak ada checkpoint co-signed apa pun untuk didisputekan. Tiket keluar yang sudah
+   * ditandatangani provider di muka (diverifikasi di start(), sebelum dana dikirim) mengizinkan
+   * klien membuka channel-nya sendiri (permissionless via factory, dengan tanda tangan provider yang
+   * sudah dimiliki) lalu men-submit Checkpoint(0,0,merkleRoot([])) co-signed — settle() sesudah jendela
+   * tantangan lalu mengembalikan seluruh deposit ke klien.
+   */
+  async exitUnilateral(): Promise<void> {
+    const code = await this.o.ctx.publicClient.getCode({ address: this.channel });
+    if (!code || code === "0x") {
+      const { hash, gasUsed } = await openChannel(this.o.ctx, this.cfg, "0x", this.providerTermsSig!);
+      this.txs.push({ label: "openViaExit", hash, gasUsed });
+    }
+    const cp0: Checkpoint = { seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };
+    const sigClient0 = await signCheckpoint(this.o.account, this.channel, this.chainId, cp0);
+    this.txs.push({ label: "exitUnilateral", ...(await submitCheckpointTx(this.o.ctx, this.channel, cp0, sigClient0, this.exitSigProvider!)) });
   }
 
   async settle(): Promise<void> { this.txs.push({ label: "settle", ...(await settleTx(this.o.ctx, this.channel)) }); }

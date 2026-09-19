@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { randomBytes } from "node:crypto";
 import type { Address, Hex, PrivateKeyAccount } from "viem";
-import { type Terms, type Receipt, ReceiptTree, commitTerms, makeReceipt, MAX_SEQ } from "../core/index.js";
+import { type Terms, type Receipt, ReceiptTree, commitTerms, makeReceipt, MAX_SEQ, merkleRoot } from "../core/index.js";
 import {
   type ChannelConfig, type Checkpoint, signCheckpoint, verifyCheckpointSig,
   signChannelTerms, verifyChannelTermsSig, signClose, rootHex,
@@ -17,6 +17,8 @@ export interface ProviderOptions {
 export interface CoSigned { cp: Checkpoint; sigProvider: Hex; sigClient?: Hex }
 export interface Session {
   cfg: ChannelConfig; predicted: Address; channel?: Address; termsSigProvider: Hex;
+  /** tiket keluar unilateral: Checkpoint(0,0,merkleRoot([])) ditandatangani provider di muka (T-exit0) */
+  exitSigProvider: Hex;
   tree: ReceiptTree; cumulativeAmount: bigint; checkpoints: Map<number, CoSigned>;
 }
 const j = (o: unknown) => JSON.parse(JSON.stringify(o, (_, v) => (typeof v === "bigint" ? v.toString() : v)));
@@ -36,8 +38,10 @@ export function createProviderApp(o: ProviderOptions) {
       payoutClient: client, payoutProvider: o.account.address, salt: ("0x" + randomBytes(32).toString("hex")) as Hex,
     };
     const predicted = await predictChannel(o.ctx, cfg);
+    const cp0: Checkpoint = { seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };
     const s: Session = {
       cfg, predicted, termsSigProvider: await signChannelTerms(o.account, predicted, chainId, cfg),
+      exitSigProvider: await signCheckpoint(o.account, predicted, chainId, cp0),
       tree: new ReceiptTree(), cumulativeAmount: 0n, checkpoints: new Map(),
     };
     sessions.set(key, s);
@@ -49,7 +53,7 @@ export function createProviderApp(o: ProviderOptions) {
     x402Version: 1,
     accepts: [{
       scheme: "exact", network: `eip155:${chainId}`, asset: o.usdg, payTo: s.predicted, maxAmountRequired: o.deposit.toString(),
-      extra: { aegis: { config: j(s.cfg), sigProvider: s.termsSigProvider, terms: j(o.terms) } },
+      extra: { aegis: { config: j(s.cfg), sigProvider: s.termsSigProvider, terms: j(o.terms), exitSig: s.exitSigProvider } },
     }],
   });
   const clientOf = (c: any) => c.req.header("Aegis-Client") as Address | undefined;
@@ -117,11 +121,18 @@ export function createProviderApp(o: ProviderOptions) {
     const client = clientOf(c); const s = client && sessions.get(client.toLowerCase());
     if (!s?.channel) return c.json({ error: "no channel" }, 409);
     const { seq } = (await c.req.json()) as { seq: number };
-    const cs = s.checkpoints.get(seq);
-    if (seq !== 0 && !cs?.sigClient) return c.json({ error: "checkpoint-not-acked", seq }, 409);
-    const toProvider = seq === 0 ? 0n : cs!.cp.cumulativeAmount;
-    const sigProvider = await signClose(o.account, s.channel, chainId, { seq, toProvider });
-    return c.json({ seq, toProvider: toProvider.toString(), sigProvider });
+    // T-close-hi: hanya checkpoint co-signed TERTINGGI yang boleh ditutup. Klien tidak boleh
+    // meminta seq 0 atau seq basi lain untuk membayar provider lebih sedikit dari yang terutang
+    // sebenarnya (eksploit: 10 unit terkirim+acked lalu minta Close(0,0) → refund penuh).
+    const n = s.tree.size;
+    let hi: number | undefined;
+    if (n === 0) hi = 0; // channel belum pernah dipakai: Close(0,0) sah
+    else if (s.checkpoints.get(n)?.sigClient) hi = n;
+    else if (s.checkpoints.get(n - 1)?.sigClient) hi = n - 1;
+    if (hi === undefined || seq !== hi) return c.json({ error: "checkpoint-not-acked", seq }, 409);
+    const toProvider = hi === 0 ? 0n : s.checkpoints.get(hi)!.cp.cumulativeAmount;
+    const sigProvider = await signClose(o.account, s.channel, chainId, { seq: hi, toProvider });
+    return c.json({ seq: hi, toProvider: toProvider.toString(), sigProvider });
   });
 
   app.get("/state", async (c) => {
