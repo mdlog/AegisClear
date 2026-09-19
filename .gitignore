@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.*
+circuits/build/*
+!circuits/build/verification_key.json
+circuits/ptau/
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+demo/out/
+stylus/**/target/
+vectors/RAND_*.json
+*.log
