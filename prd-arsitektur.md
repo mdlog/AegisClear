@@ -429,7 +429,7 @@ function channelIdField() public view returns (uint256) { return uint256(uint160
 function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[6] input) external view returns (bool);
 // input = [channelIdField, termsCommitment, receiptsRoot, seq, cumulativeAmount, payToClient]
 ```
-Verifier hasil `snarkjs zkey export solidityverifier`, dipasang sebagai alamat immutable di factory → channel. Biaya: 194.396 gas untuk 1 input publik (gnark, Foundry, reproduksi `frame-verify-gas`); tiap input publik tambahan ≈ +6,2k gas (`ecMul` 6.000 + `ecAdd` 150) → **≈ 225k gas** untuk 6 input. **Ukur sendiri Hari 6** (V10) dan tulis angkanya di §8.7.
+Verifier hasil `snarkjs zkey export solidityverifier`, dipasang sebagai alamat immutable di factory → channel. Biaya: 194.396 gas untuk 1 input publik (gnark, Foundry, reproduksi `frame-verify-gas`); tiap input publik tambahan ≈ +6,2k gas (`ecMul` 6.000 + `ecAdd` 150) → **≈ 225k gas** untuk 6 input. **Terukur 19 Sep 2026 (Foundry, bukti EX1 asli): 229.241 gas** (V10 ✅).
 
 **Kenapa Solidity, bukan Stylus (D2).** Empat pairing + 6 `ecMul` adalah 100% precompile. zk-sunade — implementasi Stylus yang memanggil precompile yang sama lewat `RawCall` — mencatat 256.334 gas; overhead-nya adalah init program (8.832 gas non-cache / 352 cache) + host I/O per call. Tidak ada yang bisa dimenangkan; ada yang bisa dikalahkan (toolchain, ukuran WASM, expiry program 365 hari).
 
@@ -498,7 +498,7 @@ Tidak ada `owner`, `pause`, proxy, atau `upgradeTo` di jalur dana. Tulis matriks
 | Transfer USDG ke channel (proxy Paxos) | ≈ 60k | _Hari 7_ |
 | `submitCheckpoint` (2 tanda tangan EOA) | ≈ 80k | _Hari 7_ |
 | `closeCooperative` (2 tanda tangan + 2 transfer) | ≈ 190k | _Hari 7_ |
-| `claimPenalty` (verifier 6 input + storage) | ≈ 260k | _Hari 7_ |
+| `claimPenalty` (verifier 6 input + storage) | ≈ 260k | verifier saja: **229.241** (Task 6); total _Hari 7_ |
 | `settle` (2 transfer) | ≈ 130k | _Hari 7_ |
 | `ack` anchored (7 hash t=3 + storage) — Stylus / Yul | ≈ 83k / 140k | _Hari 4 (benchmark) & Hari 12_ |
 | Aktivasi `AegisPoseidon.rs` (sekali) | 1.659.168 + data fee | _Hari 4_ |
