@@ -495,11 +495,11 @@ Tidak ada `owner`, `pause`, proxy, atau `upgradeTo` di jalur dana. Tulis matriks
 | Operasi | Estimasi | Terukur (Foundry / testnet) |
 |---|---|---|
 | `open` (clone + initialize + 2 verifikasi tanda tangan) | ≈ 180k | _Hari 7_ |
-| Transfer USDG ke channel (proxy Paxos) | ≈ 60k | _Hari 7_ |
-| `submitCheckpoint` (2 tanda tangan EOA) | ≈ 80k | _Hari 7_ |
+| Transfer USDG ke channel (proxy Paxos) | ≈ 60k | MockUSDG di Anvil: **51.577** (Task 14); proxy Paxos di mainnet belum diukur |
+| `submitCheckpoint` (2 tanda tangan EOA) | ≈ 80k | **102.825** (Anvil, Task 14) |
 | `closeCooperative` (2 tanda tangan + 2 transfer) | ≈ 190k | _Hari 7_ |
-| `claimPenalty` (verifier 6 input + storage) | ≈ 260k | verifier saja: **229.241** (Task 6); total _Hari 7_ |
-| `settle` (2 transfer) | ≈ 130k | _Hari 7_ |
+| `claimPenalty` (verifier 6 input + storage) | ≈ 260k | verifier saja: **229.241** (Task 6); total **293.880** (Anvil, Task 14) |
+| `settle` (2 transfer) | ≈ 130k | **93.900** (Anvil, Task 14; satu transfer ke provider + satu ke klien) |
 | `ack` anchored (7 hash t=3 + storage) — Stylus / Yul | ≈ 83k / 140k | _Hari 4 (benchmark) & Hari 12_ |
 | Aktivasi `AegisPoseidon.rs` (sekali) | 1.659.168 + data fee | _Hari 4_ |
 
@@ -579,6 +579,8 @@ provider → factory.open(cfg, sigClient, "")                                   
 ```
 **Catatan persetujuan klien.** Klien menandatangani Permit2 (dana), bukan `ChannelTerms`. Dua opsi: (a) klien mengembalikan `sigClient(ChannelTerms)` di header tambahan saat membayar (butuh SDK AegisClear sebelum pembayaran pertama) atau (b) **provider** yang membuka channel dengan tanda tangan klien yang dikirim bersama **ack pertama**. Opsi (b) menjaga FR-23: klien x402 polos cukup membayar; persetujuan syarat datang saat ack pertama, yang memang butuh SDK AegisClear di sisi klien. Dana yang sudah masuk ke alamat `predict()` sebelum `open` tetap aman: alamat itu hanya bisa menjadi channel dengan `cfg` persis yang di-hash ke salt — dan sebelum `open`, tidak ada yang bisa memindahkannya (`sweep` butuh `SETTLED`). Rekomendasi: (b) — D7. Sisi lain koin ini adalah T19.
 
+**Tiket keluar (exit ticket) — ditambahkan saat implementasi (Task 14).** Karena `submitCheckpoint`/`closeCooperative` butuh dua tanda tangan, klien tidak punya jalan keluar sepihak sebelum unit 0 jika provider menghilang setelah dana masuk. Provider karena itu menandatangani `Checkpoint(0, 0, root_kosong)` per sesi dan mengirimnya di 402 sebagai `extra.aegis.exitSig`; SDK klien memverifikasinya (domain = alamat `predict()`) **sebelum** mendanai, dan `exitUnilateral()` memakainya hanya jika klien belum memegang checkpoint co-signed apa pun. Tiket ini tidak membuka kelas serangan baru — klien memang selalu bisa mengirim checkpoint co-signed yang basi — tetapi ia mempertegas kewajiban §11.4: provider **wajib** menjalankan challenge responder yang mengirim `latestCoSigned` saat `seq` on-chain lebih rendah.
+
 **Facilitator.** Tidak ada perubahan: ia memverifikasi `witness.to == payTo` dan menyelesaikan. Uji terhadap facilitator Mesh (`facilitator.meshgateway.co`) apakah menerima `payTo` arbitrer (V8); jika tidak, jalankan facilitator sendiri dari `meshgateway/x402` fork — x402 facilitator adalah server stateless.
 
 ### 10.3 Kompatibilitas ERC-8183 (FR-27)
@@ -619,6 +621,7 @@ Setelah `Settled`, watcher memanggil `ReputationRegistry.giveFeedback(agentId_pr
 
 ### 11.4 Watcher / settler bot
 - Mengindeks event factory; memanggil `settle()` setelah `deadline`, `sweep()` setelah `SETTLED` dengan saldo > 0
+- **Challenge responder (wajib untuk provider):** untuk setiap channel yang dilayani, jika `state == CLOSING` dan `seq` on-chain < `seq` checkpoint co-signed tertinggi yang dipegang (`latestCoSigned`), kirim `submitCheckpoint` dengan checkpoint itu sebelum `deadline` — inilah yang menetralkan checkpoint basi maupun tiket keluar seq-0 (T1)
 - Peringatan untuk klien: channel `CLOSING` dengan `seq` lebih rendah dari yang klien pegang → kirim checkpoint terbaru; dengan `seq` sama & ada pelanggaran → prove & claim sebelum deadline
 
 ---
