@@ -819,7 +819,7 @@ Item ✅ diverifikasi 19 Sep 2026 dengan perintah yang tercantum (RPC publik). S
 | # | Keputusan | Opsi | Rekomendasi |
 |---|---|---|---|
 | D1 | Deployment final | testnet 46630 (MockUSDG) saja / + mainnet 4663 (USDG asli, sen-level) | **Keduanya.** Seluruh ekosistem Mesh hanya hidup di mainnet; biaya deploy < $2 pada 0,07 gwei; juri memberi prioritas USDG asli. Dana demo ≤ 5 USDG |
-| D2 | Stylus | Poseidon di Stylus jika benchmark Hari 4 ≥ 1,5× vs Yul / Yul saja | **Ukur dulu.** Ambang 1,5× karena OZ mengukur 1,6× — jika hasil kami < 1,5×, kompleksitas toolchain tidak terbayar |
+| D2 | Stylus | Poseidon di Stylus jika benchmark Hari 4 ≥ 1,5× vs Yul / Yul saja | **Terbuka — sebagian terukur (19 Sep 2026).** Yul terukur penuh via Foundry: T3=32.503, T6=172.418, 7×T3(anchored)=212.715 gas — cocok circomlibjs (D3 ✅). Stylus (OZ Poseidon2) dibangun & lolos `cargo stylus check` di testnet 46630 (WASM terkompresi 14,4 KB, batas 96 KB); belum di-deploy. Gas on-chain Stylus (`cast estimate`) menunggu deploy oleh pemilik `$PK_DEPLOYER` (tidak tersedia saat ini) — keputusan ≥1,5×/<1,5× baru bisa diambil setelah itu. Detail & perintah: `docs/benchmarks/poseidon.md` |
 | D3 | Varian hash | circomlib Poseidon v1 di semua tempat (port Rust) / Poseidon2 (OZ Rust + template circom baru) | **v1.** circomlib & `poseidon-solidity` sudah teruji dan kompatibel; port Rust ≈ 150 baris + konstanta publik, diuji terhadap `circomlibjs` |
 | D4 | `MAX_SEQ` | 64 / 128 / 256 | **128**, turun ke 64 jika proving > 30 s |
 | D5 | Jendela demo | factory demo terpisah (`MIN_CHALLENGE_WINDOW = 60 s`) / `vm.warp` saja | **Factory demo terpisah** — deploy testnet & mainnet demo perlu jendela pendek nyata; kode kontrak channel identik |

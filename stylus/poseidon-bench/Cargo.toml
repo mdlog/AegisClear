@@ -1,0 +1,22 @@
+[package]
+name = "poseidon-bench"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+stylus-sdk = "0.10.9"
+alloy-primitives = { version = "1", default-features = false }
+openzeppelin-crypto = { version = "0.3.0", features = ["ruint"] }
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+[features]
+export-abi = ["stylus-sdk/export-abi"]
+
+[profile.release]
+codegen-units = 1
+strip = true
+lto = true
+panic = "abort"
+opt-level = "s"
