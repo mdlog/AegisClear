@@ -119,6 +119,22 @@ contract AegisChannel is ReentrancyGuard {
         return keccak256(abi.encode(CLOSE_TYPEHASH, seq_, toProvider));
     }
 
+    // ---------- funding ----------
+    /// @notice Pendanaan tanpa allowance langsung ke channel: Permit2 permitTransferFrom, owner = msg.sender (FR-3).
+    /// @dev Transfer ERC-20 biasa (termasuk settlement x402 ke alamat ini) juga sah — budget() = saldo.
+    function fundWithPermit2(ISignatureTransfer.PermitTransferFrom calldata permit, bytes calldata signature) external {
+        if (state != State.OPEN && state != State.CLOSING) revert WrongState();
+        if (permit.permitted.token != cfg.token) revert WrongToken();
+        PERMIT2.permitTransferFrom(
+            permit,
+            ISignatureTransfer.SignatureTransferDetails({to: address(this), requestedAmount: permit.permitted.amount}),
+            msg.sender,
+            signature
+        );
+        emit Funded(msg.sender, permit.permitted.amount);
+        emit JobFunded(channelIdField(), msg.sender, permit.permitted.amount);
+    }
+
     // ---------- checkpoint & settle ----------
     /// @notice Checkpoint co-signed. OPEN → mulai jendela; CLOSING → hanya seq lebih tinggi, perpanjang ≤ responseWindow (FR-12/13).
     function submitCheckpoint(uint64 seq_, uint128 amount, bytes32 root, bytes calldata sigClient, bytes calldata sigProvider)
