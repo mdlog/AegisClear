@@ -4,7 +4,7 @@ Escrow & penyelesaian sengketa privacy-preserving untuk pembayaran agen-ke-agen 
 
 Spesifikasi lengkap: [`prd-arsitektur.md`](./prd-arsitektur.md). Log toolchain & pengukuran per-task: [`docs/TOOLCHAIN.md`](./docs/TOOLCHAIN.md).
 
-**Status implementasi:** kontrak, sirkuit, dan SDK sudah lengkap dan lulus seluruh suite lokal (Anvil + Foundry + circuits, lihat "Menjalankan secara lokal" di bawah). **Deploy ke testnet 46630 belum di-broadcast** — skrip sudah divalidasi lewat dry-run simulation (`forge script` tanpa `--broadcast`) terhadap RPC testnet yang hidup, tetapi transaksi nyata memerlukan private key yang didanai ETH uji, yang merupakan keputusan pemilik repo untuk dijalankan sendiri. Bagian ["Deploy ke testnet 46630"](#deploy-ke-testnet-46630) berisi perintah persis yang perlu dijalankan.
+**Status implementasi:** kontrak, sirkuit, dan SDK lengkap dan lulus seluruh suite lokal (Anvil + Foundry + circuits). **Deploy ke testnet 46630 sudah di-broadcast dan 7/7 kontrak terverifikasi di Blockscout (20 Sep 2026, blok 121.731.938 = `0x7417b62`)**; test integrasi "kooperatif" dan "sengketa" (bukti Groth16 asli + `settle()`) **lulus di chain 46630** — tx bukti liveness ada di tabel [Alamat kontrak](#alamat-kontrak). Yang belum: unggah release `v0.1.0-zkey` dan pengukuran gas Stylus on-chain untuk menutup D2 (lihat `docs/benchmarks/poseidon.md`).
 
 ## Daftar isi
 - [Ringkasan produk](#ringkasan-produk)
@@ -35,15 +35,24 @@ Konteks singkat: agen otonom di Robinhood Chain sudah saling membayar hari ini l
 
 ### Testnet 46630 (Robinhood Chain)
 
-Diisi dari `contracts/deployments/testnet-46630.json` setelah perintah [deploy](#deploy-ke-testnet-46630) dijalankan (file ini sengaja **tidak** ada di git — lihat `.gitignore` — karena isinya baru valid setelah broadcast nyata).
+Di-deploy 20 Sep 2026 dari `contracts/script/DeployTestnet.s.sol` (deployer `0x90351bB1E85a17D5f70c62C0cC076D39D897076D`, blok `0x7417b62`); semua source terverifikasi di Blockscout. `contracts/deployments/testnet-46630.json` sengaja tidak di-commit (`.gitignore`) — tabel ini adalah salinannya.
 
 | Kontrak | Variabel deploy | Alamat | Explorer |
 |---|---|---|---|
-| `MockUSDG` | `usdg` | _diisi setelah deploy_ | `https://explorer.testnet.chain.robinhood.com/address/<alamat>` |
-| `SLASettlementVerifier` | `verifier` | _diisi setelah deploy_ | `https://explorer.testnet.chain.robinhood.com/address/<alamat>` |
-| `AegisChannelFactory` (demo, `MIN_CHALLENGE_WINDOW` = 60 s) | `factory` | _diisi setelah deploy_ | `https://explorer.testnet.chain.robinhood.com/address/<alamat>` |
-| `AegisChannelFactory` (produksi, `MIN_CHALLENGE_WINDOW` = 21.600 s / 6 jam) | `factoryProd` | _diisi setelah deploy_ | `https://explorer.testnet.chain.robinhood.com/address/<alamat>` |
-| `SimpleJobEscrow` (kontrol Pasar A, evaluator biner — §14) | `escrow` | _diisi setelah deploy_ | `https://explorer.testnet.chain.robinhood.com/address/<alamat>` |
+| `MockUSDG` | `usdg` | `0xCadd4526b6E7Beb640c3e920e80Ff28B327B5a83` | [0xCadd4526…](https://explorer.testnet.chain.robinhood.com/address/0xCadd4526b6E7Beb640c3e920e80Ff28B327B5a83) |
+| `SLASettlementVerifier` | `verifier` | `0x5EC99814dF5A78ECB4dbC83f066FB62970847462` | [0x5EC99814…](https://explorer.testnet.chain.robinhood.com/address/0x5EC99814dF5A78ECB4dbC83f066FB62970847462) |
+| `AegisChannelFactory` (demo, `MIN_CHALLENGE_WINDOW` = 60 s) | `factory` | `0x0922ee7D6D518681Fd94E98e56D3f161A0574ED3` | [0x0922ee7D…](https://explorer.testnet.chain.robinhood.com/address/0x0922ee7D6D518681Fd94E98e56D3f161A0574ED3) |
+| `AegisChannelFactory` (produksi, `MIN_CHALLENGE_WINDOW` = 21.600 s / 6 jam) | `factoryProd` | `0x201BaC41758a45925E1eD7a9Ad79757F19337fDD` | [0x201BaC41…](https://explorer.testnet.chain.robinhood.com/address/0x201BaC41758a45925E1eD7a9Ad79757F19337fDD) |
+| `SimpleJobEscrow` (kontrol Pasar A, evaluator biner — §14) | `escrow` | `0x5017C9e556bF750aEE1aB9e74aA094a91924964a` | [0x5017C9e5…](https://explorer.testnet.chain.robinhood.com/address/0x5017C9e556bF750aEE1aB9e74aA094a91924964a) |
+
+**Bukti liveness di 46630 (test integrasi SDK, 20 Sep 2026):**
+
+| Skenario | Channel (clone) | Tx kunci | Hasil on-chain |
+|---|---|---|---|
+| Kooperatif — 10 unit, `closeCooperative` | [`0x8f991b6e…2844`](https://explorer.testnet.chain.robinhood.com/address/0x8f991b6ebbe5a7725fd01d4da9e870dddd5c2844) | open [`0x28e4b0b9…`](https://explorer.testnet.chain.robinhood.com/tx/0x28e4b0b9cdbcd1a52c121226dba96fa3fae558b162319986171060f3c72e61c5) · settle [`0xd46d1343…`](https://explorer.testnet.chain.robinhood.com/tx/0xd46d13430464febbd7ff07c946a95d9f847bf4c465c2095a86b8c8c03a7a2325) | `Settled(seq 10, toProvider 200.000, toClient 800.000, cooperative)` |
+| Sengketa — 1 pelanggaran, bukti Groth16, `settle` setelah jendela 120 s nyata | [`0xbcb09638…f3be`](https://explorer.testnet.chain.robinhood.com/address/0xbcb096386994cc4fb3972d0495600ead1db6f3be) | checkpoint [`0x643bf252…`](https://explorer.testnet.chain.robinhood.com/tx/0x643bf252eb5f60a53a7e56af2117b8f4c99ff9e7ed8f345fec72ae9e7760f1d3) · **claimPenalty** [`0x54355aef…`](https://explorer.testnet.chain.robinhood.com/tx/0x54355aefbcd9f651ebd5e0ca067ec0111036461f2509d23177c21d28206e93a6) · settle [`0xd903f389…`](https://explorer.testnet.chain.robinhood.com/tx/0xd903f389f47abf58ef1ff8b052b130e7e30bb04f1131441ae1c7b7cb307e37bc) | `PenaltyClaimed(seq 10, 10.000)`; `Settled(10, A 200.000, penalti 10.000, toProvider 190.000, toClient 810.000)` |
+
+Gas terukur di 46630 (klien sengketa): `fund` 58.413 · `submitCheckpoint` 118.929 · `claimPenalty` 309.373 · `settle` 98.291 (proving Groth16 di klien ±4 s).
 
 ### Alamat kanonik lintas-chain (dipakai apa adanya, tidak di-deploy ulang)
 

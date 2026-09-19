@@ -495,11 +495,11 @@ Tidak ada `owner`, `pause`, proxy, atau `upgradeTo` di jalur dana. Tulis matriks
 | Operasi | Estimasi | Terukur (Foundry / testnet) |
 |---|---|---|
 | `open` (clone + initialize + 2 verifikasi tanda tangan) | ≈ 180k | _Hari 7_ |
-| Transfer USDG ke channel (proxy Paxos) | ≈ 60k | MockUSDG di Anvil: **51.577** (Task 14); proxy Paxos di mainnet belum diukur |
-| `submitCheckpoint` (2 tanda tangan EOA) | ≈ 80k | **102.825** (Anvil, Task 14) |
+| Transfer USDG ke channel (proxy Paxos) | ≈ 60k | MockUSDG: **51.577** (Anvil) · **58.413** (testnet 46630); proxy Paxos di mainnet belum diukur |
+| `submitCheckpoint` (2 tanda tangan EOA) | ≈ 80k | **102.825** (Anvil) · **118.929** (testnet 46630) |
 | `closeCooperative` (2 tanda tangan + 2 transfer) | ≈ 190k | _Hari 7_ |
-| `claimPenalty` (verifier 6 input + storage) | ≈ 260k | verifier saja: **229.241** (Task 6); total **293.880** (Anvil, Task 14) |
-| `settle` (2 transfer) | ≈ 130k | **93.900** (Anvil, Task 14; satu transfer ke provider + satu ke klien) |
+| `claimPenalty` (verifier 6 input + storage) | ≈ 260k | verifier saja: **229.241**; total **293.880** (Anvil) · **309.373** (testnet 46630, tx `0x54355aef…`) |
+| `settle` (2 transfer) | ≈ 130k | **93.900** (Anvil) · **98.291** (testnet 46630) |
 | `ack` anchored (7 hash t=3 + storage) — Stylus / Yul | ≈ 83k / 140k | _Hari 4 (benchmark) & Hari 12_ |
 | Aktivasi `AegisPoseidon.rs` (sekali) | 1.659.168 + data fee | _Hari 4_ |
 
@@ -811,6 +811,7 @@ Item ✅ diverifikasi 19 Sep 2026 dengan perintah yang tercantum (RPC publik). S
 | V15 | Registry ERC-8004 di Robinhood Chain (MeshIdentity) | docs/repo Mesh, explorer | FR-28 roadmap |
 | V16 | ZeroStyl — apa yang sudah ia sediakan | github.com/kazai777/zerostyl | Kreditkan jika dipakai/berimpit |
 | V17 | Syarat submission: durasi video, repo publik, form | portal HackQuest | DQ jika terlewat |
+| V18 | **Deploy testnet 46630** | ✅ 20 Sep 2026: `DeployTestnet.s.sol --broadcast --verify` — 7/7 kontrak terverifikasi Blockscout (factory demo `0x0922ee7D…4ED3`, factory prod `0x201BaC41…7fDD`, verifier `0x5EC99814…7462`, MockUSDG `0xCadd4526…5a83`, escrow `0x5017C9e5…964a`); test integrasi kooperatif + sengketa (bukti Groth16 asli, jendela 120 s nyata) **lulus on-chain** — `claimPenalty` tx `0x54355aef…93a6`, `Settled` `0xd903f389…37bc` | Bukti liveness untuk submission (README) |
 
 ---
 
