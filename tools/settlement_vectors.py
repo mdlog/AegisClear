@@ -60,13 +60,14 @@ VECTORS = {
 
 
 def main():
+    args = sys.argv[1:]
+    write_random = "--no-random" not in args
     out = {}
     for name, (rs, t) in VECTORS.items():
         cum, nb, pen, cap, pc, pp = settle(rs, t)
         out[name] = {"terms": t, "receipts": rs, "seq": len(rs), "cumulativeAmount": cum,
                      "breaches": nb, "penRaw": pen, "cap": cap, "payToClient": pc, "payToProvider": pp}
         print(f"{name:32s} seq={len(rs):3d} A={cum:9d} breaches={nb:3d} penRaw={pen:8d} cap={cap:8d} -> client={pc:8d} provider={pp:9d}")
-    # 200 vektor acak (INV-4, INV-5, INV-10)
     rng = random.Random(8004)
     for k in range(200):
         n = rng.randint(0, MAX_SEQ); p = rng.randint(1, 10**6)
@@ -76,15 +77,19 @@ def main():
         for r in rs: r["due"] = r["qty"] * p
         cum, nb, pen, cap, pc, pp = settle(rs, t)
         assert pc <= cap and pc <= pen and pc + pp == cum and pp >= min(cum - cap, cum)
-        out[f"RAND_{k:03d}"] = {"terms": t, "receipts": rs, "seq": n, "cumulativeAmount": cum,
-                                "breaches": nb, "penRaw": pen, "cap": cap, "payToClient": pc, "payToProvider": pp}
-    print(f"200 vektor acak lulus INV-4/INV-5/INV-10")
-    if len(sys.argv) > 2 and sys.argv[1] == "--json":
-        os.makedirs(sys.argv[2], exist_ok=True)
+        if write_random:
+            out[f"RAND_{k:03d}"] = {"terms": t, "receipts": rs, "seq": n, "cumulativeAmount": cum,
+                                    "breaches": nb, "penRaw": pen, "cap": cap, "payToClient": pc, "payToProvider": pp}
+    print("200 vektor acak lulus INV-4/INV-5/INV-10")
+    for v in out.values():
+        v["terms"] = {**v["terms"], "nonce": str(v["terms"]["nonce"])}
+    if "--json" in args:
+        d = args[args.index("--json") + 1]
+        os.makedirs(d, exist_ok=True)
         for name, v in out.items():
-            with open(os.path.join(sys.argv[2], f"{name}.json"), "w") as f:
+            with open(os.path.join(d, f"{name}.json"), "w") as f:
                 json.dump(v, f)
-        print(f"{len(out)} vektor ditulis ke {sys.argv[2]}/")
+        print(f"{len(out)} vektor ditulis ke {d}/")
 
 
 if __name__ == "__main__":
