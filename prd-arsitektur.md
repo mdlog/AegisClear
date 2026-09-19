@@ -703,11 +703,12 @@ Skrip menjalankan skenario 1 dan 2 (§13) di kedua pasar dan mencetak:
 
 | Kolom | A (evaluator biner) | B (AegisClear) |
 |---|---|---|
-| Hasil klien / provider | 0 / 2,00 **atau** 2,00 / 0 | 0,07 / 1,93 |
-| Siapa yang memutuskan | alamat evaluator | bukti |
-| Field yang terbaca di explorer | harga, ambang, `reason` | `T`, `R`, jumlah |
-| Gas siklus penuh | terukur | terukur |
-| Waktu proving | — | terukur |
+| Hasil klien / provider | 0 / 2,00 **atau** 2,00 / 0 | 0,07 / 1,93 (sengketa) · 0,00 / 2,00 (kooperatif) |
+| Siapa yang memutuskan | alamat evaluator | bukti Groth16 · dua tanda tangan |
+| Field yang terbaca di explorer | harga, ambang, `reason` (string di calldata) | `T`, `R`, jumlah, `payToClient` |
+| Gas siklus penuh (**terukur Anvil, Task 16**) | 347.918 (complete) · 330.781 (reject) | 542.194 (sengketa, 100 unit + bukti) · 162.079 (kooperatif) |
+| Waktu proving (**terukur**) | — | 4.245 ms (N=128, snarkjs) |
+| `leak-check` calldata+log tx channel B | — | **bocor: 0**, ambigu: 0 |
 
 Lingkungan: Anvil **fork mainnet 4663** (USDG asli, Permit2 & proxy x402 asli, `vm.warp` untuk jendela) untuk uji; **testnet 46630** dengan `MockUSDG` untuk bukti liveness; **mainnet 4663** dengan USDG sen-level untuk demo video (D1). Kontrak produksi dipakai apa adanya — tidak ada `AegisClock`; jendela pendek datang dari factory demo (`MIN_CHALLENGE_WINDOW = 60 s`, D5), bukan dari kode kontrak yang berbeda.
 
