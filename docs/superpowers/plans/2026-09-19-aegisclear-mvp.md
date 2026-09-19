@@ -2178,7 +2178,7 @@ contract Permit2Test is AegisTestBase {
     address constant X402_PROXY = 0x402085c248EeA27D92E8b30b2C58ed07f9E20001;
     bytes32 constant TOKEN_PERMISSIONS_TYPEHASH = keccak256("TokenPermissions(address token,uint256 amount)");
     bytes32 constant PERMIT_TRANSFER_FROM_TYPEHASH =
-        keccak256("PermitTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline)");
+        keccak256("PermitTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline)TokenPermissions(address token,uint256 amount)");   // EIP-712 encodeType: struct yang dirujuk ikut di-append (Permit2 PermitHash.sol)
     string constant WITNESS_TYPE_STRING =
         "Witness witness)TokenPermissions(address token,uint256 amount)Witness(address to,uint256 validAfter)";
     bytes32 constant WITNESS_TYPEHASH = keccak256("Witness(address to,uint256 validAfter)");
