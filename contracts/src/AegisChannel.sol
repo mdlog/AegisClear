@@ -143,6 +143,22 @@ contract AegisChannel is ReentrancyGuard {
         emit CheckpointSubmitted(seq_, amount, root, deadline);
     }
 
+    /// @notice Klaim penalti dengan bukti Groth16 atas state saat ini (FR-14). Hanya pihak; payToClient ≤ A dipaksakan kontrak (FR-18).
+    function claimPenalty(uint256[8] calldata p, uint128 payToClient_) external {
+        if (msg.sender != cfg.client && msg.sender != cfg.provider) revert NotParty();
+        if (state != State.CLOSING) revert WrongState();
+        if (payToClient_ > cumulativeAmount) revert ExceedsCumulative();
+        uint256[6] memory inputs = [
+            channelIdField(), uint256(cfg.termsCommitment), uint256(receiptsRoot),
+            uint256(seq), uint256(cumulativeAmount), uint256(payToClient_)
+        ];
+        if (!VERIFIER.verifyProof([p[0], p[1]], [[p[2], p[3]], [p[4], p[5]]], [p[6], p[7]], inputs)) revert InvalidProof();
+        payToClient = payToClient_;
+        proofSeq = seq;
+        hasProof = true;
+        emit PenaltyClaimed(msg.sender, seq, payToClient_);
+    }
+
     /// @notice Permissionless setelah deadline (FR-16). Penalti hanya dari bukti atas state saat ini.
     function settle() external nonReentrant {
         if (state != State.CLOSING) revert WrongState();
