@@ -40,6 +40,25 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  demo:
+    dependencies:
+      '@aegisclear/sdk':
+        specifier: workspace:*
+        version: link:../sdk
+      '@hono/node-server':
+        specifier: ^2.1.1
+        version: 2.1.1(hono@4.13.8)
+      viem:
+        specifier: ^2.56.8
+        version: 2.56.8(typescript@5.9.3)
+    devDependencies:
+      tsx:
+        specifier: ^4.23.13
+        version: 4.23.13
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   sdk:
     dependencies:
       '@hono/node-server':
