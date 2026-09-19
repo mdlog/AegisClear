@@ -63,7 +63,7 @@ async function main() {
     console.table(table);
     mkdirSync(new URL("./out", import.meta.url), { recursive: true });
     const priv = [TERMS.unitPrice, TERMS.maxM1, TERMS.minM2, TERMS.penaltyBps, TERMS.capBps, TERMS.nonce, 1200n, 300n, 95n].map(String);
-    writeFileSync(new URL("./out/result.json", import.meta.url), JSON.stringify({ channelB: bDisp.channel, txs: bDisp.txs.map((t) => t.hash), private: priv, table }, null, 2));
+    writeFileSync(new URL("./out/result.json", import.meta.url), JSON.stringify({ channelB: bDisp.channel, factory: d.factory, txs: bDisp.txs.map((t) => t.hash), private: priv, table }, null, 2));
     console.log("ditulis: demo/out/result.json");
   } finally { server.close(); }
 }
