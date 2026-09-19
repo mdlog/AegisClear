@@ -744,6 +744,8 @@ template DivBps() {
     q <-- x \ 10000;
     r <-- x % 10000;
     x === q * 10000 + r;
+    component rb = Num2Bits(14);   // WAJIB: ikat r ke [0, 2^14) sebelum komparator — tanpa ini LessThan(14) menerima r negatif (celah soundness, ditemukan review Task 4)
+    rb.in <== r;
     component rlt = LessThan(14);
     rlt.in[0] <== r;
     rlt.in[1] <== 10000;
@@ -810,6 +812,9 @@ template SlaSettlement(N, DEPTH) {
     component upB = Num2Bits(32); upB.in <== unitPrice;
     component mxB = Num2Bits(32); mxB.in <== maxM1;
     component mnB = Num2Bits(32); mnB.in <== minM2;
+    component penB = Num2Bits(14); penB.in <== penaltyBps;   // ikat sebelum LessEqThan (soundness komparator)
+    component capB = Num2Bits(14); capB.in <== capBps;
+    component seqB = Num2Bits(8);  seqB.in <== seq;
     component penLe = LessEqThan(14); penLe.in[0] <== penaltyBps; penLe.in[1] <== 10000; penLe.out === 1;
     component capLe = LessEqThan(14); capLe.in[0] <== capBps;     capLe.in[1] <== 10000; capLe.out === 1;
     component seqLe = LessEqThan(8);  seqLe.in[0] <== seq;        seqLe.in[1] <== N;     seqLe.out === 1;
@@ -878,18 +883,18 @@ component main {public [channelIdField, termsCommitment, receiptsRoot, seq, cumu
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p build
-circom sla_settlement.circom --r1cs --wasm --sym -o build -l node_modules
+circom sla_settlement.circom --O2 --r1cs --wasm --sym -o build -l node_modules   # --O2 wajib: O1 default = 217.908 constraint (> 2^17); O2 = ~115k
 npx snarkjs r1cs info build/sla_settlement.r1cs
 ```
 ```bash
 chmod +x circuits/scripts/build.sh && pnpm --filter @aegisclear/circuits build
 ```
-Expected: baris `# of Constraints: <n>` dengan `n < 131072`. Catat `n` di `docs/TOOLCHAIN.md`. Jika `n ≥ 131072`: terapkan D4 — ubah `SlaSettlement(128, 7)` menjadi `SlaSettlement(64, 6)` **dan** `MAX_SEQ = 64`, `DEPTH = 6` di `sdk/src/core/receipts.ts`, lalu catat di spec §6.6/§20.
+Expected: baris `# of Constraints: <n>` dengan `n < 131072` (terukur 19 Sep 2026: 115.066 pada `--O2` setelah perbaikan soundness). Catat `n` di `docs/TOOLCHAIN.md`. Jika `n ≥ 131072`: terapkan D4 — ubah `SlaSettlement(128, 7)` menjadi `SlaSettlement(64, 6)` **dan** `MAX_SEQ = 64`, `DEPTH = 6` di `sdk/src/core/receipts.ts`, lalu catat di spec §6.6/§20.
 
 - [ ] **Step 5: Jalankan test sirkuit**
 
 Run: `pnpm --filter @aegisclear/circuits test`
-Expected: 10 test PASS (kompilasi pertama via circom_tester memakan ~1–3 menit).
+Expected: 10 test PASS (kompilasi pertama via circom_tester memakan ~1–3 menit). **Tambahan (dari review Task 4, implementasi final di repo):** `DivBps` dipecah menjadi `DivBpsConstraints()` (x, q, r sebagai input; seluruh constraint) + wrapper `DivBps()` di `circuits/lib/divbps.circom`, di-`include` oleh sirkuit utama; sirkuit probe `circuits/test/circuits/divbps_probe.circom` (`component main = DivBpsConstraints();`) memungkinkan dua test tambahan: triple jujur `(13616, 1, 3616)` diterima dan triple sisa-negatif `(13616, 2, p−6384)` DITOLAK — test ini gagal jika `rb` dihapus (bukti diskriminasi dicatat di laporan Task 4). Memanipulasi slot witness sirkuit utama secara langsung TIDAK diskriminatif (constraint dekomposisi bit lain ikut rusak).
 
 - [ ] **Step 6: Commit**
 

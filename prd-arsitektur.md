@@ -532,7 +532,7 @@ C4  ∀i: leaf_i = filled_i × Poseidon(i, qty_i, m1_i, m2_i, due_i)    // slot 
 C5  MerkleRoot128(leaf) == receiptsRoot                        // 127 Poseidon t=3
 C6  Σ filled_i × due_i == cumulativeAmount
 C7  ∀i: b_i = OR( GreaterThan(32)(m1_i, maxM1), LessThan(32)(m2_i, minM2) )
-C8  ∀i: pen_i = filled_i × b_i × ⌊due_i × penaltyBps / 10000⌋    // pembagian: witness q, r dengan due×π = 10000q + r, r < 10000
+C8  ∀i: pen_i = filled_i × b_i × ⌊due_i × penaltyBps / 10000⌋    // pembagian: witness q, r dengan due×π = 10000q + r; r WAJIB diikat Num2Bits(14) SEBELUM komparator r < 10000 (LessThan tanpa bit-bound menerima r negatif)
 C9  penRaw = Σ pen_i ;  cap = ⌊cumulativeAmount × capBps / 10000⌋ ;  payToClient == min(penRaw, cap)
 C10 range: qty_i, m1_i, m2_i < 2³²; due_i, cumulativeAmount, payToClient < 2⁶⁴; penaltyBps, capBps ≤ 10000; seq ≤ 128
 ```
@@ -546,9 +546,9 @@ Slot dengan `filled_i = 0` harus juga memiliki `qty_i = m1_i = m2_i = due_i = 0`
 | Komparator 2 × LessThan/GreaterThan(32) | ≈ 68 | 128 | 8.704 |
 | Range `due` 64-bit + aritmetika C3/C8 | ≈ 67 | 128 | 8.576 |
 | Terms Poseidon t=7 + C9 + misc | | | ≈ 860 |
-| **Total** | | | **≈ 90.500 → ptau 2¹⁷ (131.072)** |
+| **Total** | | | **≈ 90.500 (estimasi awal) → terukur 19 Sep 2026: 217.908 pada `--O1` default, 113.224 pada `--O2`, **115.066** pada `--O2` setelah pengikatan rentang `r`/`seq`/bps (celah soundness `DivBps` ditemukan saat review) → ptau 2¹⁷ (131.072)** |
 
-Target: proving < 10 s di laptop dengan `snarkjs` (WASM witness + `groth16 prove`), < 2 s dengan `rapidsnark`; witness generation < 1 s. Jika terukur > 30 s, turunkan `MAX_SEQ` ke 64 (≈ 45k constraint, ptau 2¹⁶) — D4.
+Target: proving < 10 s di laptop dengan `snarkjs` (WASM witness + `groth16 prove`), < 2 s dengan `rapidsnark`; witness generation < 1 s. Jika terukur > 30 s, turunkan `MAX_SEQ` ke 64 (≈ 45k constraint, ptau 2¹⁶) — D4. **Catatan implementasi:** `build.sh` wajib memakai `circom --O2` (simplifikasi linear penuh); tanpa itu jumlah constraint melewati 2¹⁷.
 
 ### 9.4 Trusted setup
 `powersOfTau28_hez_final_17.ptau` (Hermez, hash dipublikasikan) → `snarkjs groth16 setup` → kontribusi phase-2 → beacon → `zkey`. **Untuk hackathon: satu kontributor (penulis).** Konsekuensi: pemegang toxic waste bisa memalsukan bukti → menuntut `payToClient` hingga `A` (batas FR-18). Mitigasi: (i) transkrip ceremony di repo; (ii) sebelum ada dana non-demo di mainnet, ceremony ≥ 3 kontributor independen; (iii) alternatif PLONK universal (snarkjs, tanpa phase-2 khusus sirkuit) dengan biaya verifikasi ≈ +50–100% gas — D6. **Nyatakan ini di pitch sebelum ditanya.**
