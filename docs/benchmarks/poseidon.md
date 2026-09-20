@@ -1,6 +1,6 @@
 # Benchmark Poseidon — gerbang D2 (tanggal: 2026-09-19)
 
-**Status: ANGKA ON-CHAIN LENGKAP (20 Sep 2026) — keputusan D2 menunggu pemilik repo.** Hasil apple-to-apple di testnet 46630 (`cast estimate` − intrinsik): hash tunggal **Yul 39.472 vs Stylus 56.513 → rasio_hash 0,70×** (Stylus LEBIH MAHAL: biaya init program 8.832 gas + overhead tetap mendominasi satu hash); rantai 7 hash (jalur anchored ack) **Yul 223.901 vs Stylus 95.934 → rasio_chain7 2,33×** (Stylus 2,3× lebih murah; biaya marjinal per hash ≈ 6,6k Stylus vs ≈ 30,7k Yul). Catatan penting: `cargo stylus cache bid` gagal — **tidak ada CacheManager di ArbWasmCache chain ini** ("no cache managers found … Stylus cache is not yet enabled on this chain"), sehingga `codehashIsCached` = false dan setiap panggilan membayar init *uncached* (8.832 gas); panggilan pertama dan kedua memberi angka identik. Alamat: Stylus `0xa91333b9c548c9b584effaad4c57b45bfd92fec6` (aktivasi tx `0x4a1044fc…`), Yul `PoseidonT3` `0x5bcbFCb083D64F9723Dcd3Af973F9432E844cbb7`, caller rantai-7 `0x0a32b8E60E50aF209aa004C942aB01740e700B75`.
+**Status: RIWAYAT (Poseidon2, digantikan) — keputusan D2 sudah diambil pada 20 Sep 2026, lihat bagian "5. Poseidon v1 (kompatibel sirkuit)" di bawah dan `prd-arsitektur.md` §20 D2.** Seluruh isi di bawah (§§0–4) mem-benchmark **Poseidon2** (`openzeppelin-crypto`), yang **bukan** kompatibel circomlib/sirkuit — angka dan rasionya tetap didokumentasikan sebagai riwayat metodologi, tetapi **bukan dasar keputusan final** (lihat §5 untuk itu). Hasil apple-to-apple di testnet 46630 (`cast estimate` − intrinsik): hash tunggal **Yul 39.472 vs Stylus 56.513 → rasio_hash 0,70×** (Stylus LEBIH MAHAL: biaya init program 8.832 gas + overhead tetap mendominasi satu hash); rantai 7 hash (jalur anchored ack) **Yul 223.901 vs Stylus 95.934 → rasio_chain7 2,33×** (Stylus 2,3× lebih murah; biaya marjinal per hash ≈ 6,6k Stylus vs ≈ 30,7k Yul). Catatan penting: `cargo stylus cache bid` gagal — **tidak ada CacheManager di ArbWasmCache chain ini** ("no cache managers found … Stylus cache is not yet enabled on this chain"), sehingga `codehashIsCached` = false dan setiap panggilan membayar init *uncached* (8.832 gas); panggilan pertama dan kedua memberi angka identik. Alamat: Stylus `0xa91333b9c548c9b584effaad4c57b45bfd92fec6` (aktivasi tx `0x4a1044fc…`), Yul `PoseidonT3` `0x5bcbFCb083D64F9723Dcd3Af973F9432E844cbb7`, caller rantai-7 `0x0a32b8E60E50aF209aa004C942aB01740e700B75`.
 
 **Catatan jujur (dari brief):** kontrak Stylus di sini memakai `openzeppelin-crypto::Poseidon2` (Poseidon**2**), sedangkan `poseidon-solidity` Yul memakai Poseidon **v1** (varian yang kompatibel circomlib, dipakai di seluruh sirkuit AegisClear). Keduanya bukan fungsi yang identik — benchmark ini membandingkan **kelas biaya hashing on-chain** (EVM/Yul vs WASM/Stylus untuk operasi "satu permutasi Poseidon berukuran sebanding"), bukan interoperabilitas hash. Jika D2 lolos, port Poseidon v1 ke Rust (`AegisPoseidon.rs`, konstanta circomlib) adalah pekerjaan Plan 2 tersendiri — lihat §8.3 `prd-arsitektur.md`.
 
@@ -21,7 +21,7 @@ rasio_chain7 = (Yul 7×T3, on-chain via caller opsional − intrinsik) / (Stylus
 ```
 `rasio_hash` = 39.472 / 56.513 = **0,70×**. `rasio_chain7` = 223.901 / 95.934 = **2,33×**. (Sebelumnya: `rasio_hash`: menunggu angka on-chain Yul & Stylus; `rasio_chain7`: menunggu angka on-chain Yul (caller rantai-7 opsional) & Stylus — jika caller rantai-7 Yul tidak dibuat, baris ini TIDAK BOLEH diisi dari angka Foundry sebagai pengganti; tandai "tidak diukur on-chain" dan pakai `rasio_hash` saja untuk D2. Karena anchored mode (§8.3 `prd-arsitektur.md`) secara operasional justru kasus rantai-7 (7 hash per ack), sangat disarankan tetap mengisi `rasio_chain7` on-chain sebelum menutup D2 untuk anchored mode secara final.
 
-**Keputusan D2:** `rasio_hash` (dan `rasio_chain7` jika tersedia) ≥ 1,5× → Plan 2 memasukkan `AegisPoseidon.rs` (port Poseidon v1, konstanta circomlib) + anchored mode di Stylus; < 1,5× → anchored mode memakai Yul, Stylus dihapus dari scope. **Status saat ini: TERBUKA** — belum ada angka on-chain untuk menghitung rasio apa pun; keputusan **tidak boleh** diambil dari angka Foundry saja, dan **tidak boleh** dari campuran Foundry (Yul) × on-chain (Stylus) — kedua sisi rasio harus sama-sama on-chain (`cast estimate` terhadap kontrak yang benar-benar di-deploy di 46630).
+**Keputusan D2:** `rasio_hash` (dan `rasio_chain7` jika tersedia) ≥ 1,5× → Plan 2 memasukkan `AegisPoseidon.rs` (port Poseidon v1, konstanta circomlib) + anchored mode di Stylus; < 1,5× → anchored mode memakai Yul, Stylus dihapus dari scope. **Status saat ini: TERBUKA** — belum ada angka on-chain untuk menghitung rasio apa pun; keputusan **tidak boleh** diambil dari angka Foundry saja, dan **tidak boleh** dari campuran Foundry (Yul) × on-chain (Stylus) — kedua sisi rasio harus sama-sama on-chain (`cast estimate` terhadap kontrak yang benar-benar di-deploy di 46630). **[RIWAYAT — snapshot status Poseidon2 pada 19–20 Sep 2026; D2 sudah ditutup dengan Poseidon v1 kompatibel sirkuit, lihat "5. Poseidon v1 (kompatibel sirkuit)" di bawah dan `prd-arsitektur.md` §20 D2.]**
 
 Ukuran WASM terkompresi: **14,4 KB (14.394 byte)** (batas kode Robinhood Chain 96 KB — jauh di bawah batas, ≈ 15% dari limit). Ukuran WASM mentah (tidak terkompresi): 44,8 KB (44.807 byte). `cargo stylus check` lolos pemeriksaan aktivasi: estimasi *wasm data fee* 0,000094 ETH (dasar 0,000079 ETH + bump 20%), exit code 0, tanpa error.
 
@@ -228,3 +228,43 @@ Jadi: `gas eksekusi Stylus hash([1,2]) ≈ cast_estimate(hash, panggilan KEDUA/t
 - Rust/Stylus: `cargo 1.92.0`, `cargo-stylus 0.10.9`, toolchain `1.92.0-x86_64-unknown-linux-gnu` + target `wasm32-unknown-unknown` (rustup, sudah terpasang — lihat §2 untuk kenapa `rust-toolchain.toml` di-pin ke versi ini, bukan 1.91.0 bawaan template).
 - `CARGO_TARGET_DIR=/tmp/aegis-stylus-target`, `CARGO_HOME=/tmp/aegis-cargo-home` dipakai untuk semua perintah `cargo`/`cargo stylus` di atas — **wajib** diset ulang di shell manapun yang menjalankan perintah Step 3, karena `/home` (lokasi repo ini) nyaris penuh (lihat §2).
 - Endpoint testnet: `https://rpc.testnet.chain.robinhood.com` (chain id 46630, sesuai `.env.example`).
+
+---
+
+## 5. Poseidon v1 (kompatibel sirkuit) — 20 Sep 2026, testnet 46630
+
+**Ini angka yang dipakai keputusan D2 final (`prd-arsitektur.md` §20).** §§1–4 di atas mengukur **Poseidon2** (`openzeppelin-crypto`), yang **bukan** kompatibel circomlib — dipakai sirkuit `sla_settlement.circom` dan seluruh SDK AegisClear; rasio 2,33× di sana **tidak boleh** dipakai sebagai dasar anchored mode produksi. Bagian ini mem-benchmark `AegisPoseidon` (Rust, `stylus/aegis-poseidon/`, port 1:1 circomlib Poseidon v1 dari `circomlibjs/src/poseidon_opt.js`, algoritma teroptimasi: matriks jarang untuk 57 partial round + `Fr::sum_of_products`) terhadap `PoseidonPathYul`/`PoseidonT3` (Yul, `poseidon-solidity`) — **keduanya menghasilkan hash yang identik** dengan sirkuit dan SDK (D3), sehingga rasio di bawah ini sekaligus apples-to-apples DAN circuit-compatible.
+
+### Alamat (testnet 46630)
+
+| Kontrak | Alamat | Catatan |
+|---|---|---|
+| `AegisPoseidon`, teroptimasi (**aktif**, dipakai `factoryAnchored`) | `0x1027cf7DC26152012ed9Ef949Aa1432Bf1C7ef34` | circomlib Poseidon v1, 21,7 KB terkompresi |
+| `AegisPoseidon`, referensi `opt-level=z` (riwayat) | `0xd2b670748bf445543c94c010def03abcc04c37a7` | 18,4 KB terkompresi |
+| `AegisPoseidon`, referensi `opt-level=3` (riwayat) | `0x65b059d9ff43720ff50bd5a7daa1a5b869b4f038` | 20,1 KB terkompresi |
+| Tx deploy pertama (referensi `opt-level=z`) | `0xb181cb72f3c847dc01ba6b2e24945ef85f1e9c040ff6699e9e92b7ad7bc100fd` | — |
+| `PoseidonT3` (Yul, library `poseidon-solidity`) | `0xd52e29197D7Fc27FB79240097B92a169408Ad3d1` | pembanding on-chain |
+| `PoseidonPathYul` (Yul, `IPoseidonPath`, kembaran ABI Stylus) | `0x804318aE7b0cFCE9e1995A84B7833d95B2713766` | Rencana B bila `POSEIDON_STYLUS` kosong |
+
+Tidak ada `CacheManager` di chain ini (`cargo stylus cache bid` → "no cache managers found … Stylus cache is not yet enabled on this chain") — **semua panggilan Stylus di tabel ini uncached** (setiap panggilan membayar init program ≈8,8k gas, sama seperti §0).
+
+### Metode
+
+`cast estimate` terhadap kontrak yang benar-benar di-deploy di 46630 — gas **total transaksi** (≈21.000 intrinsik + calldata + eksekusi), bukan eksekusi saja (beda dengan kolom Foundry di §1; lihat catatan bias di sana, berlaku sama di sini). `insertPath(leaf, 5, [1..7])` = 7 hash Poseidon t=3 — operasi yang benar-benar dipakai jalur `ack` anchored (`AegisChannel.ack` → `IPoseidonPath.insertPath`); `hash2(1,2)` = 1 hash, tidak dipakai on-chain di mana pun tetapi diukur untuk kelengkapan. Kesetaraan **keluaran** (bukan hanya gas) diverifikasi di kedua sisi: `hash2(1,2)` = `7853200120776062878684798364095072458815029376092732009249414926327459813530`, `insertPath(leaf0, 0, zeros)` = `8867972900015110853220544640232097790621643464826894219536805239310374416705` — **identik** di Yul maupun ketiga build Stylus.
+
+### Hasil (`cast estimate`, gas total termasuk intrinsik)
+
+| Implementasi | `insertPath` (7 hash) | `hash2` (1 hash) |
+|---|---|---|
+| Yul `PoseidonPathYul` | **252.271** | **62.138** |
+| Stylus referensi, `opt-level=z` | 231.217 | 91.259 |
+| Stylus referensi, `opt-level=3` | 175.905 | 83.172 |
+| **Stylus teroptimasi (aktif, `0x1027cf7D…ef34`)** | **144.076** | 82.593 |
+
+Foundry (Yul, eksekusi saja — referensi/konteks, lihat catatan bias §1, TIDAK dipakai untuk rasio): `insertPath` **222.766**.
+
+Rasio `insertPath` (jalur relevan, anchored `ack`): **252.271 / 144.076 = 1,75× total**. Intrinsik + calldata `insertPath` identik di kedua sisi (signature sama), jadi mengurangkannya memberi rasio **eksekusi-saja ≈ 1,9×**. Pada `hash2` tunggal, overhead init program Stylus (uncached) tetap mendominasi satu hash — **Yul lebih murah di ketiga build Stylus** (62.138 vs 82.593–91.259) — karena itu anchored mode memakai `insertPath` (satu panggilan, 7 hash per `ack`), bukan 7× `hash2`.
+
+### Kesimpulan
+
+Rasio Poseidon2 di §§0–4 (2,33×) **bukan dasar keputusan yang valid** — Poseidon2 tidak kompatibel circomlib/sirkuit, jadi tidak bisa dipakai `AegisChannel` apa adanya. Dengan port Poseidon **v1** yang kompatibel sirkuit (D3) dan dioptimasi (matriks jarang + `sum_of_products`, lihat `stylus/aegis-poseidon/README.md`), Stylus mencapai **1,75× lebih murah secara total (≈1,9× eksekusi)** pada jalur 7-hash yang sebenarnya dipakai `ack` anchored — di atas ambang keputusan D2 (≥ 1,5×, `prd-arsitektur.md` §16 Hari 4). Hash tunggal tetap lebih murah di Yul di ketiga build Stylus; ini tidak mengubah keputusan karena `AegisChannel` tidak pernah memanggil Poseidon satu-hash on-chain. **Keputusan final (tidak berubah dari draf sebelumnya, sekarang dengan angka yang benar dan kompatibel sirkuit): Stylus untuk anchored mode** — lihat `prd-arsitektur.md` §20 D2.

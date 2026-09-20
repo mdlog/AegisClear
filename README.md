@@ -4,7 +4,7 @@ Escrow & penyelesaian sengketa privacy-preserving untuk pembayaran agen-ke-agen 
 
 Spesifikasi lengkap: [`prd-arsitektur.md`](./prd-arsitektur.md). Log toolchain & pengukuran per-task: [`docs/TOOLCHAIN.md`](./docs/TOOLCHAIN.md).
 
-**Status implementasi:** kontrak, sirkuit, dan SDK lengkap dan lulus seluruh suite lokal (Anvil + Foundry + circuits). **Deploy ke testnet 46630 sudah di-broadcast dan 7/7 kontrak terverifikasi di Blockscout (20 Sep 2026, blok 121.731.938 = `0x7417b62`)**; test integrasi "kooperatif" dan "sengketa" (bukti Groth16 asli + `settle()`) **lulus di chain 46630** — tx bukti liveness ada di tabel [Alamat kontrak](#alamat-kontrak). Release proving key: [`v0.1.0-zkey`](https://github.com/mdlog/AegisClear/releases/tag/v0.1.0-zkey). Gas Stylus vs Yul terukur on-chain (`docs/benchmarks/poseidon.md`) — D2 ditutup: Stylus hanya untuk anchored mode (P1).
+**Status implementasi:** kontrak, sirkuit, dan SDK lengkap dan lulus seluruh suite lokal (Anvil + Foundry + circuits). **Deploy v1 ke testnet 46630 — implementasi P1 dengan epoch/rollover (FR-10), payout hook via `AegisTreasuryRouter` (FR-26), dan anchored mode (FR-25) — sudah di-broadcast dan 7/7 kontrak terverifikasi di Blockscout (20 Sep 2026, blok 121.982.356 = `0x7454d94`)**, menggantikan deploy v0/P0 sebelumnya (tetap didokumentasikan sebagai riwayat, lihat [deploy v0](#deploy-v0-riwayat-20-sep-2026)). Program Stylus `AegisPoseidon` (port circomlib Poseidon v1, dioptimasi) **aktif on-chain** di `0x1027cf7DC26152012ed9Ef949Aa1432Bf1C7ef34` dan dipakai `factoryAnchored`. Test integrasi SDK terhadap 46630: **13 lulus, 4 dilewati otomatis** (test yang memakai akun Anvil #4/#5 hardcode, tidak dirancang jalan di luar chain id `31337`) — tx bukti liveness ada di tabel [Alamat kontrak](#alamat-kontrak). Release proving key: [`v0.1.0-zkey`](https://github.com/mdlog/AegisClear/releases/tag/v0.1.0-zkey). Gas Stylus vs Yul terukur on-chain dengan Poseidon **v1 kompatibel-sirkuit** (`docs/benchmarks/poseidon.md`) — D2: Stylus dipertahankan untuk anchored mode (P1), rasio **1,75× total / ≈1,9× eksekusi** pada jalur 7-hash `ack`.
 
 ## Lihat di browser (web console)
 
@@ -19,9 +19,12 @@ Mode local mengabaikan `RPC_URL` non-localhost (jatuh ke Anvil `127.0.0.1:8545` 
 
 Halaman `http://localhost:4040` (port `WEB_PORT`) memuat: **dashboard channel** (semua `ChannelOpened` di factory deployment, state/seq/A/budget/deadline/bukti, klik untuk detail + event), **panel demo** Pasar A vs Pasar B — tombol menjalankan skenario §14 di server (provider, klien A/B, proving Groth16 semuanya di proses Node; tidak ada wallet di browser) dan men-stream langkahnya (SSE) dengan tautan explorer, lalu tabel perbandingan, kartu **"privat"** (syarat & metrik yang tidak pernah masuk chain) vs **"yang dilihat chain"** (T, R, A, payToClient) dan tombol **leak-check**; serta JSON 402 mentah yang dilihat klien x402. Provider yang sama di-mount di `http://localhost:4040/provider` (`GET /job` → 402) lengkap dengan challenge responder in-process. Pengembangan UI: `pnpm web:dev` (Vite di :4043, proxy ke :4040). API: `GET /api/config`, `/api/channels`, `/api/channels/:addr`, `POST /api/demo/run {scenario}`, `GET /api/demo/runs`, `/api/demo/runs/:id`, `/api/demo/runs/:id/events` (SSE), `/api/demo/leak-check/:runId`, `/api/offer?client=A|B`.
 
+Sejak deploy v1 (20 Sep 2026), `AEGIS_NETWORK=testnet` otomatis memakai alamat baru di `contracts/deployments/testnet-46630.json` (`factory`, `factoryProd`, `factoryAnchored`, `router`, `poseidon`); dashboard channel memindai ketiga factory sekaligus dan menandai setiap channel dengan factory asalnya, termasuk tag `factoryAnchored` untuk channel anchored (Stylus `AegisPoseidon`) — lihat [Rollover, treasury router, anchored mode](#rollover-treasury-router-anchored-mode).
+
 ## Daftar isi
 - [Lihat di browser (web console)](#lihat-di-browser-web-console)
 - [Ringkasan produk](#ringkasan-produk)
+- [Rollover, treasury router, anchored mode](#rollover-treasury-router-anchored-mode)
 - [Alamat kontrak](#alamat-kontrak)
 - [Menjalankan secara lokal](#menjalankan-secara-lokal)
 - [Peran & kendali (matriks akses)](#peran--kendali-matriks-akses)
@@ -41,15 +44,49 @@ AegisClear adalah evaluator itu. Ia adalah **sirkuit**, bukan manusia atau LLM:
 
 1. **Micro-escrow state channel** — klien mendanai satu channel USDG per pasangan agen; setiap unit layanan menghasilkan *receipt* yang ditandatangani kedua pihak dan terakumulasi off-chain. Chain hanya melihat komitmen.
 2. **ZK settlement** — jika klien menuntut penalti SLA, ia mengirim bukti Groth16 bahwa *"di bawah syarat yang berkomitmen di `termsCommitment` dan receipt di bawah `receiptsRoot` yang kami berdua tanda tangani, penalti yang sah adalah X"*. Kontrak memverifikasi (**229.241 gas** terukur untuk verifier Groth16 dengan 6 input publik — `contracts/test/Verifier.t.sol`, bukti EX1 asli; lihat `docs/TOOLCHAIN.md` Task 6) dan membagi dana **proporsional** — tanpa pernah melihat harga, ambang, atau metrik.
-3. **Payout ke alamat bebas** — `payoutClient`/`payoutProvider` ditetapkan saat `open` dan boleh berupa brankas armada, Safe, atau smart account ERC-4337, bukan hot wallet agen. **Hanya itu yang ada di P0/repo ini.** `AegisTreasuryRouter` (pemetaan agen → treasury per armada, spec §8.4, P1) **belum diimplementasikan** — ia bagian dari Plan 2 (`docs/superpowers/plans/2026-09-19-aegisclear-mvp.md`, "Scope plan ini").
+3. **Payout ke alamat bebas** — `payoutClient`/`payoutProvider` ditetapkan saat `open` dan boleh berupa brankas armada, Safe, atau smart account ERC-4337, bukan hot wallet agen. Di P1, `AegisTreasuryRouter` (pemetaan agen → treasury per armada, spec §8.4) **sudah diimplementasikan dan live di testnet 46630** — lihat [Rollover, treasury router, anchored mode](#rollover-treasury-router-anchored-mode) di bawah.
 
 Konteks singkat: agen otonom di Robinhood Chain sudah saling membayar hari ini lewat rel x402/MPP `exact` (bayar dulu, terima kemudian, tanpa recourse). Untuk pekerjaan mesin bernilai puluhan–ribuan dolar, pola *pay-first* itu membuat pembeli menanggung seluruh risiko wanprestasi. AegisClear menyisipkan escrow + bukti ZK di antara deposit dan pelepasan dana, tanpa membuka harga satuan, ambang SLA, atau telemetri ke chain publik (§6.7).
 
+## Rollover, treasury router, anchored mode
+
+*(P1 — spec §5.6, §8.3, §8.4; live di testnet 46630 deploy v1, lihat [Alamat kontrak](#alamat-kontrak))*
+
+Tiga kapabilitas baru di atas channel P0 (fund → checkpoint → settle), dari sudut pandang integrator SDK:
+
+1. **Rollover epoch (FR-10).** Satu epoch channel co-signed dibatasi `MAX_SEQ = 128` unit; provider menolak unit ke-129 dengan `409 epoch-full`. Klien memanggil `await client.rollover()` (`AegisClient.rollover()`, `sdk/src/client/agent.ts`): menandatangani `Rollover(epoch, seq, toProvider)` (EIP-712), mengirimkannya ke `POST /rollover` provider, mem-broadcast tx `rollover()` on-chain (epoch bertambah 1, sisa deposit epoch lama jadi budget epoch baru, `seq`/`R`/`A` di-reset ke nol), lalu memanggil `POST /rollover/confirm` untuk tiket keluar (`Close`) epoch baru. Aman dipanggil ulang: tx `rollover` yang sudah tercatat tidak dikirim ulang. Dibuktikan di skenario 11 (lihat tabel liveness di bawah).
+2. **Treasury router (FR-26).** `AegisTreasuryRouter` memisahkan alamat payout channel dari treasury operasional agen: provider mengarahkan payout-nya lewat `ProviderOptions.payoutProvider = <alamat router>` (`createProviderApp`), dan agen (EOA, Safe, atau akun 4337 — siapa pun `msg.sender`) memanggil `AegisTreasuryRouter.setTreasury(treasury)` on-chain untuk mengatur treasury-nya **sendiri** (bukan `setTreasury(agent, treasury)` — router tidak bisa mengatur treasury pihak lain). Bila belum diset, `onPayout` meneruskan dana ke agen itu sendiri. Tanpa custody: penerusan terjadi dalam transaksi yang sama; bila transfer ke treasury gagal (mis. dibekukan), jumlahnya tercatat sebagai kredit yang bisa ditarik lewat `claim()`. Dibuktikan di skenario 13.
+3. **Anchored mode (FR-25).** Alternatif checkpoint off-chain untuk job bernilai tinggi/frekuensi rendah yang tidak mau bergantung pada asumsi liveness channel: provider dijalankan dengan `ProviderOptions.anchored = true` di atas `factoryAnchored` (`POSEIDON` = program Stylus `AegisPoseidon`, bukan `address(0)`); setiap unit di-*ack* lewat transaksi `ack(seq, leaf, cumulativeAmount, sigProvider)` on-chain, bukan checkpoint co-signed off-chain. Kontrak memasukkan `leaf` ke pohon Merkle inkremental kedalaman 7 (7 hash Poseidon t=3 per `ack`, `IPoseidonPath.insertPath`). **Yang bocor ke chain per ack: hash daun (`leaf = Poseidon(seq, qty, m1, m2, due)`) dan `cumulativeAmount`** — `qty`/`m1`/`m2`/`due` mentah dan metrik SLA **tidak pernah** dikirim on-chain (hanya ditandatangani off-chain via EIP-712 `Leaf`), persis seperti mode co-signed (§6.7). Klien menurunkan mode ini dari `factory.POSEIDON()` on-chain, bukan dari klaim 402 mentah-mentah (T-mode — 402 yang bohong soal `anchored` ditolak `start()`). Dibuktikan di 4 skenario anchored (lihat tabel liveness); gas terukur di [Alamat kontrak](#alamat-kontrak) dan `prd-arsitektur.md` §8.7.
+
+Gas anchored (`ack`) dibayar dengan Stylus di testnet 46630 (`factoryAnchored` menunjuk `AegisPoseidon`, D2 — lihat `docs/benchmarks/poseidon.md`); Yul (`PoseidonPathYul`) tetap tersedia sebagai Rencana B (Anvil/Foundry, atau chain lain tanpa Stylus).
+
 ## Alamat kontrak
 
-### Testnet 46630 (Robinhood Chain)
+### Testnet 46630 (Robinhood Chain) — deploy v1 (epoch/rollover, payout hook, anchored mode)
 
-Di-deploy 20 Sep 2026 dari `contracts/script/DeployTestnet.s.sol` (deployer `0x90351bB1E85a17D5f70c62C0cC076D39D897076D`, blok `0x7417b62`); semua source terverifikasi di Blockscout. `contracts/deployments/testnet-46630.json` sengaja tidak di-commit (`.gitignore`) — tabel ini adalah salinannya.
+Di-deploy 20 Sep 2026 dari `contracts/script/DeployTestnet.s.sol` (deployer `0x90351bB1E85a17D5f70c62C0cC076D39D897076D`, blok `121.982.356` = `0x7454d94`, `POSEIDON_STYLUS=0x1027cf7DC26152012ed9Ef949Aa1432Bf1C7ef34`); semua source terverifikasi di Blockscout (7/7). `contracts/deployments/testnet-46630.json` sengaja tidak di-commit (`.gitignore`) — tabel ini adalah salinannya.
+
+| Kontrak | Variabel deploy | Alamat | Explorer |
+|---|---|---|---|
+| `MockUSDG` | `usdg` | `0x7455E600be30C511175B410453E8a23dF52E94EF` | [0x7455E600…](https://explorer.testnet.chain.robinhood.com/address/0x7455E600be30C511175B410453E8a23dF52E94EF) |
+| `SLASettlementVerifier` | `verifier` | `0x7B8ad2d9e848e4Ac62f6Df30283D50Df36D56273` | [0x7B8ad2d9…](https://explorer.testnet.chain.robinhood.com/address/0x7B8ad2d9e848e4Ac62f6Df30283D50Df36D56273) |
+| `AegisChannelFactory` (demo, co-signed, `MIN_CHALLENGE_WINDOW` = 60 s) | `factory` | `0x596E9f218a0e73Cb8a22F5cDcb93FD681F24dAfF` | [0x596E9f21…](https://explorer.testnet.chain.robinhood.com/address/0x596E9f218a0e73Cb8a22F5cDcb93FD681F24dAfF) |
+| `AegisChannelFactory` (produksi, co-signed, `MIN_CHALLENGE_WINDOW` = 21.600 s / 6 jam) | `factoryProd` | `0xf8e93aE5790a3484874963ADE7397Bc5006dFE5a` | [0xf8e93aE5…](https://explorer.testnet.chain.robinhood.com/address/0xf8e93aE5790a3484874963ADE7397Bc5006dFE5a) |
+| `AegisChannelFactory` (anchored — FR-25, `MIN_CHALLENGE_WINDOW` = 60 s, `POSEIDON` = Stylus `AegisPoseidon`) | `factoryAnchored` | `0x1fB7d8E1445802508c1003aE4543467a3f7c6147` | [0x1fB7d8E1…](https://explorer.testnet.chain.robinhood.com/address/0x1fB7d8E1445802508c1003aE4543467a3f7c6147) |
+| `AegisTreasuryRouter` (FR-26) | `router` | `0xe4A87335A54d50bf5E2afd830dc917b33b697689` | [0xe4A87335…](https://explorer.testnet.chain.robinhood.com/address/0xe4A87335A54d50bf5E2afd830dc917b33b697689) |
+| `SimpleJobEscrow` (kontrol Pasar A, evaluator biner — §14) | `escrow` | `0xC4b08e8Fd02ef1549F129A509A04a8e6319fAb9C` | [0xC4b08e8F…](https://explorer.testnet.chain.robinhood.com/address/0xC4b08e8Fd02ef1549F129A509A04a8e6319fAb9C) |
+| `AegisPoseidon` (Stylus — FR-25, circomlib Poseidon v1, port teroptimasi, 21,7 KB terkompresi, **aktif**) | `poseidon` | `0x1027cf7DC26152012ed9Ef949Aa1432Bf1C7ef34` | [0x1027cf7D…](https://explorer.testnet.chain.robinhood.com/address/0x1027cf7DC26152012ed9Ef949Aa1432Bf1C7ef34) |
+
+**Yul twin di testnet (pembanding apples-to-apples untuk D2, bukan bagian deployment produksi — lihat `docs/benchmarks/poseidon.md`):**
+
+| Kontrak | Alamat | Explorer |
+|---|---|---|
+| `PoseidonT3` (library, `poseidon-solidity`) | `0xd52e29197D7Fc27FB79240097B92a169408Ad3d1` | [0xd52e2919…](https://explorer.testnet.chain.robinhood.com/address/0xd52e29197D7Fc27FB79240097B92a169408Ad3d1) |
+| `PoseidonPathYul` (`IPoseidonPath`, kembaran ABI dari `AegisPoseidon`, Rencana B bila `POSEIDON_STYLUS` kosong) | `0x804318aE7b0cFCE9e1995A84B7833d95B2713766` | [0x804318aE…](https://explorer.testnet.chain.robinhood.com/address/0x804318aE7b0cFCE9e1995A84B7833d95B2713766) |
+
+#### Deploy v0 (riwayat, 20 Sep 2026)
+
+Implementasi P0 (sebelum epoch/rollover, payout hook, anchored mode); digantikan oleh deploy v1 di atas dan tidak lagi dipakai `AEGIS_NETWORK=testnet`. Di-deploy dari `contracts/script/DeployTestnet.s.sol` (deployer sama, blok `121.731.938` = `0x7417b62`); 7/7 source terverifikasi di Blockscout saat itu.
 
 | Kontrak | Variabel deploy | Alamat | Explorer |
 |---|---|---|---|
@@ -59,14 +96,33 @@ Di-deploy 20 Sep 2026 dari `contracts/script/DeployTestnet.s.sol` (deployer `0x9
 | `AegisChannelFactory` (produksi, `MIN_CHALLENGE_WINDOW` = 21.600 s / 6 jam) | `factoryProd` | `0x201BaC41758a45925E1eD7a9Ad79757F19337fDD` | [0x201BaC41…](https://explorer.testnet.chain.robinhood.com/address/0x201BaC41758a45925E1eD7a9Ad79757F19337fDD) |
 | `SimpleJobEscrow` (kontrol Pasar A, evaluator biner — §14) | `escrow` | `0x5017C9e556bF750aEE1aB9e74aA094a91924964a` | [0x5017C9e5…](https://explorer.testnet.chain.robinhood.com/address/0x5017C9e556bF750aEE1aB9e74aA094a91924964a) |
 
-**Bukti liveness di 46630 (test integrasi SDK, 20 Sep 2026):**
+**Bukti liveness di 46630 — deploy v1 (test integrasi SDK, 20 Sep 2026; 13/13 lulus, 973 s; semua channel di bawah berakhir `SETTLED`):**
 
-| Skenario | Channel (clone) | Tx kunci | Hasil on-chain |
-|---|---|---|---|
-| Kooperatif — 10 unit, `closeCooperative` | [`0x8f991b6e…2844`](https://explorer.testnet.chain.robinhood.com/address/0x8f991b6ebbe5a7725fd01d4da9e870dddd5c2844) | open [`0x28e4b0b9…`](https://explorer.testnet.chain.robinhood.com/tx/0x28e4b0b9cdbcd1a52c121226dba96fa3fae558b162319986171060f3c72e61c5) · settle [`0xd46d1343…`](https://explorer.testnet.chain.robinhood.com/tx/0xd46d13430464febbd7ff07c946a95d9f847bf4c465c2095a86b8c8c03a7a2325) | `Settled(seq 10, toProvider 200.000, toClient 800.000, cooperative)` |
-| Sengketa — 1 pelanggaran, bukti Groth16, `settle` setelah jendela 120 s nyata | [`0xbcb09638…f3be`](https://explorer.testnet.chain.robinhood.com/address/0xbcb096386994cc4fb3972d0495600ead1db6f3be) | checkpoint [`0x643bf252…`](https://explorer.testnet.chain.robinhood.com/tx/0x643bf252eb5f60a53a7e56af2117b8f4c99ff9e7ed8f345fec72ae9e7760f1d3) · **claimPenalty** [`0x54355aef…`](https://explorer.testnet.chain.robinhood.com/tx/0x54355aefbcd9f651ebd5e0ca067ec0111036461f2509d23177c21d28206e93a6) · settle [`0xd903f389…`](https://explorer.testnet.chain.robinhood.com/tx/0xd903f389f47abf58ef1ff8b052b130e7e30bb04f1131441ae1c7b7cb307e37bc) | `PenaltyClaimed(seq 10, 10.000)`; `Settled(10, A 200.000, penalti 10.000, toProvider 190.000, toClient 810.000)` |
+Factory co-signed (`factory`, demo):
 
-Gas terukur di 46630 (klien sengketa): `fund` 58.413 · `submitCheckpoint` 118.929 · `claimPenalty` 309.373 · `settle` 98.291 (proving Groth16 di klien ±4 s).
+| Skenario | Channel | Tx `open` |
+|---|---|---|
+| Kooperatif — klien A, 10 unit | [`0xb166f187…487b`](https://explorer.testnet.chain.robinhood.com/address/0xb166f1879a2eaeb37304308575b28b079936487b) | [`0xcb97bbf6…4090`](https://explorer.testnet.chain.robinhood.com/tx/0xcb97bbf6abae693404cfab1392ae7cffdf0dca49f27ca32484e149ff5bd44090) |
+| Sengketa — klien B, 1 pelanggaran + bukti Groth16 | [`0x18fd339c…5444`](https://explorer.testnet.chain.robinhood.com/address/0x18fd339c86c1f9841779ab1341f6cb9fe9265444) | [`0x3f8d9aee…8849`](https://explorer.testnet.chain.robinhood.com/tx/0x3f8d9aeed24919e257a243cea237847e468e30b5871a894ba8229d80df028849) |
+| Skenario 11 (FR-10) — epoch penuh → `rollover()` → lanjut epoch 1 → close | [`0x188febd7…37c7`](https://explorer.testnet.chain.robinhood.com/address/0x188febd7f3559133020a9aa0988b3ea086c437c7) | [`0xe2d6e114…bd3a`](https://explorer.testnet.chain.robinhood.com/tx/0xe2d6e1144f641867a04ad958b048e84948059e2c430a786ea32d1a5f17d6bd3a) |
+| F3 — klien B, `ClientPolicy` menolak qty di luar batas, keluar lewat tiket seq-0 | [`0x8e6fcb4d…f0b5`](https://explorer.testnet.chain.robinhood.com/address/0x8e6fcb4d6d4e703490cbdd3dd0304fa20012f0b5) | — (bukti lengkap: `readChannel` di akhir test, `sdk/test/integration.test.ts`) |
+| Skenario 13 (FR-26) — `payoutProvider` = `AegisTreasuryRouter`, treasury dibayar dalam tx `close` yang sama | [`0x5a57e6ed…fde1`](https://explorer.testnet.chain.robinhood.com/address/0x5a57e6edc1186ec1a2dc1c16d26b8e6f3b6ffde1) | [`0x848f7823…9c11`](https://explorer.testnet.chain.robinhood.com/tx/0x848f7823476b4425669857caf1a0621133f25d8c91e95f98c95c9832a2d69c11) |
+
+Factory anchored (`factoryAnchored`, FR-25, Stylus `AegisPoseidon`):
+
+| Skenario | Channel | Tx `open` |
+|---|---|---|
+| Sengketa anchored — 10 `ack` on-chain (1 pelanggaran) → `startClose` → bukti → settle | [`0xa9c8bea6…7ee7`](https://explorer.testnet.chain.robinhood.com/address/0xa9c8bea6745820f03254c60c0ae984b4a8ad7ee7) | [`0x517445dc…7dda`](https://explorer.testnet.chain.robinhood.com/tx/0x517445dc227b2594adbf848e4f6a42faf6e546e26fbed47d6246549d8b067dda) |
+| Provider memanggil `startClose()` lebih dulu (CLOSING) — `dispute()` tetap lanjut ke bukti | [`0x0c7dbeba…27dc`](https://explorer.testnet.chain.robinhood.com/address/0x0c7dbeba89c83c7ac446b76b2af258a096f227dc) | — |
+| Kooperatif anchored — 5 `ack` → close (klien menandatangani dulu) | [`0x2858e618…d6f9`](https://explorer.testnet.chain.robinhood.com/address/0x2858e6185a17641ee28fd3976f5c19012ca1d6f9) | — |
+| Keluar unilateral anchored — provider tidak menjawab → `startClose` → settle, deposit kembali penuh | [`0xf63e7199…7bec`](https://explorer.testnet.chain.robinhood.com/address/0xf63e7199be7ac0098946abdf8736c480408c7bec) | — |
+
+Tx `open` yang ditandai "—" tidak dicatat terpisah oleh controller; status `SETTLED` masing-masing channel diverifikasi lewat pembacaan on-chain (`readChannel`) di akhir test yang bersangkutan.
+
+Gas terukur di 46630 (deploy v1, proving Groth16 di klien ±4 s):
+- **Sengketa co-signed** (klien B): `fund` **57.905** · `submitCheckpoint` **118.113** · `claimPenalty` **308.256** · `settle` **102.427**.
+- **Sengketa anchored** (Stylus `AegisPoseidon`): `fund` **59.872** · `ack` pertama **357.028** (storage dingin), lalu **211.021–217.237** stabil (9 `ack` berikutnya) · `startClose` **65.484** · `claimPenalty` **312.706** · `settle` **102.427**.
+- **Anchored `ack` di Anvil lokal** (jalur Yul, pembanding — bukan testnet): pertama **449.142**, stabil **≈303.400–309.400**.
 
 ### Alamat kanonik lintas-chain (dipakai apa adanya, tidak di-deploy ulang)
 
@@ -219,17 +275,30 @@ Salin `.env.example` → `.env`, isi `PK_DEPLOYER`/`PK_PROVIDER`/`PK_CLIENT_A`/`
 set -a; source .env; set +a
 ```
 
-### (a) Deploy + verifikasi Blockscout
+### (a) Deploy program Stylus `AegisPoseidon`, lalu kontrak + verifikasi Blockscout
+
+`AegisChannelFactory` anchored (FR-25) butuh alamat program Stylus **sebelum** di-deploy — jalankan `cargo stylus deploy` lebih dulu:
+
+```bash
+cd stylus/aegis-poseidon
+export CARGO_TARGET_DIR=/tmp/aegis-stylus-target   # partisi /home sering nyaris penuh, lihat docs/benchmarks/poseidon.md §2
+cargo stylus deploy --endpoint $RPC_URL --private-key $PK_DEPLOYER
+# catat alamat yang dicetak → testnet 46630: 0x1027cf7DC26152012ed9Ef949Aa1432Bf1C7ef34 (21,7 KB terkompresi, aktivasi lolos)
+cd ../..
+```
+
+Lalu deploy kontrak Solidity dengan `POSEIDON_STYLUS` diisi alamat di atas (kosongkan variabelnya untuk memakai Rencana B `PoseidonPathYul` — lihat komentar di `.env.example`):
 
 ```bash
 cd contracts
-forge script script/DeployTestnet.s.sol --rpc-url $RPC_URL --broadcast --private-key $PK_DEPLOYER \
+POSEIDON_STYLUS=0x1027cf7DC26152012ed9Ef949Aa1432Bf1C7ef34 \
+  forge script script/DeployTestnet.s.sol --rpc-url $RPC_URL --broadcast --private-key $PK_DEPLOYER \
   --verify --verifier blockscout --verifier-url https://explorer.testnet.chain.robinhood.com/api/
 cat deployments/testnet-46630.json
 cd ..
 ```
 
-Hasil yang diharapkan: 5 alamat (`usdg`, `verifier`, `factory`, `factoryProd`, `escrow`) di `contracts/deployments/testnet-46630.json`, dan halaman explorer masing-masing kontrak menampilkan source terverifikasi. **Jangan commit file ini** (sudah di `.gitignore`) — isi tabel di [Alamat kontrak](#alamat-kontrak) secara manual dari isinya untuk dibagikan di pitch/submission.
+Hasil yang diharapkan: 8 alamat (`usdg`, `verifier`, `factory`, `factoryProd`, `factoryAnchored`, `poseidon`, `escrow`, `router`) + `chainId`/`deployBlock` di `contracts/deployments/testnet-46630.json`, dan halaman explorer masing-masing kontrak (termasuk `AegisPoseidon`) menampilkan source terverifikasi. Script menjalankan known-answer check `hash2(1,2)` terhadap `poseidon` sebelum men-deploy `factoryAnchored` — wiring Poseidon yang salah gagal jelas di sini (`revert POSEIDON_STYLUS: wrong Poseidon`), bukan diam-diam menghasilkan root yang salah. **Jangan commit file ini** (sudah di `.gitignore`) — isi tabel di [Alamat kontrak](#alamat-kontrak) secara manual dari isinya untuk dibagikan di pitch/submission.
 
 Jika `--verify` gagal saat broadcast (mis. timeout explorer), ulangi per kontrak:
 
@@ -256,19 +325,19 @@ Jalankan dari **root repo** (`pnpm --filter` mengeksekusi script `test` dengan c
 
 ```bash
 DEPLOY_FILE=contracts/deployments/testnet-46630.json CHAIN_ID=46630 RPC_URL=$RPC_URL \
-  pnpm --filter @aegisclear/sdk test -- integration
+  pnpm --filter @aegisclear/sdk test -- integration --testTimeout=600000
 ```
 
 Alternatif dengan path absolut (setara, kalau ragu soal direktori mana yang jadi acuan):
 
 ```bash
 DEPLOY_FILE="$(pwd)/contracts/deployments/testnet-46630.json" CHAIN_ID=46630 RPC_URL=$RPC_URL \
-  pnpm --filter @aegisclear/sdk test -- integration
+  pnpm --filter @aegisclear/sdk test -- integration --testTimeout=600000
 ```
 
-Jika `DEPLOY_FILE` salah eja/tidak ada, test tidak diam-diam ter-skip — konsol mencetak `integration: deploy file not found at <path> — suite skipped` sebelum vitest melaporkan 0 test.
+`--testTimeout=600000` (10 menit/test) diperlukan karena beberapa jendela tantangan (60 s/120 s) ditunggu secara nyata (bukan `evm_increaseTime`) dan default timeout vitest (5 s) jauh lebih pendek. Jika `DEPLOY_FILE` salah eja/tidak ada, test tidak diam-diam ter-skip — konsol mencetak `integration: deploy file not found at <path> — suite skipped` sebelum vitest melaporkan 0 test.
 
-Hasil yang diharapkan: test "kooperatif" (`PK_CLIENT_A`) dan "sengketa" (`PK_CLIENT_B`, termasuk bukti ZK asli + `settle()`) **PASS** di chain `46630`, ±3–4 menit karena jendela tantangan 120 s ditunggu secara nyata (bukan `evm_increaseTime`). Tx hash channel B (test sengketa) adalah bukti liveness untuk submission. Test lain di file ini (`/close`, tiket keluar unilateral, watcher in-process) memakai akun Anvil hardcode di luar `PK_CLIENT_A/B` dan **tidak** dirancang untuk lulus di testnet tanpa pendanaan tambahan — ini konsisten dengan cakupan Task 17.
+Hasil yang diharapkan (deploy v1, diverifikasi 20 Sep 2026): **13 test PASS** di chain `46630` — kooperatif & sengketa co-signed (`PK_CLIENT_A`/`PK_CLIENT_B`, termasuk bukti ZK asli + `settle()`), skenario 11 (rollover epoch), F3 (ClientPolicy + tiket keluar), skenario 13 (treasury router), dan keempat skenario anchored (sengketa, provider-`startClose`-dulu, kooperatif, keluar unilateral) — total **±973 detik (~16 menit)**. **4 test lain di-skip otomatis** di luar chain id `31337` (`it.skipIf(LOCAL_ONLY)`: `/close` seq basi, tiket keluar unilateral non-anchored, watcher in-process pengganti checkpoint basi, F2 balasan tanda tangan salah) karena memakai akun Anvil #4/#5 hardcode yang tidak berdana di testnet — ini bukan kegagalan, konsisten dengan cakupan Task 17. Tx `open`/`ack`/`claimPenalty` dari run ini adalah bukti liveness untuk submission — lihat tabel di [Alamat kontrak](#alamat-kontrak).
 
 ### (d) Menjalankan provider (watcher in-process) & watcher permissionless
 
