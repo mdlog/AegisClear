@@ -115,7 +115,7 @@ Implementasi P1 pertama (blok `121.982.356` = `0x7454d94`; 7/7 terverifikasi), d
 
 #### Deploy v0 (riwayat, 20 Sep 2026)
 
-Implementasi P0 (sebelum epoch/rollover, payout hook, anchored mode); digantikan oleh deploy v1 di atas dan tidak lagi dipakai `AEGIS_NETWORK=testnet`. Di-deploy dari `contracts/script/DeployTestnet.s.sol` (deployer sama, blok `121.731.938` = `0x7417b62`); 7/7 source terverifikasi di Blockscout saat itu.
+Implementasi P0 (sebelum epoch/rollover, payout hook, anchored mode); digantikan oleh deploy v1 (di atas, riwayat) dan kemudian v2 (aktif); tidak lagi dipakai `AEGIS_NETWORK=testnet`. Di-deploy dari `contracts/script/DeployTestnet.s.sol` (deployer sama, blok `121.731.938` = `0x7417b62`); 7/7 source terverifikasi di Blockscout saat itu.
 
 | Kontrak | Variabel deploy | Alamat | Explorer |
 |---|---|---|---|

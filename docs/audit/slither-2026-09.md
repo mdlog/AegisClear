@@ -150,9 +150,12 @@ guarantee rested on the accidental size of the post-hook code, not on a check.
 `63/64 · X`, so `gasleft() = X/64`; `X/64 < HOOK_GAS/63 ⇒ X < 64/63 · HOOK_GAS`, i.e. the hook was *not* offered the
 full stipend and the caller must retry with more gas. A hook that fails on its own (reverts early, or burns the full
 300k) leaves ≥ `HOOK_GAS/63` and is still ignored — T-hook is unchanged. EOA payees are untouched (no hook, no check).
-Cost: one `GAS` + compare (~30 gas) on contract payees only; the minimum *gas limit* for calls with contract payees
-rises to ≈305k at the hook (gas *used* does not change; the SDK/web use viem gas estimation, nothing is hardcoded, and
-success is monotonic in the limit so `eth_estimateGas` converges).
+Cost: one `GAS` + compare (~30 gas) on contract payees only. The guard changes the minimum *gas limit* only when the
+hook actually exhausts what it was offered: a hook that finishes within its budget leaves `gasleft() ≥ HOOK_GAS/63`
+as long as the caller had ≈ (hook cost + 4.8k) available at the call, so cheap hooks (the router ≈ 55k) need no extra
+headroom; only a hook that burns the full 300k pushes the required limit to ≈305k at the hook (gas *used* does not
+change; the SDK/web use viem gas estimation, nothing is hardcoded, and success is monotonic in the limit so
+`eth_estimateGas` converges).
 
 **Regression tests** (`test/HookGas.t.sol`, mocks `HeavyToken`, `NeedyPayout`, `GasProbePayout`; 3 of the 5 fail on
 the previous code, verified by re-running them against `git show 4144d3d:contracts/src/AegisChannel.sol`):
