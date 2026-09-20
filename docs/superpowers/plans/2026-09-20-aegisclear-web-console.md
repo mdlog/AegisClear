@@ -2013,6 +2013,8 @@ Halaman `http://localhost:4040` (port `WEB_PORT`) memuat: **dashboard channel** 
 
 Also in the existing "Menjalankan secara lokal" steps, after the demo CLI lines, add one line: `pnpm test:web   # butuh Anvil + DeployLocal seperti test SDK (RPC_URL untuk port lain)`.
 
+- [ ] **Step 1b: Wire the demo package into the repo's checks (Task 1 review carry-over)** — root `package.json`: add `"test:demo": "pnpm --filter @aegisclear/demo test"` and include it in `"test"`; create `demo/tsconfig.json` = `{ "extends": "../tsconfig.base.json", "compilerOptions": { "rootDir": ".", "noEmit": true, "types": ["node"] }, "include": ["src", "test", "run.ts", "leak-check.ts"] }` and `"typecheck": "tsc -p tsconfig.json --noEmit"` in `demo/package.json` (add `typescript`/`@types/node` devDependencies if missing); `pnpm --filter @aegisclear/demo typecheck` must be clean. In `demo/leak-check.ts`, wrap the `leakCheck` call: `catch (e) { console.error(`BOCOR-CEK GAGAL: ${(e as Error).message}`); process.exit(1); }` (one-line diagnostic instead of a stack trace).
+
 - [ ] **Step 2: `docs/TOOLCHAIN.md`** — add a "Web console" row group: Vite, React, @vitejs/plugin-react, vitest versions actually installed (`pnpm --filter @aegisclear/web list --depth 0`).
 
 - [ ] **Step 3: `prd-arsitektur.md` §14** — append after the "Lingkungan:" paragraph:
