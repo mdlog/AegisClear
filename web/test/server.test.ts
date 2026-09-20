@@ -158,4 +158,33 @@ describe.skipIf(!DEPLOY_EXISTS)("web console server (Anvil)", () => {
     expect(offer.body.accepts[0].extra.aegis.config.client).toBe(privateKeyToAccount(srv.cfg.keys.b).address);
     expect(offer.body.accepts[0].payTo).toMatch(/^0x[0-9a-fA-F]{40}$/);
   });
+
+  it("B-anchored-dispute: 20 ack on-chain via factoryAnchored → 0.02 / 0.38, channel mode anchored, leak-check tanpa metrik", async () => {
+    const r = await post("B-anchored-dispute"); expect(r.status).toBe(202);
+    const run = await waitRun(((await r.json()) as { runId: string }).runId);
+    expect(run.status, run.error).toBe("done");
+    expect(run.result![0].pasar).toBe("B: AegisClear anchored (ack on-chain, sengketa)");
+    expect(run.result![0].klien_provider).toBe("0.02 / 0.38");
+    const ackSteps = run.steps.filter((s) => s.label === "ack");
+    expect(ackSteps.length).toBe(20);
+    const ch = (await get<{ channels: ChannelSummary[] }>("/api/channels")).channels.find((x) => x.channel === run.channels[0])!;
+    expect(ch.mode).toBe("anchored"); expect(ch.seq).toBe(20); expect(ch.state).toBe("SETTLED");
+    const rep = await get<LeakResponse[]>(`/api/demo/leak-check/${run.id}`);
+    expect(rep[0].leaks).toBe(0);
+    // open + fund + 20 ack + startClose + claimPenalty [+ settle bila klien menang balapan settle() dengan
+    // watcher provider (C1, sama seperti B-dispute) — jadi 24 atau 25, bukan angka tetap; yang wajib benar
+    // adalah setiap tx "ack" klien (20 tx on-chain FR-25) ikut terpindai leak-check.
+    expect(rep[0].txs.length).toBeGreaterThanOrEqual(23);
+    for (const s of ackSteps) expect(rep[0].txs).toContain(s.txHash);
+  });
+
+  it("B-rollover: 128 + 5 unit dengan satu deposit → 0.00 / 2.66, epoch on-chain 1", async () => {
+    const r = await post("B-rollover"); expect(r.status).toBe(202);
+    const run = await waitRun(((await r.json()) as { runId: string }).runId);
+    expect(run.status, run.error).toBe("done");
+    expect(run.result![0].klien_provider).toBe("0.00 / 2.66");
+    expect(run.steps.filter((s) => s.txHash).map((s) => s.label)).toEqual(expect.arrayContaining(["fund", "rollover", "closeCooperative"]));
+    const ch = (await get<{ channels: ChannelSummary[] }>("/api/channels")).channels.find((x) => x.channel === run.channels[0])!;
+    expect(ch.epoch).toBe(1); expect(ch.state).toBe("SETTLED");
+  });
 });

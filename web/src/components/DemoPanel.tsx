@@ -9,6 +9,8 @@ import { OfferView } from "./OfferView";
 
 const LABEL: Record<ScenarioId, string> = {
   "B-cooperative": "B · kooperatif (klien A)", "B-dispute": "B · sengketa + bukti (klien B)",
+  "B-anchored-dispute": "B · anchored: 20 ack on-chain + sengketa (klien A)",
+  "B-rollover": "B · rollover: 128 + 5 unit, 1 deposit (klien B)",
   "A-complete": "A · escrow biner: complete", "A-reject": "A · escrow biner: reject", all: "Jalankan semua (4 baris §14)",
 };
 

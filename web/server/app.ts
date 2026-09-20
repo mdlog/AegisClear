@@ -26,7 +26,12 @@ export const j = (o: unknown) => JSON.parse(JSON.stringify(o, (_, v) => (typeof 
 
 export interface WebServer {
   app: Hono; cfg: WebConfig;
-  services: { chain: ChainServices; index: ChannelIndex; provider: ReturnType<typeof createProviderApp>; runIdOf: Map<Address, string>; store: RunStore; runner: ReturnType<typeof makeRunner> };
+  services: {
+    chain: ChainServices; index: ChannelIndex; provider: ReturnType<typeof createProviderApp>;
+    /** provider anchored (`/provider-anchored`) — undefined bila deployment ini tidak punya `factoryAnchored`. */
+    providerAnchored?: ReturnType<typeof createProviderApp>;
+    runIdOf: Map<Address, string>; store: RunStore; runner: ReturnType<typeof makeRunner>;
+  };
   start(): Promise<{ port: number }>; stop(): Promise<void>;
 }
 
@@ -49,8 +54,22 @@ export function createWebServer(cfg: WebConfig): WebServer {
     challengeWindow: cfg.windows.challenge, responseWindow: cfg.windows.response, metrics: metricsFor,
   });
   app.route("/provider", providerApp.app);
+  // Provider anchored (FR-25): factory terpisah (POSEIDON() != 0) → ack klien = tx on-chain, tanpa checkpoint
+  // co-signed. Hanya dipasang bila deployment ini benar-benar punya factoryAnchored (mis. deployment lama tidak).
+  const providerAnchoredApp = cfg.deployment.factoryAnchored
+    ? createProviderApp({
+        ctx: chain.ctx(cfg.keys.provider, cfg.deployment.factoryAnchored), account: providerAccount, usdg: cfg.deployment.usdg, terms: TERMS_BASE, unitQty: 1n, deposit: DEPOSIT_B,
+        challengeWindow: cfg.windows.challenge, responseWindow: cfg.windows.response, metrics: metricsFor, anchored: true,
+      })
+    : undefined;
+  if (providerAnchoredApp) app.route("/provider-anchored", providerAnchoredApp.app);
   const store = new RunStore();
-  const runner = makeRunner({ cfg, chain, store, provider: providerApp, runIdOf, providerUrl: `http://127.0.0.1:${cfg.port}/provider`, index });
+  const runner = makeRunner({
+    cfg, chain, store, provider: providerApp, providerAnchored: providerAnchoredApp, runIdOf,
+    providerUrl: `http://127.0.0.1:${cfg.port}/provider`,
+    providerAnchoredUrl: providerAnchoredApp ? `http://127.0.0.1:${cfg.port}/provider-anchored` : undefined,
+    index,
+  });
 
   app.get("/api/config", (c) => {
     const body: ConfigResponse = {
@@ -97,7 +116,11 @@ export function createWebServer(cfg: WebConfig): WebServer {
     const recs = runner.privateOf(c.req.param("runId"));
     if (!recs?.length) return c.json({ error: "run tidak dikenal atau tidak punya channel Pasar B" }, 404);
     const out: LeakResponse[] = [];
-    for (const p of recs) out.push({ channel: p.channel, ...(await leakCheck(chain.publicClient, cfg.deployment.factory, p.channel, p.txs, p.values, cfg.deployBlock)) });
+    for (const p of recs) {
+      // mode channel menentukan factory yang punya event ChannelOpened-nya (leakCheck memindai tx itu juga).
+      const factory = p.anchored ? cfg.deployment.factoryAnchored! : cfg.deployment.factory;
+      out.push({ channel: p.channel, ...(await leakCheck(chain.publicClient, factory, p.channel, p.txs, p.values, cfg.deployBlock)) });
+    }
     return c.json(out);
   });
   // 402 mentah yang dilihat klien x402 — membuat sesi provider untuk klien demo bila belum ada (tanpa efek on-chain).
@@ -118,6 +141,7 @@ export function createWebServer(cfg: WebConfig): WebServer {
   // dapat body JSON yang bisa di-parse, bukan fallback SPA (text/html) atau 404 polos bawaan Hono.
   app.all("/api/*", (c) => c.json({ error: "not found" }, 404));
   app.all("/provider/*", (c) => c.json({ error: "not found" }, 404));
+  app.all("/provider-anchored/*", (c) => c.json({ error: "not found" }, 404));
 
   // ---- static (web/dist) dengan fallback SPA; selalu terdaftar TERAKHIR ----
   app.get("/*", (c) => {
@@ -133,9 +157,9 @@ export function createWebServer(cfg: WebConfig): WebServer {
     return c.body(readFileSync(file), 200, { "content-type": MIME[path.extname(file)] ?? "application/octet-stream" });
   });
 
-  let server: ServerType | undefined; let watcher: Watcher | undefined;
+  let server: ServerType | undefined; let watcher: Watcher | undefined; let watcherAnchored: Watcher | undefined;
   return {
-    app, cfg, services: { chain, index, provider: providerApp, runIdOf, store, runner },
+    app, cfg, services: { chain, index, provider: providerApp, providerAnchored: providerAnchoredApp, runIdOf, store, runner },
     start: () => new Promise((resolve, reject) => {
       (async () => {
         // RPC yang benar-benar dilayani WAJIB cocok dengan chainId config — RPC_URL testnet yang salah
@@ -144,8 +168,11 @@ export function createWebServer(cfg: WebConfig): WebServer {
         const id = await chain.publicClient.getChainId();
         if (id !== cfg.chainId)
           throw new Error(`RPC ${cfg.rpcUrl} melayani chain ${id}, bukan ${cfg.chainId} — set RPC_URL=http://127.0.0.1:8545 (Anvil) atau AEGIS_NETWORK=testnet`);
-        // Responder T1 in-process (README §(d)): wajib berjalan di proses provider ini.
+        // Responder T1 in-process (README §(d)): wajib berjalan di proses provider ini — untuk KEDUA provider,
+        // co-signed dan anchored (masing-masing punya `sessions`/co-signed store sendiri di memori proses ini).
         watcher = providerApp.startProviderWatcher({ intervalMs: cfg.network === "local" ? 2_000 : 15_000, fromBlock: cfg.deployBlock, log: (s) => console.log(`[watcher] ${s}`) });
+        if (providerAnchoredApp)
+          watcherAnchored = providerAnchoredApp.startProviderWatcher({ intervalMs: cfg.network === "local" ? 2_000 : 15_000, fromBlock: cfg.deployBlock, log: (s) => console.log(`[watcher-anchored] ${s}`) });
         // Loopback secara default — semua endpoint di sini TANPA autentikasi dan kunci demo hidup di
         // proses ini (lihat README); WEB_HOST=0.0.0.0 adalah pilihan sadar untuk mengekspos.
         server = serve({ fetch: app.fetch, port: cfg.port, hostname: process.env.WEB_HOST ?? "127.0.0.1" }, (info) => resolve({ port: info.port }));
@@ -154,6 +181,7 @@ export function createWebServer(cfg: WebConfig): WebServer {
     }),
     stop: () => new Promise((resolve) => {
       watcher?.stop();
+      watcherAnchored?.stop();
       if (!server) { resolve(); return; }
       // ServerType (@hono/node-server) = Server | Http2Server | Http2SecureServer — closeAllConnections
       // ada di ketiganya saat runtime (Node ≥ 18.2) tapi tidak seragam di typing Http2Server; cast sempit

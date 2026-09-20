@@ -6,7 +6,8 @@ import type { WebConfig } from "./config.js";
 
 export interface ChainServices {
   publicClient: PublicClient;
-  ctx: (pk: Hex) => ChainCtx;
+  /** `factory` default: `cfg.deployment.factory` (co-signed). Provider anchored & runner anchored meneruskan `cfg.deployment.factoryAnchored`. */
+  ctx: (pk: Hex, factory?: Address) => ChainCtx;
   addressOf: (pk: Hex) => Address;
   /** MockUSDG.mint (permissionless) dari kunci faucet bila saldo `who` < `min`; 50 USDG per mint. */
   ensureUsdg: (who: Address, min: bigint) => Promise<{ minted: bigint }>;
@@ -18,8 +19,8 @@ export const MINT_AMOUNT = 50_000_000n;
 
 export function makeChain(cfg: WebConfig): ChainServices {
   const publicClient = createPublicClient({ chain: cfg.chain, transport: http(cfg.rpcUrl) });
-  const ctx = (pk: Hex): ChainCtx => ({
-    publicClient, chainId: cfg.chainId, factory: cfg.deployment.factory,
+  const ctx = (pk: Hex, factory: Address = cfg.deployment.factory): ChainCtx => ({
+    publicClient, chainId: cfg.chainId, factory,
     walletClient: createWalletClient({ account: privateKeyToAccount(pk), chain: cfg.chain, transport: http(cfg.rpcUrl) }),
   });
   const addressOf = (pk: Hex) => privateKeyToAccount(pk).address;

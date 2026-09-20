@@ -23,7 +23,7 @@ export function ChannelsTable({ cfg, onSelect }: { cfg: ConfigResponse | null; o
       {rows.length > 0 && (
         <div className="scroll">
           <table className="table">
-            <thead><tr><th>channel</th><th>klien</th><th>state</th><th>seq</th><th>A (USDG)</th><th>budget</th><th>deadline</th><th>bukti</th></tr></thead>
+            <thead><tr><th>channel</th><th>klien</th><th>mode</th><th>state</th><th>seq</th><th>epoch</th><th>A (USDG)</th><th>budget</th><th>deadline</th><th>bukti</th></tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr
@@ -36,8 +36,10 @@ export function ChannelsTable({ cfg, onSelect }: { cfg: ConfigResponse | null; o
                 >
                   <td><Addr a={r.channel} base={cfg?.explorerBase} />{r.runId && <span className="tag">run</span>}{r.factoryName !== "factory" && <span className="tag">{r.factoryName}</span>}</td>
                   <td><Addr a={r.client} base={cfg?.explorerBase} /></td>
+                  <td><span className={`pill mode-${r.mode}`}>{r.mode}</span></td>
                   <td><span className={`pill st-${r.state}`}>{r.state}</span></td>
                   <td>{r.seq}</td>
+                  <td>{r.epoch}</td>
                   <td>{fmtUsdg(r.cumulativeAmount)}</td>
                   <td>{fmtUsdg(r.budget)}</td>
                   <td>{r.state === "CLOSING" ? countdown(r.deadline, now) : "—"}</td>

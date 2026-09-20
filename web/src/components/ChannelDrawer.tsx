@@ -22,7 +22,7 @@ export function ChannelDrawer({ addr, cfg, onClose }: { addr: string; cfg: Confi
       {d && (
         <>
           <dl className="kv">
-            <dt>state</dt><dd><span className={`pill st-${d.state}`}>{d.state}</span> · seq {d.seq} · A {fmtUsdg(d.cumulativeAmount)} USDG · budget {fmtUsdg(d.budget)} USDG</dd>
+            <dt>state</dt><dd><span className={`pill st-${d.state}`}>{d.state}</span> <span className={`pill mode-${d.mode}`}>{d.mode}</span> · seq {d.seq} · epoch {d.epoch} · A {fmtUsdg(d.cumulativeAmount)} USDG · budget {fmtUsdg(d.budget)} USDG</dd>
             <dt>T (termsCommitment)</dt><dd><code>{d.termsCommitment}</code></dd>
             <dt>R (receiptsRoot)</dt><dd><code>{d.receiptsRoot}</code></dd>
             <dt>klien → payoutClient</dt><dd><Addr a={d.cfg.client} base={base} /> → <Addr a={d.cfg.payoutClient} base={base} /></dd>

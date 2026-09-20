@@ -59,8 +59,9 @@ export class ChannelIndex {
         const v = await readChannel(this.ctx, channel);
         const summary: ChannelSummary = {
           channel, factory: f.address, factoryName: f.name, client, provider, termsCommitment,
-          state: v.state, seq: v.seq, cumulativeAmount: v.cumulativeAmount.toString(), receiptsRoot: rootHex(v.receiptsRoot), budget: v.budget.toString(), deadline: v.deadline, hasProof: v.hasProof, payToClient: v.payToClient.toString(),
+          state: v.state, seq: v.seq, epoch: v.epoch, cumulativeAmount: v.cumulativeAmount.toString(), receiptsRoot: rootHex(v.receiptsRoot), budget: v.budget.toString(), deadline: v.deadline, hasProof: v.hasProof, payToClient: v.payToClient.toString(),
           openedTx: transactionHash, openedBlock: blockNumber.toString(), runId: this.runIdOf(channel),
+          mode: f.name === "factoryAnchored" ? "anchored" : "co-signed",
         };
         // Hanya channel yang terminal DAN kosong yang dibekukan: dana telat bisa masuk ke channel SETTLED
         // (budget() = saldo hidup) dan disapu watcher lewat sweep(); selama saldo ≠ 0, tetap dibaca ulang tiap scan.

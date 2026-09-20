@@ -12,6 +12,7 @@ a.mono { color: var(--accent); text-decoration: none; } a.mono:hover { text-deco
 .pill.net-testnet { border-color: var(--accent); } .pill.net-local { border-color: var(--warn); }
 .pill.st-OPEN { border-color: var(--accent); } .pill.st-CLOSING { border-color: var(--warn); } .pill.st-SETTLED { border-color: var(--ok); } .pill.st-UNINIT { border-color: var(--muted); }
 .pill.st-running { border-color: var(--warn); } .pill.st-done { border-color: var(--ok); } .pill.st-error { border-color: var(--bad); }
+.pill.mode-anchored { border-color: var(--warn); }
 .tag { margin-left: 6px; padding: 0 5px; border-radius: 4px; background: var(--line); font-size: 11px; }
 .banner { padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); margin: 8px 0; }
 .banner.error { border-color: var(--bad); }

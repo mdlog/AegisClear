@@ -1,8 +1,8 @@
 import type { Address, Hex } from "viem";
 
 export type Network = "local" | "testnet";
-export type ScenarioId = "B-cooperative" | "B-dispute" | "A-complete" | "A-reject" | "all";
-export const SCENARIOS: ScenarioId[] = ["B-cooperative", "B-dispute", "A-complete", "A-reject", "all"];
+export type ScenarioId = "B-cooperative" | "B-dispute" | "B-anchored-dispute" | "B-rollover" | "A-complete" | "A-reject" | "all";
+export const SCENARIOS: ScenarioId[] = ["B-cooperative", "B-dispute", "B-anchored-dispute", "B-rollover", "A-complete", "A-reject", "all"];
 export type ChannelState = "UNINIT" | "OPEN" | "CLOSING" | "SETTLED";
 
 export interface ConfigResponse {
@@ -26,8 +26,10 @@ export interface RunSnapshot {
 }
 export interface ChannelSummary {
   channel: Address; factory: Address; factoryName: string; client: Address; provider: Address; termsCommitment: Hex;
-  state: ChannelState; seq: number; cumulativeAmount: string; receiptsRoot: Hex; budget: string; deadline: number; hasProof: boolean; payToClient: string;
+  state: ChannelState; seq: number; epoch: number; cumulativeAmount: string; receiptsRoot: Hex; budget: string; deadline: number; hasProof: boolean; payToClient: string;
   openedTx: Hex; openedBlock: string; runId?: string;
+  /** "anchored" iff factoryName === "factoryAnchored" (ack on-chain, tanpa checkpoint co-signed) — selain itu "co-signed". */
+  mode: "co-signed" | "anchored";
 }
 export interface ChannelEvent { name: string; args: Record<string, string>; txHash: Hex; blockNumber: string; gasUsed: string }
 export interface ChannelDetail extends ChannelSummary {

@@ -32,7 +32,12 @@ export interface ScenarioEnv {
 }
 export interface MarketBResult { channel: Address; txs: TxLog[]; gasTotal: bigint; provingMs: number; clientDelta: bigint; providerDelta: bigint; local: Settlement; terms: Terms }
 /** runRollover: MarketBResult + epoch on-chain akhir dan total unit terlayani lintas epoch (FR-10). */
-export interface RolloverResult extends MarketBResult { epoch: number; units: number }
+export interface RolloverResult extends MarketBResult {
+  epoch: number; units: number;
+  /** `settle()` atas `c.tree.receipts` SETELAH rollover — pohon lokal direset tiap epoch baru, jadi ini
+   * HANYA mencakup receipt epoch pasca-rollover (5 unit terakhir di sini), bukan seluruh `units` lintas epoch. */
+  local: Settlement;
+}
 export interface MarketAResult { gasTotal: bigint; result: string; txs: TxLog[] }
 export interface Row { pasar: string; klien_provider: string; penentu: string; terlihat: string; gas: string; proving_ms: string; txs: { label: string; hash: Hex }[] }
 
@@ -69,6 +74,9 @@ export async function runMarketB(env: ScenarioEnv, pk: Hex, dispute: boolean, em
   emit({ phase: "open", label: "provider membuka channel saat ack pertama (tx provider, lihat kolom channel)", channel: c.channel });
   for (let i = 0; i < units; i++) {
     await c.requestUnit();
+    // anchored: setiap ack adalah tx on-chain tersendiri (agent.ts requestUnit()) — flush segera supaya
+    // log live menampilkan tiap ack seiring mendarat, bukan menumpuk sampai dispute/close.
+    if (c.anchored) flush("ack");
     if ((i + 1) % 10 === 0 || i + 1 === units)
       emit({ phase: "serve", label: `${i + 1}/${units} unit dilayani & ${ackLabel}`, progress: { done: i + 1, total: units }, channel: c.channel });
   }

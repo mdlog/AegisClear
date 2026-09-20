@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import type { ChannelDetail, ConfigResponse, LeakResponse, RunSnapshot } from "../../shared/types";
 import { getChannel } from "../api";
 import { fmtUsdg, shortAddr } from "../format";
@@ -33,13 +33,18 @@ export function PrivacyCards({ cfg, run, leak }: { cfg: ConfigResponse | null; r
         <h3>Yang dilihat chain</h3>
         {err && <p className="banner error">{err}</p>}
         {chs.map((c) => (
-          <dl className="kv" key={c.channel}>
-            <dt>channel</dt><dd><code>{shortAddr(c.channel)}</code> · {c.state}</dd>
-            <dt>T</dt><dd><code>{shortAddr(c.termsCommitment)}</code></dd>
-            <dt>R</dt><dd><code>{shortAddr(c.receiptsRoot)}</code></dd>
-            <dt>A</dt><dd>{fmtUsdg(c.cumulativeAmount)} USDG</dd>
-            <dt>payToClient</dt><dd>{c.hasProof ? `${fmtUsdg(c.payToClient)} USDG (bukti)` : "— (tanpa bukti)"}</dd>
-          </dl>
+          <Fragment key={c.channel}>
+            <dl className="kv">
+              <dt>channel</dt><dd><code>{shortAddr(c.channel)}</code> · {c.state}</dd>
+              <dt>T</dt><dd><code>{shortAddr(c.termsCommitment)}</code></dd>
+              <dt>R</dt><dd><code>{shortAddr(c.receiptsRoot)}</code></dd>
+              <dt>A</dt><dd>{fmtUsdg(c.cumulativeAmount)} USDG</dd>
+              <dt>payToClient</dt><dd>{c.hasProof ? `${fmtUsdg(c.payToClient)} USDG (bukti)` : "— (tanpa bukti)"}</dd>
+            </dl>
+            {c.mode === "anchored" && (
+              <p className="muted">anchored: hash daun + A per ack terlihat on-chain (harga per unit tersirat); metrik &amp; ambang tetap privat</p>
+            )}
+          </Fragment>
         ))}
         {leak && leak.map((l) => (
           <p key={l.channel} className={l.leaks === 0 ? "ok" : "bad"}>
