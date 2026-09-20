@@ -2,7 +2,7 @@
 // Dipakai oleh demo/run.ts (CLI, cetak tabel) dan web/server (console browser, stream langkah).
 import { parseAbi, type Address, type Hex, type PublicClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { AegisClient, erc20Balance, settle, type Artifacts, type ChainCtx, type Settlement, type Terms, type TxLog } from "@aegisclear/sdk";
+import { AegisClient, erc20Balance, readChannel, settle, type Artifacts, type ChainCtx, type Settlement, type Terms, type TxLog } from "@aegisclear/sdk";
 
 export const BREACHES = new Set([3, 17, 29, 44, 58, 71, 90]);           // EX1
 export const TERMS_BASE: Omit<Terms, "nonce"> = { unitPrice: 20_000n, maxM1: 800n, minM2: 90n, penaltyBps: 5000n, capBps: 3000n };
@@ -67,9 +67,28 @@ export async function runMarketB(env: ScenarioEnv, pk: Hex, dispute: boolean, em
     const { payToClient } = await c.dispute();
     flush("dispute");
     emit({ phase: "prove", label: `bukti Groth16: payToClient ${fmtUsdg(payToClient)} USDG`, detail: `${c.provingMs} ms proving`, channel: c.channel });
-    await env.timeTravel(env.challengeWindow + 1, emit);
-    await c.settle();
-    flush("settle");
+    // Tunggu dari deadline ON-CHAIN, bukan challengeWindow + 1: proving Groth16 di atas sudah memakan
+    // waktu nyata, jadi deadline yang sebenarnya bisa sudah lebih dekat dari perkiraan challengeWindow.
+    const v = await readChannel(ctx, c.channel);
+    const now = Number((await env.publicClient.getBlock()).timestamp);
+    await env.timeTravel(Math.max(0, v.deadline - now) + 2, emit);
+    // web/server menjalankan startProviderWatcher in-process (permissionless settle() setelah deadline).
+    // Klien di sini bisa kalah balapan dengannya — settle() lalu revert WrongState walau channel sudah
+    // SETTLED dengan benar oleh watcher. Itu bukan kegagalan skenario, jadi jangan biarkan run berakhir
+    // di "error": cek dulu, dan bila settle() sendiri gagal, cek ulang sebelum melempar.
+    let s = await readChannel(ctx, c.channel);
+    if (s.state === "SETTLED") {
+      emit({ phase: "settle", label: "sudah di-settle oleh watcher provider (permissionless) — tanpa tx klien", channel: c.channel });
+    } else {
+      try {
+        await c.settle();
+        flush("settle");
+      } catch (e) {
+        s = await readChannel(ctx, c.channel);
+        if (s.state !== "SETTLED") throw e;
+        emit({ phase: "settle", label: "settle() klien kalah balapan dengan watcher provider — channel sudah SETTLED", channel: c.channel });
+      }
+    }
   } else {
     await c.closeCooperative();
     flush("close");

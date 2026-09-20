@@ -8,7 +8,7 @@ import type { Address } from "viem";
 import { createProviderApp, type Watcher } from "@aegisclear/sdk";
 import { BREACHES, DEPOSIT_B, TERMS_BASE, metricsFor, leakCheck } from "@aegisclear/demo";
 import type { ConfigResponse, LeakResponse } from "../shared/types.js";
-import type { WebConfig } from "./config.js";
+import { ADDRESS_KEYS, type WebConfig } from "./config.js";
 import { makeChain, type ChainServices } from "./chain.js";
 import { ChannelIndex } from "./channels.js";
 import { streamSSE } from "hono/streaming";
@@ -39,7 +39,9 @@ export function createWebServer(cfg: WebConfig): WebServer {
   const providerAccount = privateKeyToAccount(cfg.keys.provider);
   const provider = providerAccount.address;
   const clients = [{ label: "A" as const, address: privateKeyToAccount(cfg.keys.a).address }, { label: "B" as const, address: privateKeyToAccount(cfg.keys.b).address }];
-  const { chainId: _c, deployBlock: _b, ...addresses } = cfg.deployment as unknown as Record<string, unknown>;
+  // Whitelist eksplisit (bukan spread deployment): field non-alamat yang mungkin ditambahkan ke JSON
+  // deployment nanti (mis. catatan deployer) tidak otomatis bocor lewat /api/config.
+  const addresses = Object.fromEntries(ADDRESS_KEYS.filter((k) => cfg.deployment[k] !== undefined).map((k) => [k, cfg.deployment[k]])) as ConfigResponse["addresses"];
   const runIdOf = new Map<Address, string>();   // channel → runId (diisi Task 4)
   const index = new ChannelIndex(cfg, chain.ctx(cfg.keys.provider), (ch) => runIdOf.get(ch));
   const providerApp = createProviderApp({
@@ -53,7 +55,7 @@ export function createWebServer(cfg: WebConfig): WebServer {
   app.get("/api/config", (c) => {
     const body: ConfigResponse = {
       network: cfg.network, chainId: cfg.chainId, rpcUrl: cfg.rpcUrl, explorerBase: cfg.explorerBase, deployBlock: cfg.deployBlock.toString(),
-      addresses: addresses as ConfigResponse["addresses"], provider, clients, windows: cfg.windows,
+      addresses, provider, clients, windows: cfg.windows,
       terms: j({ unitPrice: TERMS_BASE.unitPrice, maxM1: TERMS_BASE.maxM1, minM2: TERMS_BASE.minM2, penaltyBps: TERMS_BASE.penaltyBps, capBps: TERMS_BASE.capBps }),
       breaches: [...BREACHES].sort((a, b) => a - b), deposit: DEPOSIT_B.toString(),
     };
@@ -111,6 +113,12 @@ export function createWebServer(cfg: WebConfig): WebServer {
     return c.json({ status: res.status, body });
   });
 
+  // 404 JSON untuk /api/* dan /provider/* yang tidak cocok rute mana pun di atas — terdaftar SETELAH
+  // rute asli (termasuk app.route("/provider", ...)) dan SEBELUM fallback statis, supaya klien x402/API
+  // dapat body JSON yang bisa di-parse, bukan fallback SPA (text/html) atau 404 polos bawaan Hono.
+  app.all("/api/*", (c) => c.json({ error: "not found" }, 404));
+  app.all("/provider/*", (c) => c.json({ error: "not found" }, 404));
+
   // ---- static (web/dist) dengan fallback SPA; selalu terdaftar TERAKHIR ----
   app.get("/*", (c) => {
     let p: string;
@@ -128,11 +136,30 @@ export function createWebServer(cfg: WebConfig): WebServer {
   let server: ServerType | undefined; let watcher: Watcher | undefined;
   return {
     app, cfg, services: { chain, index, provider: providerApp, runIdOf, store, runner },
-    start: () => new Promise((resolve) => {
-      // Responder T1 in-process (README §(d)): wajib berjalan di proses provider ini.
-      watcher = providerApp.startProviderWatcher({ intervalMs: cfg.network === "local" ? 2_000 : 15_000, fromBlock: cfg.deployBlock, log: (s) => console.log(`[watcher] ${s}`) });
-      server = serve({ fetch: app.fetch, port: cfg.port }, (info) => resolve({ port: info.port }));
+    start: () => new Promise((resolve, reject) => {
+      (async () => {
+        // RPC yang benar-benar dilayani WAJIB cocok dengan chainId config — RPC_URL testnet yang salah
+        // ketik, atau mode local yang diam-diam kena RPC lain, harus gagal di sini, bukan mengirim tx
+        // ke chain yang salah tanpa peringatan.
+        const id = await chain.publicClient.getChainId();
+        if (id !== cfg.chainId)
+          throw new Error(`RPC ${cfg.rpcUrl} melayani chain ${id}, bukan ${cfg.chainId} — set RPC_URL=http://127.0.0.1:8545 (Anvil) atau AEGIS_NETWORK=testnet`);
+        // Responder T1 in-process (README §(d)): wajib berjalan di proses provider ini.
+        watcher = providerApp.startProviderWatcher({ intervalMs: cfg.network === "local" ? 2_000 : 15_000, fromBlock: cfg.deployBlock, log: (s) => console.log(`[watcher] ${s}`) });
+        // Loopback secara default — semua endpoint di sini TANPA autentikasi dan kunci demo hidup di
+        // proses ini (lihat README); WEB_HOST=0.0.0.0 adalah pilihan sadar untuk mengekspos.
+        server = serve({ fetch: app.fetch, port: cfg.port, hostname: process.env.WEB_HOST ?? "127.0.0.1" }, (info) => resolve({ port: info.port }));
+        server.on("error", reject);   // mis. EADDRINUSE — start() harus reject, bukan diam saja.
+      })().catch(reject);
     }),
-    stop: () => new Promise((resolve) => { watcher?.stop(); server ? server.close(() => resolve()) : resolve(); }),
+    stop: () => new Promise((resolve) => {
+      watcher?.stop();
+      if (!server) { resolve(); return; }
+      // ServerType (@hono/node-server) = Server | Http2Server | Http2SecureServer — closeAllConnections
+      // ada di ketiganya saat runtime (Node ≥ 18.2) tapi tidak seragam di typing Http2Server; cast sempit
+      // ini hanya untuk itu. Stream SSE yang masih terbuka tidak boleh menahan Ctrl-C.
+      (server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.();
+      server.close(() => resolve());
+    }),
   };
 }

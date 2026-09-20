@@ -22,6 +22,16 @@ describe("loadConfig", () => {
     const rel = path.relative(REPO_ROOT, LOCAL);
     const c = loadConfig({ DEPLOY_FILE: rel, RPC_URL: "http://127.0.0.1:8547", WEB_PORT: "4042" });
     expect(c.rpcUrl).toBe("http://127.0.0.1:8547"); expect(c.port).toBe(4042); expect(c.deployFile).toBe(LOCAL);
+    expect(c.rpcNote).toBeUndefined();
+  });
+  it("local: RPC_URL non-localhost (mis. testnet publik) DIABAIKAN — dipakai default Anvil + rpcNote (C2)", () => {
+    const c = loadConfig({ DEPLOY_FILE: LOCAL, RPC_URL: "https://rpc.testnet.chain.robinhood.com" });
+    expect(c.rpcUrl).toBe("http://127.0.0.1:8545");
+    expect(c.rpcNote).toMatch(/RPC_URL https:\/\/rpc\.testnet\.chain\.robinhood\.com diabaikan di mode local/);
+  });
+  it("local: RPC_URL ::1 / localhost juga dihormati (bukan cuma 127.0.0.1)", () => {
+    expect(loadConfig({ DEPLOY_FILE: LOCAL, RPC_URL: "http://localhost:8547" }).rpcUrl).toBe("http://localhost:8547");
+    expect(loadConfig({ DEPLOY_FILE: LOCAL, RPC_URL: "http://[::1]:8547" }).rpcUrl).toBe("http://[::1]:8547");
   });
   it("testnet: env wajib disebutkan bila hilang", () => {
     expect(() => loadConfig({ AEGIS_NETWORK: "testnet", DEPLOY_FILE: TESTNET, RPC_URL: "x" })).toThrow(/PK_PROVIDER, PK_CLIENT_A, PK_CLIENT_B, PK_DEPLOYER/);
@@ -36,6 +46,8 @@ describe("loadConfig", () => {
     const noBlock = dep("testnet2.json", { chainId: 46630, usdg: "0xCadd4526b6E7Beb640c3e920e80Ff28B327B5a83", verifier: "0x5EC99814dF5A78ECB4dbC83f066FB62970847462", factory: "0x0922ee7D6D518681Fd94E98e56D3f161A0574ED3", escrow: "0x5017C9e556bF750aEE1aB9e74aA094a91924964a" });
     expect(loadConfig({ ...env, DEPLOY_FILE: noBlock, FACTORY_BLOCK: "5" }).deployBlock).toBe(5n);
     expect(loadConfig({ ...env, DEPLOY_FILE: noBlock }).deployBlock).toBe(0n);
+    // FACTORY_BLOCK bukan angka → pesan jelas (C2.4), bukan SyntaxError BigInt mentah.
+    expect(() => loadConfig({ ...env, DEPLOY_FILE: noBlock, FACTORY_BLOCK: "abc" })).toThrow(/FACTORY_BLOCK harus angka blok/);
   });
   it("testnet: deployment dengan chainId lain ditolak", () => {
     expect(() => loadConfig({ AEGIS_NETWORK: "testnet", DEPLOY_FILE: LOCAL, RPC_URL: "x", PK_PROVIDER: PK, PK_CLIENT_A: PK, PK_CLIENT_B: PK, PK_DEPLOYER: PK })).toThrow(/chainId 31337/);

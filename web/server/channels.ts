@@ -8,6 +8,15 @@ const FACTORY_KEYS = ["factory", "factoryProd", "factoryAnchored"] as const;
 /** Indeks channel dari event ChannelOpened semua factory di deployment; view on-chain per channel; cache `ttlMs`. */
 export class ChannelIndex {
   private cache?: { at: number; data: ChannelSummary[] };
+  /** Dedupe pemindaian bersamaan: pemanggil `list()` yang tiba selagi satu scan berjalan menunggu promise yang sama alih-alih memicu scan on-chain kedua. */
+  private pending?: Promise<ChannelSummary[]>;
+  /**
+   * Channel yang sudah pernah teramati SETTLED: state itu terminal, jadi `readChannel` tidak perlu
+   * diulang untuknya di setiap scan berikutnya — ini yang membuat indeks tetap murah seiring jumlah
+   * channel bertambah (skala), bukan O(channel) `readChannel` per scan selamanya. `runId` TETAP
+   * di-re-attach dari `runIdOf` tiap kali dibaca (map itu bisa terisi belakangan setelah cache ini dibuat).
+   */
+  private readonly settled = new Map<Address, ChannelSummary>();
   private readonly gas = new Map<Hex, bigint>();
   constructor(
     private readonly cfg: WebConfig, private readonly ctx: ChainCtx,
@@ -18,30 +27,51 @@ export class ChannelIndex {
   factories(): { name: string; address: Address }[] {
     return FACTORY_KEYS.flatMap((k) => (this.cfg.deployment[k] ? [{ name: k, address: this.cfg.deployment[k]! }] : []));
   }
-  async list(force = false): Promise<ChannelSummary[]> {
-    if (!force && this.cache && Date.now() - this.cache.at < this.ttlMs) return this.cache.data;
-    const out: ChannelSummary[] = [];
-    for (const f of this.factories()) {
-      const logs = await this.ctx.publicClient.getContractEvents({ address: f.address, abi: factoryAbi, eventName: "ChannelOpened", fromBlock: this.cfg.deployBlock });
-      for (const l of logs) {
-        if (!l.args.channel || !l.args.client || !l.args.provider || !l.args.termsCommitment) continue;
-        const channel = getAddress(l.args.channel);
-        const v = await readChannel(this.ctx, channel);
-        out.push({
-          channel, factory: f.address, factoryName: f.name, client: getAddress(l.args.client), provider: getAddress(l.args.provider), termsCommitment: l.args.termsCommitment,
-          state: v.state, seq: v.seq, cumulativeAmount: v.cumulativeAmount.toString(), receiptsRoot: rootHex(v.receiptsRoot), budget: v.budget.toString(), deadline: v.deadline, hasProof: v.hasProof, payToClient: v.payToClient.toString(),
-          openedTx: l.transactionHash, openedBlock: l.blockNumber.toString(), runId: this.runIdOf(channel),
-        });
-      }
-    }
+  /** Cache `ttlMs` dipakai apa adanya untuk SEMUA pembaca (termasuk `detail()` yang tidak menemukan alamatnya) — tidak ada jalur "paksa" yang melewati TTL, supaya alamat asing/typo tidak bisa memicu scan penuh di setiap panggilan (lihat `detail`). */
+  async list(): Promise<ChannelSummary[]> {
+    if (this.cache && Date.now() - this.cache.at < this.ttlMs) return this.cache.data;
+    if (this.pending) return this.pending;
+    this.pending = this.scan().finally(() => { this.pending = undefined; });
+    return this.pending;
+  }
+  private async scan(): Promise<ChannelSummary[]> {
+    // Per factory, lalu per log DALAM factory itu — dua-duanya paralel (Promise.all), bukan satu
+    // readChannel sekuensial per channel seperti sebelumnya (itulah bottleneck skala indeks channel).
+    const perFactory = await Promise.all(this.factories().map((f) => this.scanFactory(f)));
+    const out = perFactory.flat();
     out.sort((a, b) => (BigInt(b.openedBlock) > BigInt(a.openedBlock) ? 1 : BigInt(b.openedBlock) < BigInt(a.openedBlock) ? -1 : 0));
     this.cache = { at: Date.now(), data: out };
     return out;
   }
+  private async scanFactory(f: { name: string; address: Address }): Promise<ChannelSummary[]> {
+    const logs = await this.ctx.publicClient.getContractEvents({ address: f.address, abi: factoryAbi, eventName: "ChannelOpened", fromBlock: this.cfg.deployBlock });
+    const tasks: Promise<ChannelSummary>[] = [];
+    for (const l of logs) {
+      if (!l.args.channel || !l.args.client || !l.args.provider || !l.args.termsCommitment) continue;
+      const channel = getAddress(l.args.channel);
+      const client = getAddress(l.args.client);
+      const provider = getAddress(l.args.provider);
+      const termsCommitment = l.args.termsCommitment;
+      const { transactionHash, blockNumber } = l;
+      tasks.push((async () => {
+        const cached = this.settled.get(channel);
+        if (cached) return { ...cached, runId: this.runIdOf(channel) };
+        const v = await readChannel(this.ctx, channel);
+        const summary: ChannelSummary = {
+          channel, factory: f.address, factoryName: f.name, client, provider, termsCommitment,
+          state: v.state, seq: v.seq, cumulativeAmount: v.cumulativeAmount.toString(), receiptsRoot: rootHex(v.receiptsRoot), budget: v.budget.toString(), deadline: v.deadline, hasProof: v.hasProof, payToClient: v.payToClient.toString(),
+          openedTx: transactionHash, openedBlock: blockNumber.toString(), runId: this.runIdOf(channel),
+        };
+        if (v.state === "SETTLED") this.settled.set(channel, summary);
+        return summary;
+      })());
+    }
+    return Promise.all(tasks);
+  }
   async detail(addr: string): Promise<ChannelDetail | undefined> {
     let channel: Address;
     try { channel = getAddress(addr); } catch { return undefined; }
-    const s = (await this.list()).find((c) => c.channel === channel) ?? (await this.list(true)).find((c) => c.channel === channel);
+    const s = (await this.list()).find((c) => c.channel === channel);
     if (!s) return undefined;
     const c = await this.ctx.publicClient.readContract({ address: channel, abi: channelAbi, functionName: "cfg" });
     const cfg: ChannelDetail["cfg"] = { client: c[0], provider: c[1], token: c[2], termsCommitment: c[3], challengeWindow: c[4], responseWindow: c[5], payoutClient: c[6], payoutProvider: c[7], salt: c[8] };

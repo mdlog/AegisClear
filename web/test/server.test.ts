@@ -30,6 +30,11 @@ describe.skipIf(!DEPLOY_EXISTS)("web console server (Anvil)", () => {
     expect(JSON.stringify(c)).not.toMatch(/0x[0-9a-f]{64}/i);
   });
 
+  it("start() menolak bila chain id yang dilayani RPC tidak cocok dengan config (C2 chain-id cross-check)", async () => {
+    const mismatched = createWebServer({ ...srv.cfg, chainId: 999999 });
+    await expect(mismatched.start()).rejects.toThrow(/melayani chain 31337, bukan 999999/);
+  });
+
   it("provider di /provider: klien SDK membuka channel; /api/channels & /api/channels/:addr melihatnya", async () => {
     const cfg = srv.cfg; const chain = srv.services.chain;
     const c = new AegisClient({ ctx: chain.ctx(cfg.keys.a), account: privateKeyToAccount(cfg.keys.a), providerUrl: `${BASE}/provider`, usdg: cfg.deployment.usdg, artifacts: defaultArtifacts(REPO_ROOT) });
@@ -65,6 +70,15 @@ describe.skipIf(!DEPLOY_EXISTS)("web console server (Anvil)", () => {
   it("GET /%zz (path persen tidak valid) → 400, bukan 500", async () => {
     const r = await fetch(`${BASE}/%zz`);
     expect(r.status).toBe(400);
+  });
+
+  it("GET /api/nope, /provider/nope → 404 JSON (bukan fallback SPA text/html)", async () => {
+    const r1 = await fetch(`${BASE}/api/nope`);
+    expect(r1.status).toBe(404);
+    expect(await r1.json()).toEqual({ error: "not found" });
+    const r2 = await fetch(`${BASE}/provider/nope`);
+    expect(r2.status).toBe(404);
+    expect(await r2.json()).toEqual({ error: "not found" });
   });
 
   const waitRun = async (id: string) => {
@@ -107,7 +121,13 @@ describe.skipIf(!DEPLOY_EXISTS)("web console server (Anvil)", () => {
     expect(run.result![0].klien_provider).toBe("0.07 / 1.93");
     expect(Number(run.result![0].proving_ms)).toBeGreaterThan(0);
     expect(run.steps.map((s) => s.phase)).toEqual(expect.arrayContaining(["fund", "serve", "dispute", "prove", "wait", "settle"]));
-    expect(run.steps.filter((s) => s.txHash).map((s) => s.label)).toEqual(expect.arrayContaining(["fund", "submitCheckpoint", "claimPenalty", "settle"]));
+    // settle() sendiri bisa menang ATAU kalah balapan dengan startProviderWatcher permissionless
+    // (C1) — kalau kalah, tidak ada tx "settle" tersendiri (watcher yang men-settle), jadi hanya
+    // tiga label tx yang PASTI ada di sini; keberadaan langkah "settle" (tx atau bukan) dicek terpisah.
+    expect(run.steps.filter((s) => s.txHash).map((s) => s.label)).toEqual(expect.arrayContaining(["fund", "submitCheckpoint", "claimPenalty"]));
+    expect(run.steps.some((s) => s.phase === "settle")).toBe(true);
+    const chDetail = await get<{ state: string }>(`/api/channels/${run.channels[0]}`);
+    expect(chDetail.state).toBe("SETTLED");
     const sse = await (await ssePromise).text();
     expect(sse).toMatch(/event: step\n/); expect(sse).toMatch(/event: done\n/);
     expect(sse.split("event: step").length - 1).toBe(run.steps.length);
@@ -126,7 +146,11 @@ describe.skipIf(!DEPLOY_EXISTS)("web console server (Anvil)", () => {
     const disp = runs.find((r) => r.scenario === "B-dispute" && r.status === "done")!;
     const rep = await get<LeakResponse[]>(`/api/demo/leak-check/${disp.id}`);
     expect(rep.length).toBe(1); expect(rep[0].channel).toBe(disp.channels[0]);
-    expect(rep[0].leaks).toBe(0); expect(rep[0].ambiguous).toBe(0); expect(rep[0].txs.length).toBe(5); // open + fund + submitCheckpoint + claimPenalty + settle
+    expect(rep[0].leaks).toBe(0); expect(rep[0].ambiguous).toBe(0);
+    // open + fund + submitCheckpoint + claimPenalty [+ settle bila klien menang balapan settle()
+    // dengan watcher provider — C1: kalau klien kalah balapan, ia tidak pernah mengirim tx settle
+    // sendiri, jadi txs klien berhenti di claimPenalty (4 tx + open = 4, bukan 5)].
+    expect([4, 5]).toContain(rep[0].txs.length);
     const aRun = runs.find((r) => r.scenario === "A-reject")!;
     expect((await fetch(`${BASE}/api/demo/leak-check/${aRun.id}`)).status).toBe(404);
     const offer = await get<{ status: number; body: any }>("/api/offer?client=B");

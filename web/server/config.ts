@@ -18,6 +18,8 @@ export interface WebConfig {
   /** kunci demo — TIDAK PERNAH dikembalikan lewat API atau ditulis ke log */
   keys: { provider: Hex; a: Hex; b: Hex; faucet: Hex };
   windows: { challenge: number; response: number };
+  /** diisi bila RPC_URL non-localhost diabaikan di mode local (dicetak sekali oleh index.ts). */
+  rpcNote?: string;
 }
 
 // anvil #0 (faucet/deployer), #1 (klien A), #2 (provider), #3 (klien B) — sama dengan demo/run.ts & DeployLocal.
@@ -28,7 +30,14 @@ export const ANVIL_KEYS = {
   b: "0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6",
 } as const satisfies WebConfig["keys"];
 export const TESTNET = { chainId: 46630, explorerBase: "https://explorer.testnet.chain.robinhood.com", deployFile: "contracts/deployments/testnet-46630.json" } as const;
-const ADDRESS_KEYS = ["usdg", "factory", "factoryProd", "factoryAnchored", "escrow", "verifier", "router", "poseidon"] as const;
+export const ADDRESS_KEYS = ["usdg", "factory", "factoryProd", "factoryAnchored", "escrow", "verifier", "router", "poseidon"] as const;
+const DEFAULT_LOCAL_RPC = "http://127.0.0.1:8545";
+/**
+ * hostname yang boleh dipakai RPC_URL di mode local — apa pun di luar ini mengarah ke chain publik,
+ * bukan Anvil lokal. `URL#hostname` mengembalikan alamat IPv6 literal DENGAN kurung siku (`"[::1]"`),
+ * jadi kedua bentuk didaftarkan supaya `http://[::1]:8545` benar-benar dikenali sebagai localhost.
+ */
+const LOCAL_HOSTNAMES = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 
 /** Memuat KEY=VALUE dari file .env ke `env` — hanya variabel yang belum ada. Mengembalikan jumlah yang diisi. */
 export function loadDotEnv(file = path.join(REPO_ROOT, ".env"), env: NodeJS.ProcessEnv = process.env): number {
@@ -68,9 +77,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WebConfig {
     const deployFile = path.resolve(REPO_ROOT, env.DEPLOY_FILE ?? "contracts/deployments/local.json");
     const deployment = readDeployment(deployFile);
     if (Number(deployment.chainId) !== 31337) throw new Error(`deployment ${deployFile} untuk chainId ${deployment.chainId}, bukan 31337`);
+    // Mode local TIDAK BOLEH diam-diam memakai RPC publik dari .env: RPC_URL hanya dihormati bila
+    // menunjuk ke localhost — selain itu jatuh ke Anvil default dan dicatat lewat rpcNote (index.ts
+    // mencetaknya sekali) supaya operator tahu kenapa RPC_URL yang ia set tidak dipakai.
+    let rpcUrl = DEFAULT_LOCAL_RPC;
+    let rpcNote: string | undefined;
+    if (env.RPC_URL) {
+      let hostname: string | undefined;
+      try { hostname = new URL(env.RPC_URL).hostname; } catch { hostname = undefined; }
+      if (hostname && LOCAL_HOSTNAMES.has(hostname)) rpcUrl = env.RPC_URL;
+      else rpcNote = `RPC_URL ${env.RPC_URL} diabaikan di mode local (bukan localhost); pakai AEGIS_NETWORK=testnet untuk chain publik`;
+    }
     return {
-      network, chainId: 31337, rpcUrl: env.RPC_URL ?? "http://127.0.0.1:8545", chain: foundry, port,
+      network, chainId: 31337, rpcUrl, chain: foundry, port,
       deployment, deployFile, deployBlock: 0n, keys: { ...ANVIL_KEYS }, windows: { challenge: 120, response: 60 },
+      ...(rpcNote ? { rpcNote } : {}),
     };
   }
   const missing = ["RPC_URL", "PK_PROVIDER", "PK_CLIENT_A", "PK_CLIENT_B", "PK_DEPLOYER"].filter((k) => !env[k]);
@@ -83,9 +104,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WebConfig {
     id: TESTNET.chainId, name: "robinhood-testnet", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
     rpcUrls: { default: { http: [rpcUrl] } }, blockExplorers: { default: { name: "Blockscout", url: TESTNET.explorerBase } },
   });
+  let deployBlock: bigint;
+  try { deployBlock = BigInt(deployment.deployBlock ?? env.FACTORY_BLOCK ?? 0); } catch { throw new Error("FACTORY_BLOCK harus angka blok"); }
   return {
     network, chainId: TESTNET.chainId, rpcUrl, chain, explorerBase: TESTNET.explorerBase, port, deployment, deployFile,
-    deployBlock: BigInt(deployment.deployBlock ?? env.FACTORY_BLOCK ?? 0),
+    deployBlock,
     keys: { provider: env.PK_PROVIDER as Hex, a: env.PK_CLIENT_A as Hex, b: env.PK_CLIENT_B as Hex, faucet: env.PK_DEPLOYER as Hex },
     windows: { challenge: 60, response: 30 },
   };
