@@ -23,7 +23,7 @@ contract PenaltyTest is AegisTestBase {
     function setUp() public override {
         super.setUp();
         realVerifier = new SLASettlementVerifier();
-        realFactory = new AegisChannelFactory(address(realVerifier), PERMIT2, 60);
+        realFactory = new AegisChannelFactory(address(realVerifier), PERMIT2, 60, address(0));
         uint256 T = abi.decode(vm.ffi(_cmd(true, address(0))), (uint256));
         AegisChannel.Config memory c = defaultConfig();
         c.termsCommitment = bytes32(T);

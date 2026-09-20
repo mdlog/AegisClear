@@ -10,15 +10,14 @@ contract AegisChannelFactory {
     address public immutable VERIFIER;
     address public immutable PERMIT2;
     uint32 public immutable MIN_CHALLENGE_WINDOW;
+    address public immutable POSEIDON;   // 0 = mode co-signed; kontrak IPoseidonPath = mode anchored (FR-25)
 
     event ChannelOpened(address indexed channel, address indexed client, address indexed provider, bytes32 termsCommitment);
     error WindowTooShort();
 
-    constructor(address verifier, address permit2, uint32 minChallengeWindow) {
-        IMPLEMENTATION = address(new AegisChannel(verifier, permit2));
-        VERIFIER = verifier;
-        PERMIT2 = permit2;
-        MIN_CHALLENGE_WINDOW = minChallengeWindow;
+    constructor(address verifier, address permit2, uint32 minChallengeWindow, address poseidonPath) {
+        IMPLEMENTATION = address(new AegisChannel(verifier, permit2, poseidonPath));
+        VERIFIER = verifier; PERMIT2 = permit2; MIN_CHALLENGE_WINDOW = minChallengeWindow; POSEIDON = poseidonPath;
     }
 
     function salt(AegisChannel.Config calldata c) public pure returns (bytes32) { return keccak256(abi.encode(c)); }

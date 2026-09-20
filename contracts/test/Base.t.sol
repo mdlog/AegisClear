@@ -7,12 +7,15 @@ import {AegisChannelFactory} from "../src/AegisChannelFactory.sol";
 import {MockUSDG} from "../src/MockUSDG.sol";
 import {MockVerifier} from "./mocks/MockVerifier.sol";
 import {Sigs} from "./utils/Sigs.sol";
+import {PoseidonPathYul} from "../src/PoseidonPathYul.sol";
 
 abstract contract AegisTestBase is Test {
     address internal constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
     MockUSDG internal usdg;
     MockVerifier internal verifier;
     AegisChannelFactory internal factory;
+    PoseidonPathYul internal yul;
+    AegisChannelFactory internal factoryAnchored;
     uint256 internal clientPk = 0xA11CE;
     uint256 internal providerPk = 0xB0B;
     address internal client;
@@ -21,7 +24,9 @@ abstract contract AegisTestBase is Test {
     function setUp() public virtual {
         usdg = new MockUSDG();
         verifier = new MockVerifier(true);
-        factory = new AegisChannelFactory(address(verifier), PERMIT2, 60);
+        factory = new AegisChannelFactory(address(verifier), PERMIT2, 60, address(0));
+        yul = new PoseidonPathYul();
+        factoryAnchored = new AegisChannelFactory(address(verifier), PERMIT2, 60, address(yul));
         client = vm.addr(clientPk);
         provider = vm.addr(providerPk);
         vm.label(client, "client");
@@ -49,6 +54,16 @@ abstract contract AegisTestBase is Test {
         bytes memory sigP = Sigs.sign(providerPk, termsDigest(c));
         vm.prank(client);
         ch = AegisChannel(factory.open(c, "", sigP));
+    }
+
+    function openByClientOn(AegisChannelFactory f, AegisChannel.Config memory c) internal returns (AegisChannel ch) {
+        address predicted = f.predict(c);
+        bytes32 d = Sigs.digest(Sigs.domain(predicted), AegisChannel(f.IMPLEMENTATION()).hashChannelTerms(c));
+        vm.prank(client);
+        ch = AegisChannel(f.open(c, "", Sigs.sign(providerPk, d)));
+    }
+    function leafSig(AegisChannel ch, uint64 s, bytes32 leaf, uint128 amount) internal view returns (bytes memory) {
+        return Sigs.sign(providerPk, Sigs.digest(ch.domainSeparator(), ch.hashLeaf(ch.epoch(), s, leaf, amount)));
     }
 
     function fund(AegisChannel ch, uint256 amount) internal {

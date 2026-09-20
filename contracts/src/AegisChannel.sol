@@ -8,6 +8,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {ISignatureTransfer} from "permit2/src/interfaces/ISignatureTransfer.sol";
 import {ISLASettlementVerifier} from "./interfaces/ISLASettlementVerifier.sol";
 import {IAegisPayoutHook} from "./interfaces/IAegisPayoutHook.sol";
+import {IPoseidonPath} from "./interfaces/IPoseidonPath.sol";
 
 /// @title AegisChannel — micro-escrow channel USDG per pasangan agen (spec §8.1).
 /// @dev Satu clone EIP-1167 per channel; alamat = atribusi. Tidak ada owner/pause/upgrade.
@@ -37,11 +38,15 @@ contract AegisChannel is ReentrancyGuard {
         keccak256("Checkpoint(uint32 epoch,uint64 seq,uint128 cumulativeAmount,bytes32 receiptsRoot)");
     bytes32 public constant CLOSE_TYPEHASH = keccak256("Close(uint32 epoch,uint64 seq,uint128 toProvider)");
     bytes32 public constant ROLLOVER_TYPEHASH = keccak256("Rollover(uint32 epoch,uint64 seq,uint128 toProvider)");
+    bytes32 public constant LEAF_TYPEHASH = keccak256("Leaf(uint32 epoch,uint64 seq,bytes32 leaf,uint128 cumulativeAmount)");
     uint64 public constant MAX_SEQ = 128;
 
     address public immutable FACTORY;
     ISLASettlementVerifier public immutable VERIFIER;
     ISignatureTransfer public immutable PERMIT2;
+    IPoseidonPath public immutable POSEIDON;
+    bool public immutable ANCHORED;              // mode per implementasi/factory (spec B.3): Config & alamat channel tidak berubah
+    uint256[7] private filledSubtrees;            // pohon inkremental kedalaman 7 (hanya anchored)
 
     Config public cfg;
     bytes32 public domainSeparator;
@@ -66,6 +71,8 @@ contract AegisChannel is ReentrancyGuard {
     event JobFunded(uint256 indexed jobId, address indexed client, uint256 amount);
     event PaymentReleased(uint256 indexed jobId, address indexed provider, uint256 amount);
     event Refunded(uint256 indexed jobId, address indexed client, uint256 amount);
+    event Acked(uint64 seq, bytes32 leaf, uint128 cumulativeAmount, bytes32 root);
+    event CloseStarted(address indexed by, uint64 seq, uint128 cumulativeAmount, bytes32 receiptsRoot, uint64 deadline);
 
     error NotFactory();
     error AlreadyInitialized();
@@ -80,11 +87,16 @@ contract AegisChannel is ReentrancyGuard {
     error TooEarly();
     error ExceedsBudget();
     error WrongToken();
+    error WrongMode();
+    error NotClient();
+    error AmountDecreased();
 
-    constructor(address verifier, address permit2) {
+    constructor(address verifier, address permit2, address poseidonPath) {
         FACTORY = msg.sender;
         VERIFIER = ISLASettlementVerifier(verifier);
         PERMIT2 = ISignatureTransfer(permit2);
+        POSEIDON = IPoseidonPath(poseidonPath);
+        ANCHORED = poseidonPath != address(0);
         state = State.SETTLED; // implementasi tidak pernah dipakai langsung
     }
 
@@ -125,6 +137,9 @@ contract AegisChannel is ReentrancyGuard {
     function hashRollover(uint32 epoch_, uint64 seq_, uint128 toProvider) public pure returns (bytes32) {
         return keccak256(abi.encode(ROLLOVER_TYPEHASH, epoch_, seq_, toProvider));
     }
+    function hashLeaf(uint32 epoch_, uint64 seq_, bytes32 leaf, uint128 amount) public pure returns (bytes32) {
+        return keccak256(abi.encode(LEAF_TYPEHASH, epoch_, seq_, leaf, amount));
+    }
 
     // ---------- funding ----------
     /// @notice Pendanaan tanpa allowance langsung ke channel: Permit2 permitTransferFrom, owner = msg.sender (FR-3).
@@ -147,6 +162,7 @@ contract AegisChannel is ReentrancyGuard {
     function submitCheckpoint(uint64 seq_, uint128 amount, bytes32 root, bytes calldata sigClient, bytes calldata sigProvider)
         external
     {
+        if (ANCHORED) revert WrongMode();
         if (state != State.OPEN && state != State.CLOSING) revert WrongState();
         if (seq_ > MAX_SEQ) revert SeqTooLarge();
         if (state == State.CLOSING && seq_ <= seq) revert StaleCheckpoint();
@@ -164,6 +180,37 @@ contract AegisChannel is ReentrancyGuard {
             if (ext > deadline) deadline = ext;
         }
         emit CheckpointSubmitted(seq_, amount, root, deadline);
+    }
+
+    /// @notice Anchored (FR-25): klien meng-ack unit `seq_` on-chain dengan daun = Poseidon(seq,qty,m1,m2,due) yang
+    ///         ditandatangani provider (`Leaf`). Hanya hash daun + kumulatif yang naik; metrik & harga per unit tetap privat.
+    ///         Satu panggilan IPoseidonPath melakukan 7 hash penyisipan (Stylus di Robinhood Chain, Yul di Anvil/Foundry).
+    function ack(uint64 seq_, bytes32 leaf, uint128 cumulativeAmount_, bytes calldata sigProvider) external {
+        if (!ANCHORED) revert WrongMode();
+        if (msg.sender != cfg.client) revert NotClient();
+        if (state != State.OPEN) revert WrongState();
+        if (seq_ != seq) revert StaleCheckpoint();
+        if (seq_ >= MAX_SEQ) revert SeqTooLarge();
+        if (cumulativeAmount_ < cumulativeAmount) revert AmountDecreased();
+        bytes32 d = _digest(hashLeaf(epoch, seq_, leaf, cumulativeAmount_));
+        if (!SignatureChecker.isValidSignatureNow(cfg.provider, d, sigProvider)) revert BadSignature();
+        (uint256 root, uint256[7] memory nodes) = POSEIDON.insertPath(uint256(leaf), seq_, filledSubtrees);
+        for (uint256 i; i < 7; i++) if ((seq_ >> i) & 1 == 0) filledSubtrees[i] = nodes[i];
+        receiptsRoot = bytes32(root);
+        seq = seq_ + 1;
+        cumulativeAmount = cumulativeAmount_;
+        hasProof = false;
+        emit Acked(seq_, leaf, cumulativeAmount_, bytes32(root));
+    }
+
+    /// @notice Anchored: salah satu pihak membuka jendela tantangan atas state on-chain (pengganti submitCheckpoint).
+    function startClose() external {
+        if (!ANCHORED) revert WrongMode();
+        if (msg.sender != cfg.client && msg.sender != cfg.provider) revert NotParty();
+        if (state != State.OPEN) revert WrongState();
+        state = State.CLOSING;
+        deadline = uint64(block.timestamp) + cfg.challengeWindow;
+        emit CloseStarted(msg.sender, seq, cumulativeAmount, receiptsRoot, deadline);
     }
 
     /// @notice Klaim penalti dengan bukti Groth16 atas state saat ini (FR-14). Hanya pihak; payToClient ≤ A dipaksakan kontrak (FR-18).
@@ -225,8 +272,8 @@ contract AegisChannel is ReentrancyGuard {
         emit PaymentReleased(channelIdField(), cfg.provider, toProvider);
     }
 
-    /// @dev Hook untuk state per-epoch tambahan (mode anchored menimpa ini untuk me-nol-kan pohon inkremental).
-    function _resetEpochState() internal virtual {}
+    /// @dev State per-epoch tambahan: mode anchored me-nol-kan pohon inkremental agar epoch baru mulai dari emptyRoot.
+    function _resetEpochState() internal { if (ANCHORED) delete filledSubtrees; }
 
     /// @notice Setelah SETTLED: dana yang masuk belakangan → payoutClient (FR-6). Siapa pun boleh memanggil.
     function sweep() external nonReentrant {
