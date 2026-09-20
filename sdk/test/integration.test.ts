@@ -29,7 +29,7 @@ const RPC = process.env.RPC_URL ?? "http://127.0.0.1:8545";
 const CHAIN_ID = Number(process.env.CHAIN_ID ?? 31337);
 const chain = CHAIN_ID === 31337 ? foundry : defineChain({ id: CHAIN_ID, name: "robinhood-testnet", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: [RPC] } } });
 const PK = {
-  deployer: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" as Hex, // anvil #0
+  deployer: (process.env.PK_DEPLOYER ?? "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80") as Hex, // anvil #0; di testnet: PK_DEPLOYER (faucet ETH + mint MockUSDG untuk kunci segar)
   provider: (process.env.PK_PROVIDER ?? "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a") as Hex, // anvil #2
   clientA: (process.env.PK_CLIENT_A ?? "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d") as Hex,  // anvil #1
   clientB: (process.env.PK_CLIENT_B ?? "0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6") as Hex,  // anvil #3
@@ -37,6 +37,10 @@ const PK = {
   clientD: "0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a" as Hex,  // anvil #4 — uji tiket keluar unilateral (lokal saja, tidak diparametrisasi PK_*)
 };
 const art = defaultArtifacts(new URL("../..", import.meta.url).pathname);
+// ETH gas untuk kunci segar: 1 ETH di Anvil; 0,0005 ETH di testnet (≈ 150 tx pada 0,01 gwei × 300k gas).
+const FUND_ETH = CHAIN_ID === 31337 ? 1_000_000_000_000_000_000n : 500_000_000_000_000n;
+// Tes yang memakai kunci Anvil #4/#5 (clientC/clientD) hanya bisa jalan di 31337.
+const LOCAL_ONLY = CHAIN_ID !== 31337;
 const j = (o: unknown) => JSON.parse(JSON.stringify(o, (_, v) => (typeof v === "bigint" ? v.toString() : v)));
 
 const DEPLOY_EXISTS = existsSync(DEPLOY);
@@ -123,7 +127,7 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
     console.table(c.txs.map((t) => ({ label: t.label, gasUsed: t.gasUsed.toString() })));
   });
 
-  it("/close menolak seq basi (0 atau tengah); hanya seq tertinggi ter-ack diterima", async () => {
+  it.skipIf(LOCAL_ONLY)("/close menolak seq basi (0 atau tengah); hanya seq tertinggi ter-ack diterima", async () => {
     const c = mkClient(PK.clientC); const me = privateKeyToAccount(PK.clientC).address;
     const c0 = await bal(me); const p0 = await bal(providerAddr);
     await c.start();
@@ -237,7 +241,7 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
     } finally { evilServer.close(); }
   });
 
-  it("tiket keluar unilateral: provider mati sebelum unit 0 → deposit klien kembali penuh", async () => {
+  it.skipIf(LOCAL_ONLY)("tiket keluar unilateral: provider mati sebelum unit 0 → deposit klien kembali penuh", async () => {
     const c = mkClient(PK.clientD); const me = privateKeyToAccount(PK.clientD).address;
     const c0 = await bal(me);
     await c.start(); // hanya danai + verifikasi tiket keluar — TIDAK ada requestUnit() (provider dianggap tidak pernah menjawab)
@@ -249,7 +253,7 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
     expect(await bal(me)).toBe(c0);
   });
 
-  it("Task 15 fix round 1: startProviderWatcher in-process mengganti checkpoint basi klien (seq 5) dengan seq 10 co-signed asli, lalu settle membayar 200.000", async () => {
+  it.skipIf(LOCAL_ONLY)("Task 15 fix round 1: startProviderWatcher in-process mengganti checkpoint basi klien (seq 5) dengan seq 10 co-signed asli, lalu settle membayar 200.000", async () => {
     // Sesi/provider app TERPISAH (port sendiri) agar tidak bentrok dengan sesi clientC yang sudah
     // SETTLED di test "/close menolak seq basi" di atas — akun anvil #5 yang sama boleh dipakai lagi
     // karena ini adalah `createProviderApp` (dan karenanya `sessions`) yang baru/kosong.
@@ -317,7 +321,7 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
 
   it("skenario 11 (FR-10): epoch penuh → 409 epoch-full → rollover() → unit lanjut di epoch 1 → close; provider = A0 + A1", async () => {
     const pk = generatePrivateKey(); const acct = privateKeyToAccount(pk);
-    const eth = await ctxOf(PK.deployer).walletClient.sendTransaction({ to: acct.address, value: 1_000_000_000_000_000_000n });
+    const eth = await ctxOf(PK.deployer).walletClient.sendTransaction({ to: acct.address, value: FUND_ETH });
     await publicClient.waitForTransactionReceipt({ hash: eth });
     await mintUsdg(acct.address, 10_000_000n);
     const c = new AegisClient({ ctx: ctxOf(pk), account: acct, providerUrl: "http://127.0.0.1:4020", usdg: d.usdg, artifacts: art });
@@ -352,7 +356,7 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
     expect(c.txs.map((t) => t.label)).toEqual(["fund", "rollover", "closeCooperative"]);
   });
 
-  it("F2: balasan provider dengan tanda tangan checkpoint SALAH ditolak SEBELUM pohon disentuh; dispute() tetap bisa memakai checkpoint co-signed sebelumnya", async () => {
+  it.skipIf(LOCAL_ONLY)("F2: balasan provider dengan tanda tangan checkpoint SALAH ditolak SEBELUM pohon disentuh; dispute() tetap bisa memakai checkpoint co-signed sebelumnya", async () => {
     // Provider ASLI (jujur) dipanggil in-process; proxy di port 4041 meneruskan semuanya apa adanya,
     // kecuali balasan POST /job ke-K: `sigProvider` diganti tanda tangan atas checkpoint yang sama dari
     // KUNCI LAIN (anvil #6) — format sah, penandatangan salah.
@@ -469,7 +473,7 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
     const server3 = serve({ fetch: app3.fetch, port: 4028 });
     try {
       const pk = generatePrivateKey(); const acct = privateKeyToAccount(pk);
-      const eth = await ctxOf(PK.deployer).walletClient.sendTransaction({ to: acct.address, value: 1_000_000_000_000_000_000n });
+      const eth = await ctxOf(PK.deployer).walletClient.sendTransaction({ to: acct.address, value: FUND_ETH });
       await publicClient.waitForTransactionReceipt({ hash: eth });
       await mintUsdg(acct.address, 2_000_000n);
       const c = new AegisClient({ ctx: ctxOf(pk), account: acct, providerUrl: "http://127.0.0.1:4028", usdg: d.usdg, artifacts: art });
@@ -490,7 +494,7 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
     const PORT = 4027;
     const fresh = async (usdgAmount: bigint) => {
       const pk = generatePrivateKey(); const acct = privateKeyToAccount(pk);
-      const eth = await ctxOf(PK.deployer).walletClient.sendTransaction({ to: acct.address, value: 1_000_000_000_000_000_000n });
+      const eth = await ctxOf(PK.deployer).walletClient.sendTransaction({ to: acct.address, value: FUND_ETH });
       await publicClient.waitForTransactionReceipt({ hash: eth });
       await mintUsdg(acct.address, usdgAmount);
       return { pk, acct };
