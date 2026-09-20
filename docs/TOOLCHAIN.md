@@ -5,6 +5,7 @@
 - python3: Python 3.12.3
 - cargo: cargo 1.92.0 (344c4567c 2025-10-21), cargo-stylus: stylus 0.10.9
 - rustup targets: wasm32-unknown-unknown wasm32v1-none x86_64-unknown-linux-gnu 
+- web console (Task 7, 2026-09-20; `pnpm --filter @aegisclear/web list --depth 0`): vite 6.4.3, react 18.3.1, @vitejs/plugin-react 4.7.0, vitest 5.0.1
 
 ## sla_settlement.circom (Task 4, 2026-09-19)
 - `SlaSettlement(128, 7)` (MAX_SEQ=128, DEPTH=7 — unchanged, D4 not applied), compiled with `circom --O2` (full constraint simplification; see `circuits/scripts/build.sh`).

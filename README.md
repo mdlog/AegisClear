@@ -6,7 +6,19 @@ Spesifikasi lengkap: [`prd-arsitektur.md`](./prd-arsitektur.md). Log toolchain &
 
 **Status implementasi:** kontrak, sirkuit, dan SDK lengkap dan lulus seluruh suite lokal (Anvil + Foundry + circuits). **Deploy ke testnet 46630 sudah di-broadcast dan 7/7 kontrak terverifikasi di Blockscout (20 Sep 2026, blok 121.731.938 = `0x7417b62`)**; test integrasi "kooperatif" dan "sengketa" (bukti Groth16 asli + `settle()`) **lulus di chain 46630** — tx bukti liveness ada di tabel [Alamat kontrak](#alamat-kontrak). Release proving key: [`v0.1.0-zkey`](https://github.com/mdlog/AegisClear/releases/tag/v0.1.0-zkey). Gas Stylus vs Yul terukur on-chain (`docs/benchmarks/poseidon.md`) — D2 ditutup: Stylus hanya untuk anchored mode (P1).
 
+## Lihat di browser (web console)
+
+```bash
+# Lokal (Anvil 8545 + DeployLocal sudah jalan, zkey ada di circuits/build/):
+pnpm web                                  # = pnpm --filter @aegisclear/web start → http://localhost:4040
+# Testnet 46630 (butuh RPC_URL, PK_PROVIDER, PK_CLIENT_A, PK_CLIENT_B, PK_DEPLOYER di .env — dibaca otomatis):
+AEGIS_NETWORK=testnet pnpm web
+```
+
+Halaman `http://localhost:4040` (port `WEB_PORT`) memuat: **dashboard channel** (semua `ChannelOpened` di factory deployment, state/seq/A/budget/deadline/bukti, klik untuk detail + event), **panel demo** Pasar A vs Pasar B — tombol menjalankan skenario §14 di server (provider, klien A/B, proving Groth16 semuanya di proses Node; tidak ada wallet di browser) dan men-stream langkahnya (SSE) dengan tautan explorer, lalu tabel perbandingan, kartu **"privat"** (syarat & metrik yang tidak pernah masuk chain) vs **"yang dilihat chain"** (T, R, A, payToClient) dan tombol **leak-check**; serta JSON 402 mentah yang dilihat klien x402. Provider yang sama di-mount di `http://localhost:4040/provider` (`GET /job` → 402) lengkap dengan challenge responder in-process. Pengembangan UI: `pnpm web:dev` (Vite di :4043, proxy ke :4040). API: `GET /api/config`, `/api/channels`, `/api/channels/:addr`, `POST /api/demo/run {scenario}`, `/api/demo/runs/:id`, `/api/demo/runs/:id/events` (SSE), `/api/demo/leak-check/:runId`, `/api/offer?client=A|B`.
+
 ## Daftar isi
+- [Lihat di browser (web console)](#lihat-di-browser-web-console)
 - [Ringkasan produk](#ringkasan-produk)
 - [Alamat kontrak](#alamat-kontrak)
 - [Menjalankan secara lokal](#menjalankan-secara-lokal)
@@ -100,6 +112,8 @@ pnpm --filter @aegisclear/demo demo
 
 # Opsional: pemindaian kebocoran calldata/event on-chain yang membuktikan tabel §6.7 di bawah
 pnpm --filter @aegisclear/demo leak-check
+
+pnpm test:web   # butuh Anvil + DeployLocal seperti test SDK (RPC_URL untuk port lain)
 ```
 
 Sub-suite satuan bila perlu debug lebih sempit: `pnpm test:sdk`, `pnpm test:circuits`, `pnpm test:contracts` (dijalankan dari root; `forge test -vv` juga bisa langsung dari `contracts/`).

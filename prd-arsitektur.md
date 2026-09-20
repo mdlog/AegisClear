@@ -712,6 +712,8 @@ Skrip menjalankan skenario 1 dan 2 (§13) di kedua pasar dan mencetak:
 
 Lingkungan: Anvil **fork mainnet 4663** (USDG asli, Permit2 & proxy x402 asli, `vm.warp` untuk jendela) untuk uji; **testnet 46630** dengan `MockUSDG` untuk bukti liveness; **mainnet 4663** dengan USDG sen-level untuk demo video (D1). Kontrak produksi dipakai apa adanya — tidak ada `AegisClock`; jendela pendek datang dari factory demo (`MIN_CHALLENGE_WINDOW = 60 s`, D5), bukan dari kode kontrak yang berbeda.
 
+**Web console (20 Sep 2026).** `web/` menjalankan skenario tabel ini dari browser (`pnpm web` → `http://localhost:4040`, mode `local`/`testnet`): dashboard channel dari event `ChannelOpened`, log langkah live per skenario dengan tautan explorer, tabel perbandingan di atas, kartu privat-vs-chain, dan `leak-check` per run. Kunci demo tetap di server (tidak ada wallet browser); provider yang sama di-mount di `/provider`.
+
 > `block.number` di Robinhood Chain adalah estimasi blok L1 yang update periodik. Semua logika waktu memakai `block.timestamp`; jangan pakai `block.number` untuk deadline.
 
 ---
