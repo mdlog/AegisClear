@@ -24,7 +24,7 @@ describe.skipIf(!existsSync(DEPLOY))("watcher", () => {
     const sigP = await signChannelTerms(provider, predicted, 31337, cfg);
     const { channel } = await openChannel(ctx(PK_C), cfg, "0x", sigP);   // klien membuka, provider menandatangani
     await erc20Transfer(ctx(PK_C), d.usdg, channel, 500_000n);
-    const cp = { seq: 3, cumulativeAmount: 60_000n, receiptsRoot: 5n };
+    const cp = { epoch: 0, seq: 3, cumulativeAmount: 60_000n, receiptsRoot: 5n };
     await submitCheckpointTx(ctx(PK_P), channel, cp, await signCheckpoint(client, channel, 31337, cp), await signCheckpoint(provider, channel, 31337, cp));
 
     const w = new Watcher({ ctx: ctx(PK_P) });
@@ -52,8 +52,8 @@ describe.skipIf(!existsSync(DEPLOY))("watcher", () => {
     await erc20Transfer(ctx(PK_C), d.usdg, channel, 500_000n);
 
     // klien & provider co-sign DUA checkpoint off-chain: seq 3 (basi) dan seq 7 (tertinggi/benar)
-    const cpStale: Checkpoint = { seq: 3, cumulativeAmount: 60_000n, receiptsRoot: 5n };
-    const cpLatest: Checkpoint = { seq: 7, cumulativeAmount: 140_000n, receiptsRoot: 9n };
+    const cpStale: Checkpoint = { epoch: 0, seq: 3, cumulativeAmount: 60_000n, receiptsRoot: 5n };
+    const cpLatest: Checkpoint = { epoch: 0, seq: 7, cumulativeAmount: 140_000n, receiptsRoot: 9n };
     const bothSign = async (cp: Checkpoint) => ({
       cp, sigClient: await signCheckpoint(client, channel, 31337, cp), sigProvider: await signCheckpoint(provider, channel, 31337, cp),
     });
@@ -95,8 +95,8 @@ describe.skipIf(!existsSync(DEPLOY))("watcher", () => {
     const bothSign = async (cp: Checkpoint) => ({
       cp, sigClient: await signCheckpoint(client, channel, 31337, cp), sigProvider: await signCheckpoint(provider, channel, 31337, cp),
     });
-    const stale = await bothSign({ seq: 3, cumulativeAmount: 60_000n, receiptsRoot: 5n });
-    const latest = await bothSign({ seq: 7, cumulativeAmount: 140_000n, receiptsRoot: 9n });
+    const stale = await bothSign({ epoch: 0, seq: 3, cumulativeAmount: 60_000n, receiptsRoot: 5n });
+    const latest = await bothSign({ epoch: 0, seq: 7, cumulativeAmount: 140_000n, receiptsRoot: 9n });
 
     // klien men-submit checkpoint BASI (seq 3) → CLOSING, deadline = t0 + 60
     await submitCheckpointTx(ctx(PK_C), channel, stale.cp, stale.sigClient, stale.sigProvider);
@@ -139,7 +139,7 @@ describe.skipIf(!existsSync(DEPLOY))("watcher", () => {
     const sigP = await signChannelTerms(provider, predicted, 31337, cfg);
     const { channel } = await openChannel(ctx(PK_C), cfg, "0x", sigP);
     await erc20Transfer(ctx(PK_C), d.usdg, channel, 500_000n);
-    const cp = { seq: 3, cumulativeAmount: 60_000n, receiptsRoot: 5n };
+    const cp = { epoch: 0, seq: 3, cumulativeAmount: 60_000n, receiptsRoot: 5n };
     await submitCheckpointTx(ctx(PK_P), channel, cp, await signCheckpoint(client, channel, 31337, cp), await signCheckpoint(provider, channel, 31337, cp));
 
     const w = new Watcher({ ctx: ctx(PK_P) });

@@ -1,12 +1,12 @@
 import type { Address, Hex, PrivateKeyAccount } from "viem";
 import { type Terms, type Receipt, ReceiptTree, settle, buildCircuitInput, commitTerms, merkleRoot, leafHash } from "../core/index.js";
 import {
-  type ChannelConfig, type Checkpoint, type TypedDataVerifier, signCheckpoint, signChannelTerms, signClose, rootHex,
+  type ChannelConfig, type Checkpoint, type TypedDataVerifier, signCheckpoint, signChannelTerms, signClose, signRollover, rootHex,
   makeTypedDataVerifier,
 } from "../core/typedData.js";
 import {
   type ChainCtx, erc20Transfer, predictChannel, openChannel, submitCheckpointTx, claimPenaltyTx, settleTx,
-  closeCooperativeTx, readChannel,
+  closeCooperativeTx, rolloverTx, readChannel,
 } from "../chain/channel.js";
 import { prove, toCalldata, type Artifacts } from "../core/prover.js";
 
@@ -42,7 +42,7 @@ export interface TxLog { label: string; hash: Hex; gasUsed: bigint }
 const bi = (x: string | number | bigint) => BigInt(x);
 
 export class AegisClient {
-  cfg!: ChannelConfig; channel!: Address; terms!: Terms; deposit = 0n;
+  cfg!: ChannelConfig; channel!: Address; terms!: Terms; deposit = 0n; epoch = 0;
   readonly tree = new ReceiptTree();
   readonly checkpoints = new Map<number, { cp: Checkpoint; sigProvider: Hex; sigClient: Hex }>();
   readonly txs: TxLog[] = [];
@@ -86,7 +86,7 @@ export class AegisClient {
     if (predicted.toLowerCase() !== String(offer.payTo).toLowerCase()) throw new Error("payTo != predictChannel(cfg) (T19)");
     if (!(await this.verify.verifyChannelTermsSig(cfg.provider, predicted, this.chainId, cfg, a.sigProvider))) throw new Error("bad provider terms signature (T19)");
     // Tiket keluar unilateral (seq 0): harus tervalidasi SEBELUM klien mendanai channel (§6.2/T-exit0).
-    const cp0: Checkpoint = { seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };
+    const cp0: Checkpoint = { epoch: 0, seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };
     if (!(await this.verify.verifyCheckpointSig(cfg.provider, predicted, this.chainId, cp0, a.exitSig))) throw new Error("bad provider exit ticket (seq-0)");
     // Pagar ekonomi (ClientPolicy) — SEBELUM transfer apa pun. Tanpa ini klien mendanai berapa pun yang
     // diminta dan menerima jendela tantangan sepanjang apa pun (dana tertahan selama itu bila sengketa).
@@ -128,7 +128,8 @@ export class AegisClient {
     if (this.maxQtyPerUnit !== undefined && r.qty > this.maxQtyPerUnit)
       throw new Error(`receipt ${r.seq} qty ${r.qty} exceeds maxQtyPerUnit ${this.maxQtyPerUnit}`);
     if (this.o.accept && !this.o.accept(r)) throw new Error(`receipt ${r.seq} rejected by policy`);
-    const cp: Checkpoint = { seq: Number(b.checkpoint.seq), cumulativeAmount: bi(b.checkpoint.cumulativeAmount), receiptsRoot: bi(b.checkpoint.receiptsRoot) };
+    const cp: Checkpoint = { epoch: Number(b.checkpoint.epoch), seq: Number(b.checkpoint.seq), cumulativeAmount: bi(b.checkpoint.cumulativeAmount), receiptsRoot: bi(b.checkpoint.receiptsRoot) };
+    if (cp.epoch !== this.epoch) throw new Error("checkpoint epoch mismatch");
     // Rekomputasi atas pohon tentatif (leaves + leaf(r), receipts + r) — belum ada mutasi.
     const tentativeRoot = await merkleRoot([...this.tree.leaves, await leafHash(r)]);
     const tentativeCumulative = settle([...this.tree.receipts, r], this.terms).cumulativeAmount;
@@ -151,14 +152,43 @@ export class AegisClient {
 
   async closeCooperative(): Promise<void> {
     const seq = this.tree.size;
-    const res = await fetch(`${this.o.providerUrl}/close`, { method: "POST", headers: this.hdr(), body: JSON.stringify({ seq }) });
+    const toProvider = settle(this.tree.receipts, this.terms).cumulativeAmount;
+    const msg = { epoch: this.epoch, seq, toProvider };
+    const sigClient = await signClose(this.o.account, this.channel, this.chainId, msg);
+    const res = await fetch(`${this.o.providerUrl}/close`, { method: "POST", headers: this.hdr(), body: JSON.stringify({ seq, toProvider: toProvider.toString(), sigClient }) });
     if (res.status !== 200) throw new Error(`POST /close ${res.status}: ${await res.text()}`);
     const b = (await res.json()) as any;
-    const toProvider = bi(b.toProvider);
-    if (toProvider !== settle(this.tree.receipts, this.terms).cumulativeAmount) throw new Error("close amount mismatch");
-    if (!(await this.verify.verifyCloseSig(this.cfg.provider, this.channel, this.chainId, { seq, toProvider }, b.sigProvider))) throw new Error("bad provider close signature");
-    const sigClient = await signClose(this.o.account, this.channel, this.chainId, { seq, toProvider });
+    if (Number(b.epoch) !== this.epoch || Number(b.seq) !== seq || bi(b.toProvider) !== toProvider) throw new Error("close reply mismatch");
+    if (!(await this.verify.verifyCloseSig(this.cfg.provider, this.channel, this.chainId, msg, b.sigProvider))) throw new Error("bad provider close signature");
     this.txs.push({ label: "closeCooperative", ...(await closeCooperativeTx(this.o.ctx, this.channel, seq, toProvider, sigClient, b.sigProvider)) });
+  }
+
+  /**
+   * Rollover kooperatif (FR-10): bayar epoch berjalan, sisa deposit jadi budget epoch baru, seq/R/A reset,
+   * epoch++. Klien menandatangani dulu (identitas + niat), provider ikut menandatangani, klien mengirim tx,
+   * lalu memberi tahu provider (`/rollover/confirm`) yang memverifikasi on-chain dan memberi tiket keluar baru.
+   */
+  async rollover(): Promise<void> {
+    const seq = this.tree.size;
+    const toProvider = settle(this.tree.receipts, this.terms).cumulativeAmount;
+    const msg = { epoch: this.epoch, seq, toProvider };
+    const sigClient = await signRollover(this.o.account, this.channel, this.chainId, msg);
+    const res = await fetch(`${this.o.providerUrl}/rollover`, { method: "POST", headers: this.hdr(), body: JSON.stringify({ seq, toProvider: toProvider.toString(), sigClient }) });
+    if (res.status !== 200) throw new Error(`POST /rollover ${res.status}: ${await res.text()}`);
+    const b = (await res.json()) as any;
+    if (Number(b.epoch) !== this.epoch || Number(b.seq) !== seq || bi(b.toProvider) !== toProvider) throw new Error("rollover reply mismatch");
+    if (!(await this.verify.verifyRolloverSig(this.cfg.provider, this.channel, this.chainId, msg, b.sigProvider))) throw new Error("bad provider rollover signature");
+    this.txs.push({ label: "rollover", ...(await rolloverTx(this.o.ctx, this.channel, seq, toProvider, sigClient, b.sigProvider)) });
+    const confirm = await fetch(`${this.o.providerUrl}/rollover/confirm`, { method: "POST", headers: this.hdr() });
+    if (confirm.status !== 200) throw new Error(`POST /rollover/confirm ${confirm.status}: ${await confirm.text()}`);
+    const cb = (await confirm.json()) as any;
+    const onchain = await readChannel(this.o.ctx, this.channel);
+    if (onchain.epoch !== this.epoch + 1 || Number(cb.epoch) !== onchain.epoch) throw new Error("epoch mismatch after rollover");
+    this.epoch = onchain.epoch;
+    const cp0: Checkpoint = { epoch: this.epoch, seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };
+    if (!(await this.verify.verifyCheckpointSig(this.cfg.provider, this.channel, this.chainId, cp0, cb.exitSig))) throw new Error("bad provider exit ticket (new epoch)");
+    this.exitSigProvider = cb.exitSig as Hex;
+    this.tree.reset(); this.checkpoints.clear(); this.pendingAck = undefined;
   }
 
   /** Unilateral: checkpoint co-signed TERTINGGI yang dipegang, lalu bukti penalti bila ada (§6.4) */
@@ -200,7 +230,7 @@ export class AegisClient {
       const { hash, gasUsed } = await openChannel(this.o.ctx, this.cfg, "0x", this.providerTermsSig!);
       this.txs.push({ label: "openViaExit", hash, gasUsed });
     }
-    const cp0: Checkpoint = { seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };
+    const cp0: Checkpoint = { epoch: this.epoch, seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };
     const sigClient0 = await signCheckpoint(this.o.account, this.channel, this.chainId, cp0);
     this.txs.push({ label: "exitUnilateral", ...(await submitCheckpointTx(this.o.ctx, this.channel, cp0, sigClient0, this.exitSigProvider!)) });
   }

@@ -50,4 +50,6 @@ export class ReceiptTree {
     this.receipts.push(r);
   }
   root(): Promise<bigint> { return merkleRoot(this.leaves); }
+  /** Epoch baru (rollover): kosongkan daun & receipt; objek tetap sama agar referensi pemilik tidak putus. */
+  reset(): void { this.leaves.length = 0; this.receipts.length = 0; }
 }

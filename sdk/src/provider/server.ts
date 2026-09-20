@@ -8,9 +8,9 @@ import { randomBytes } from "node:crypto";
 import type { Address, Hex, PrivateKeyAccount } from "viem";
 import { type Terms, type Receipt, ReceiptTree, commitTerms, makeReceipt, MAX_SEQ, merkleRoot, randomNonce } from "../core/index.js";
 import {
-  type ChannelConfig, type Checkpoint, signCheckpoint, signChannelTerms, signClose, rootHex, makeTypedDataVerifier,
+  type ChannelConfig, type Checkpoint, signCheckpoint, signChannelTerms, signClose, signRollover, rootHex, makeTypedDataVerifier,
 } from "../core/typedData.js";
-import { type ChainCtx, predictChannel, openChannel, erc20Balance } from "../chain/channel.js";
+import { type ChainCtx, predictChannel, openChannel, erc20Balance, readChannel } from "../chain/channel.js";
 import { Watcher } from "../watcher/watcher.js";
 
 export interface ProviderOptions {
@@ -34,6 +34,9 @@ export interface Session {
   /** tiket keluar unilateral: Checkpoint(0,0,merkleRoot([])) ditandatangani provider di muka (T-exit0) */
   exitSigProvider: Hex;
   tree: ReceiptTree; cumulativeAmount: bigint; checkpoints: Map<number, CoSigned>;
+  epoch: number;
+  /** Close/Rollover sudah ditandatangani provider: tidak ada unit baru sampai rollover terkonfirmasi (F-close-continue) */
+  closing: boolean;
 }
 const j = (o: unknown) => JSON.parse(JSON.stringify(o, (_, v) => (typeof v === "bigint" ? v.toString() : v)));
 
@@ -56,11 +59,12 @@ export function createProviderApp(o: ProviderOptions) {
       payoutClient: client, payoutProvider: o.account.address, salt: ("0x" + randomBytes(32).toString("hex")) as Hex,
     };
     const predicted = await predictChannel(o.ctx, cfg);
-    const cp0: Checkpoint = { seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };
+    const cp0: Checkpoint = { epoch: 0, seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };
     const s: Session = {
       cfg, predicted, terms, termsSigProvider: await signChannelTerms(o.account, predicted, chainId, cfg),
       exitSigProvider: await signCheckpoint(o.account, predicted, chainId, cp0),
       tree: new ReceiptTree(), cumulativeAmount: 0n, checkpoints: new Map(),
+      epoch: 0, closing: false,
     };
     sessions.set(key, s);
     return s;
@@ -112,6 +116,7 @@ export function createProviderApp(o: ProviderOptions) {
       }
     }
     if (n >= MAX_SEQ) return c.json({ error: "epoch-full" }, 409);
+    if (s.closing) return c.json({ error: "session-closing" }, 409);
     // (3) tidak melayani melebihi deposit (FR-24)
     const due = o.unitQty * s.terms.unitPrice;
     if ((await erc20Balance(o.ctx, o.usdg, s.channel)) < s.cumulativeAmount + due) return c.json(challenge(s), 402);
@@ -120,7 +125,7 @@ export function createProviderApp(o: ProviderOptions) {
     const r: Receipt = makeReceipt(n, o.unitQty, m1, m2, s.terms.unitPrice);
     await s.tree.append(r);
     s.cumulativeAmount += due;
-    const cp: Checkpoint = { seq: n + 1, cumulativeAmount: s.cumulativeAmount, receiptsRoot: await s.tree.root() };
+    const cp: Checkpoint = { epoch: s.epoch, seq: n + 1, cumulativeAmount: s.cumulativeAmount, receiptsRoot: await s.tree.root() };
     const sigProvider = await signCheckpoint(o.account, s.channel, chainId, cp);
     s.checkpoints.set(n + 1, { cp, sigProvider });
     return c.json({ result: `unit-${n}`, receipt: j(r), checkpoint: j(cp), sigProvider, channel: s.channel });
@@ -136,22 +141,46 @@ export function createProviderApp(o: ProviderOptions) {
     return c.json({ ok: true });
   });
 
-  app.post("/close", async (c) => {
+  /**
+   * Gating bersama /close & /rollover (T-close-hi + F-close-continue): hanya seq co-signed TERTINGGI, jumlah
+   * harus persis kumulatif checkpoint itu, dan permintaan WAJIB membawa tanda tangan klien atas pesan yang sama
+   * (bukti identitas + niat; header Aegis-Client sendiri tidak diautentikasi). Setelah provider ikut
+   * menandatangani, sesi ditandai `closing`: tidak ada unit baru sampai rollover terkonfirmasi on-chain.
+   */
+  async function countersign(c: any, kind: "close" | "rollover") {
     const client = clientOf(c); const s = client && sessions.get(client.toLowerCase());
     if (!s?.channel) return c.json({ error: "no channel" }, 409);
-    const { seq } = (await c.req.json()) as { seq: number };
-    // T-close-hi: hanya checkpoint co-signed TERTINGGI yang boleh ditutup. Klien tidak boleh
-    // meminta seq 0 atau seq basi lain untuk membayar provider lebih sedikit dari yang terutang
-    // sebenarnya (eksploit: 10 unit terkirim+acked lalu minta Close(0,0) → refund penuh).
+    const { seq, toProvider, sigClient } = (await c.req.json()) as { seq: number; toProvider: string; sigClient: Hex };
     const n = s.tree.size;
     let hi: number | undefined;
-    if (n === 0) hi = 0; // channel belum pernah dipakai: Close(0,0) sah
+    if (n === 0) hi = 0;
     else if (s.checkpoints.get(n)?.sigClient) hi = n;
     else if (s.checkpoints.get(n - 1)?.sigClient) hi = n - 1;
     if (hi === undefined || seq !== hi) return c.json({ error: "checkpoint-not-acked", seq }, 409);
-    const toProvider = hi === 0 ? 0n : s.checkpoints.get(hi)!.cp.cumulativeAmount;
-    const sigProvider = await signClose(o.account, s.channel, chainId, { seq: hi, toProvider });
-    return c.json({ seq: hi, toProvider: toProvider.toString(), sigProvider });
+    const owed = hi === 0 ? 0n : s.checkpoints.get(hi)!.cp.cumulativeAmount;
+    if (BigInt(toProvider) !== owed) return c.json({ error: "amount-mismatch", toProvider: owed.toString() }, 409);
+    const msg = { epoch: s.epoch, seq: hi, toProvider: owed };
+    const ok = kind === "close"
+      ? await verify.verifyCloseSig(client!, s.channel, chainId, msg, sigClient)
+      : await verify.verifyRolloverSig(client!, s.channel, chainId, msg, sigClient);
+    if (!ok) return c.json({ error: "bad-client-signature" }, 400);
+    const sigProvider = kind === "close" ? await signClose(o.account, s.channel, chainId, msg) : await signRollover(o.account, s.channel, chainId, msg);
+    s.closing = true;
+    return c.json({ epoch: s.epoch, seq: hi, toProvider: owed.toString(), sigProvider });
+  }
+  app.post("/close", (c) => countersign(c, "close"));
+  app.post("/rollover", (c) => countersign(c, "rollover"));
+
+  /** Setelah tx rollover klien masuk: verifikasi on-chain (epoch+1, seq 0, OPEN) lalu mulai epoch baru di sesi. */
+  app.post("/rollover/confirm", async (c) => {
+    const client = clientOf(c); const s = client && sessions.get(client.toLowerCase());
+    if (!s?.channel) return c.json({ error: "no channel" }, 409);
+    const v = await readChannel(o.ctx, s.channel);
+    if (v.epoch !== s.epoch + 1 || v.seq !== 0 || v.state !== "OPEN") return c.json({ error: "rollover-not-onchain", epoch: v.epoch, seq: v.seq, state: v.state }, 409);
+    s.epoch = v.epoch; s.closing = false; s.tree.reset(); s.cumulativeAmount = 0n; s.checkpoints.clear();
+    const cp0: Checkpoint = { epoch: s.epoch, seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };
+    s.exitSigProvider = await signCheckpoint(o.account, s.channel, chainId, cp0);
+    return c.json({ epoch: s.epoch, exitSig: s.exitSigProvider });
   });
 
   app.get("/state", async (c) => {

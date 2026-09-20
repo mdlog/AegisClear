@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { existsSync } from "node:fs";
-import { createPublicClient, http } from "viem";
+import { createPublicClient, http, encodeAbiParameters, hashTypedData, hashDomain, getTypesForEIP712Domain, keccak256, toBytes, concatHex, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { foundry } from "viem/chains";
 import {
-  signCheckpoint, verifyCheckpointSig, signChannelTerms, verifyChannelTermsSig, signClose, verifyCloseSig, makeTypedDataVerifier, type ChannelConfig,
+  signCheckpoint, verifyCheckpointSig, signChannelTerms, verifyChannelTermsSig, signClose, verifyCloseSig, signRollover, verifyRolloverSig,
+  makeTypedDataVerifier, domain, CHECKPOINT_TYPES, CLOSE_TYPES, ROLLOVER_TYPES, rootHex, type ChannelConfig,
 } from "../src/core/typedData.js";
 
 const acct = privateKeyToAccount("0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d");
@@ -19,19 +20,45 @@ const cfg: ChannelConfig = {
 };
 
 describe("EIP-712", () => {
-  it("checkpoint sign/verify roundtrip; nilai berbeda gagal", async () => {
-    const cp = { seq: 100, cumulativeAmount: 2_000_000n, receiptsRoot: 777n };
+  it("checkpoint sign/verify roundtrip; epoch/seq/chainId berbeda gagal", async () => {
+    const cp = { epoch: 0, seq: 100, cumulativeAmount: 2_000_000n, receiptsRoot: 777n };
     const sig = await signCheckpoint(acct, channel, 31337, cp);
     expect(await verifyCheckpointSig(acct.address, channel, 31337, cp, sig)).toBe(true);
     expect(await verifyCheckpointSig(acct.address, channel, 31337, { ...cp, seq: 101 }, sig)).toBe(false);
+    expect(await verifyCheckpointSig(acct.address, channel, 31337, { ...cp, epoch: 1 }, sig)).toBe(false);
     expect(await verifyCheckpointSig(acct.address, channel, 4663, cp, sig)).toBe(false);
   });
-  it("channel terms & close roundtrip", async () => {
+  it("channel terms, close & rollover roundtrip; close ≠ rollover meski isi sama", async () => {
     const s1 = await signChannelTerms(acct, channel, 31337, cfg);
     expect(await verifyChannelTermsSig(acct.address, channel, 31337, cfg, s1)).toBe(true);
-    const s2 = await signClose(acct, channel, 31337, { seq: 10, toProvider: 5n });
-    expect(await verifyCloseSig(acct.address, channel, 31337, { seq: 10, toProvider: 5n }, s2)).toBe(true);
-    expect(await verifyCloseSig(acct.address, channel, 31337, { seq: 10, toProvider: 6n }, s2)).toBe(false);
+    const m = { epoch: 2, seq: 10, toProvider: 5n };
+    const s2 = await signClose(acct, channel, 31337, m);
+    expect(await verifyCloseSig(acct.address, channel, 31337, m, s2)).toBe(true);
+    expect(await verifyCloseSig(acct.address, channel, 31337, { ...m, toProvider: 6n }, s2)).toBe(false);
+    expect(await verifyCloseSig(acct.address, channel, 31337, { ...m, epoch: 3 }, s2)).toBe(false);
+    const s3 = await signRollover(acct, channel, 31337, m);
+    expect(await verifyRolloverSig(acct.address, channel, 31337, m, s3)).toBe(true);
+    expect(await verifyCloseSig(acct.address, channel, 31337, m, s3)).toBe(false);      // tipe berbeda → digest berbeda
+    expect(await verifyRolloverSig(acct.address, channel, 31337, m, s2)).toBe(false);
+  });
+  // Struct hash TS == keccak256(abi.encode(TYPEHASH, ...)) persis seperti AegisChannel.hashCheckpoint/hashClose/hashRollover:
+  // menjamin string typehash di kontrak dan `types` di SDK tidak pernah menyimpang (tanpa chain).
+  it("struct hash cocok dengan typehash kontrak (Checkpoint/Close/Rollover)", () => {
+    const dom = domain(channel, 31337);
+    // Generik eksplisit: getTypesForEIP712Domain() mengembalikan TypedDataParameter[] biasa (field `type`
+    // melebar jadi `string`), bukan literal `as const` — tanpa ini `hashDomain` mencoba memetakannya lewat
+    // TypedDataToPrimitiveTypes (abitype) dan gagal di level tipe (bukan di runtime; nilai hash tidak berubah).
+    const domSep = hashDomain<Record<string, unknown>>({ domain: dom, types: { EIP712Domain: getTypesForEIP712Domain({ domain: dom }) } });
+    const th = (s: string) => keccak256(toBytes(s));
+    const expectDigest = (types: any, primaryType: string, message: any, encoded: Hex) =>
+      expect(hashTypedData({ domain: dom, types, primaryType, message })).toBe(keccak256(concatHex(["0x1901", domSep, keccak256(encoded)])));
+    expectDigest(CHECKPOINT_TYPES, "Checkpoint", { epoch: 1, seq: 7n, cumulativeAmount: 140_000n, receiptsRoot: rootHex(777n) },
+      encodeAbiParameters([{ type: "bytes32" }, { type: "uint32" }, { type: "uint64" }, { type: "uint128" }, { type: "bytes32" }],
+        [th("Checkpoint(uint32 epoch,uint64 seq,uint128 cumulativeAmount,bytes32 receiptsRoot)"), 1, 7n, 140_000n, rootHex(777n)]));
+    expectDigest(CLOSE_TYPES, "Close", { epoch: 1, seq: 7n, toProvider: 5n },
+      encodeAbiParameters([{ type: "bytes32" }, { type: "uint32" }, { type: "uint64" }, { type: "uint128" }], [th("Close(uint32 epoch,uint64 seq,uint128 toProvider)"), 1, 7n, 5n]));
+    expectDigest(ROLLOVER_TYPES, "Rollover", { epoch: 1, seq: 7n, toProvider: 5n },
+      encodeAbiParameters([{ type: "bytes32" }, { type: "uint32" }, { type: "uint64" }, { type: "uint128" }], [th("Rollover(uint32 epoch,uint64 seq,uint128 toProvider)"), 1, 7n, 5n]));
   });
 });
 
@@ -39,8 +66,8 @@ describe("EIP-712", () => {
 // Butuh RPC hidup (gate sama seperti suite integrasi: file deploy lokal ada ⇒ Anvil diasumsikan berjalan).
 describe.skipIf(!existsSync(DEPLOY))("makeTypedDataVerifier (ERC-1271/6492-aware)", () => {
   const v = makeTypedDataVerifier(createPublicClient({ chain: foundry, transport: http(RPC) }));
-  it("checkpoint EOA: sah → true; pesan/chainId/penandatangan lain → false; setara fungsi murni", async () => {
-    const cp = { seq: 100, cumulativeAmount: 2_000_000n, receiptsRoot: 777n };
+  it("checkpoint EOA (epoch 0): sah → true; pesan/chainId/penandatangan lain → false; setara fungsi murni", async () => {
+    const cp = { epoch: 0, seq: 100, cumulativeAmount: 2_000_000n, receiptsRoot: 777n };
     const sig = await signCheckpoint(acct, channel, 31337, cp);
     expect(await v.verifyCheckpointSig(acct.address, channel, 31337, cp, sig)).toBe(true);
     expect(await v.verifyCheckpointSig(acct.address, channel, 31337, { ...cp, seq: 101 }, sig)).toBe(false);
@@ -48,13 +75,16 @@ describe.skipIf(!existsSync(DEPLOY))("makeTypedDataVerifier (ERC-1271/6492-aware
     expect(await v.verifyCheckpointSig(other.address, channel, 31337, cp, sig)).toBe(false);
     expect(await v.verifyCheckpointSig(acct.address, channel, 31337, cp, sig)).toBe(await verifyCheckpointSig(acct.address, channel, 31337, cp, sig));
   });
-  it("channel terms & close EOA lewat verifier on-chain", async () => {
+  it("channel terms, close & rollover (epoch 0) EOA lewat verifier on-chain", async () => {
     const s1 = await signChannelTerms(acct, channel, 31337, cfg);
     expect(await v.verifyChannelTermsSig(acct.address, channel, 31337, cfg, s1)).toBe(true);
     expect(await v.verifyChannelTermsSig(acct.address, channel, 31337, { ...cfg, challengeWindow: 121 }, s1)).toBe(false);
     expect(await v.verifyChannelTermsSig(other.address, channel, 31337, cfg, s1)).toBe(false);
-    const s2 = await signClose(acct, channel, 31337, { seq: 10, toProvider: 5n });
-    expect(await v.verifyCloseSig(acct.address, channel, 31337, { seq: 10, toProvider: 5n }, s2)).toBe(true);
-    expect(await v.verifyCloseSig(acct.address, channel, 31337, { seq: 10, toProvider: 6n }, s2)).toBe(false);
+    const m = { epoch: 0, seq: 10, toProvider: 5n };
+    const s2 = await signClose(acct, channel, 31337, m);
+    expect(await v.verifyCloseSig(acct.address, channel, 31337, m, s2)).toBe(true);
+    expect(await v.verifyCloseSig(acct.address, channel, 31337, { ...m, toProvider: 6n }, s2)).toBe(false);
+    const s3 = await signRollover(acct, channel, 31337, m);
+    expect(await v.verifyRolloverSig(acct.address, channel, 31337, m, s3)).toBe(true);
   });
 });

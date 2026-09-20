@@ -15,7 +15,12 @@ export interface WatcherOptions {
    * — inilah yang membuat provider aman dari checkpoint basi klien (termasuk tiket keluar seq-0 dari
    * Task 14). Respons dikirim TANPA memandang `deadline`: `AegisChannel.submitCheckpoint` menerima seq
    * lebih tinggi di CLOSING sampai `settle()` benar-benar dipanggil (tidak ada cek deadline di sana),
-   * jadi selama belum ada yang men-settle, respons yang "terlambat" tetap sah dan tetap menang.
+   * jadi selama belum ada yang men-settle, respons yang "terlambat" tetap sah dan tetap menang. FR-10:
+   * checkpoint hanya dibandingkan jika epoch-nya SAMA dengan epoch on-chain saat ini — sebuah checkpoint
+   * co-signed dari epoch lama (mis. cache provider belum diperbarui setelah `rollover`) tidak pernah bisa
+   * menang lagi (tanda tangannya atas epoch lama akan ditolak kontrak) dan seq-nya yang besar tidak boleh
+   * disalahartikan sebagai "lebih baru" dari seq kecil di epoch baru — itu akan membuat tick() mencoba
+   * submit yang sama (revert) di setiap tick tanpa akhir.
    */
   coSigned?: (channel: Address) => { cp: Checkpoint; sigClient: Hex; sigProvider: Hex } | undefined;
 }
@@ -55,9 +60,11 @@ export class Watcher {
           // tick yang sama hanya terjadi bila deadline HASIL BACA ULANG pun sudah lewat. Bila respons
           // gagal (throw), settle dilewati untuk channel ini di tick ini — dicoba lagi tick berikutnya,
           // karena men-settle state basi adalah hasil terburuk bagi pemegang checkpoint yang lebih baru.
+          // Guard epoch (FR-10): `mine.cp.epoch === v.epoch` WAJIB sebelum membandingkan seq — epoch lain
+          // berarti checkpoint ini basi dari sebelum `rollover` dan tidak akan pernah menang on-chain.
           const mine = this.o.coSigned?.(ch);
           let view = v;
-          if (mine && mine.cp.seq > v.seq) {
+          if (mine && mine.cp.epoch === v.epoch && mine.cp.seq > v.seq) {
             await submitCheckpointTx(this.o.ctx, ch, mine.cp, mine.sigClient, mine.sigProvider);
             responded.push(ch);
             this.o.log?.(`responded ${ch} seq ${mine.cp.seq}`);

@@ -12,7 +12,7 @@ export interface ChainCtx {
 
 export interface ChannelView {
   state: (typeof CHANNEL_STATE)[number]; seq: number; cumulativeAmount: bigint; receiptsRoot: bigint;
-  deadline: number; hasProof: boolean; payToClient: bigint; budget: bigint;
+  deadline: number; hasProof: boolean; payToClient: bigint; budget: bigint; epoch: number;
 }
 
 export async function waitTx(ctx: ChainCtx, hash: Hex) {
@@ -34,7 +34,7 @@ export async function openChannel(ctx: ChainCtx, cfg: ChannelConfig, sigClient: 
 
 export async function readChannel(ctx: ChainCtx, channel: Address): Promise<ChannelView> {
   const c = { address: channel, abi: channelAbi } as const;
-  const [st, seq, A, R, dl, hp, pc, b] = await Promise.all([
+  const [st, seq, A, R, dl, hp, pc, b, ep] = await Promise.all([
     ctx.publicClient.readContract({ ...c, functionName: "state" }),
     ctx.publicClient.readContract({ ...c, functionName: "seq" }),
     ctx.publicClient.readContract({ ...c, functionName: "cumulativeAmount" }),
@@ -43,8 +43,9 @@ export async function readChannel(ctx: ChainCtx, channel: Address): Promise<Chan
     ctx.publicClient.readContract({ ...c, functionName: "hasProof" }),
     ctx.publicClient.readContract({ ...c, functionName: "payToClient" }),
     ctx.publicClient.readContract({ ...c, functionName: "budget" }),
+    ctx.publicClient.readContract({ ...c, functionName: "epoch" }),
   ]);
-  return { state: CHANNEL_STATE[Number(st)], seq: Number(seq), cumulativeAmount: A, receiptsRoot: BigInt(R), deadline: Number(dl), hasProof: hp, payToClient: pc, budget: b };
+  return { state: CHANNEL_STATE[Number(st)], seq: Number(seq), cumulativeAmount: A, receiptsRoot: BigInt(R), deadline: Number(dl), hasProof: hp, payToClient: pc, budget: b, epoch: Number(ep) };
 }
 
 async function write(ctx: ChainCtx, channel: Address, functionName: any, args: any[]) {
@@ -60,6 +61,8 @@ export const settleTx = (ctx: ChainCtx, ch: Address) => write(ctx, ch, "settle",
 export const sweepTx = (ctx: ChainCtx, ch: Address) => write(ctx, ch, "sweep", []);
 export const closeCooperativeTx = (ctx: ChainCtx, ch: Address, seq: number, toProvider: bigint, sigC: Hex, sigP: Hex) =>
   write(ctx, ch, "closeCooperative", [BigInt(seq), toProvider, sigC, sigP]);
+export const rolloverTx = (ctx: ChainCtx, ch: Address, seq: number, toProvider: bigint, sigC: Hex, sigP: Hex) =>
+  write(ctx, ch, "rollover", [BigInt(seq), toProvider, sigC, sigP]);
 
 export async function erc20Transfer(ctx: ChainCtx, token: Address, to: Address, amount: bigint) {
   const hash = await ctx.walletClient.writeContract({ address: token, abi: erc20Abi, functionName: "transfer", args: [to, amount] });

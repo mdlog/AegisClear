@@ -11,8 +11,8 @@ import { foundry } from "viem/chains";
 import { createProviderApp } from "../src/provider/server.js";
 import { AegisClient } from "../src/client/agent.js";
 import {
-  randomNonce, defaultArtifacts, erc20Balance, erc20Abi, commitTerms, signChannelTerms, signCheckpoint,
-  rootHex, predictChannel, merkleRoot, submitCheckpointTx, type ChainCtx, type ChannelConfig,
+  randomNonce, defaultArtifacts, erc20Balance, erc20Abi, erc20Transfer, commitTerms, signChannelTerms, signCheckpoint,
+  signClose, rootHex, predictChannel, merkleRoot, submitCheckpointTx, type ChainCtx, type ChannelConfig,
 } from "../src/index.js";
 
 // DEPLOY_FILE (env) diresolve relatif terhadap REPO ROOT, bukan cwd proses: `pnpm --filter
@@ -147,14 +147,20 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
     await expect(c.exitUnilateral()).rejects.toThrow(/co-signed checkpoints exist/);
     expect(c.txs.length).toBe(txCountBeforeExit);
     const hdr = { "Aegis-Client": me, "content-type": "application/json" };
-    const r0 = await fetch("http://127.0.0.1:4020/close", { method: "POST", headers: hdr, body: JSON.stringify({ seq: 0 }) });
-    expect(r0.status).toBe(409);
-    const r5 = await fetch("http://127.0.0.1:4020/close", { method: "POST", headers: hdr, body: JSON.stringify({ seq: 5 }) });
-    expect(r5.status).toBe(409);
-    const r10 = await fetch("http://127.0.0.1:4020/close", { method: "POST", headers: hdr, body: JSON.stringify({ seq: 10 }) });
+    const post = async (seq: number, toProvider: bigint, signer = privateKeyToAccount(PK.clientC)) => {
+      const sigClient = await signClose(signer, c.channel, CHAIN_ID, { epoch: c.epoch, seq, toProvider });
+      return fetch("http://127.0.0.1:4020/close", { method: "POST", headers: hdr, body: JSON.stringify({ seq, toProvider: toProvider.toString(), sigClient }) });
+    };
+    expect((await post(0, 0n)).status).toBe(409);
+    expect((await post(5, 100_000n)).status).toBe(409);
+    expect((await post(10, 199_999n)).status).toBe(409);                                   // jumlah salah
+    expect((await post(10, 200_000n, privateKeyToAccount(PK.clientD))).status).toBe(400);  // tanda tangan bukan klien ini
+    const r10 = await post(10, 200_000n);
     expect(r10.status).toBe(200);
     expect(((await r10.json()) as any).toProvider).toBe("200000");
-    // jalur yang benar (seq tertinggi) tetap bisa menutup channel secara normal
+    // F-close-continue: setelah provider ikut menandatangani Close, tidak ada unit baru lagi
+    await expect(c.requestUnit()).rejects.toThrow(/session-closing/);
+    // jalur yang benar tetap bisa menutup channel secara normal (tanda tangan baru atas pesan yang sama)
     await c.closeCooperative();
     expect((await c.view()).state).toBe("SETTLED");
     expect((await bal(providerAddr)) - p0).toBe(200_000n);
@@ -280,6 +286,35 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
     expect(a1.unitQty).toBe("1");   // F3: provider mengiklankan qty per unit
   });
 
+  it("skenario 11 (FR-10): epoch penuh → 409 epoch-full → rollover() → unit lanjut di epoch 1 → close; provider = A0 + A1", async () => {
+    const pk = generatePrivateKey(); const acct = privateKeyToAccount(pk);
+    const eth = await ctxOf(PK.deployer).walletClient.sendTransaction({ to: acct.address, value: 1_000_000_000_000_000_000n });
+    await publicClient.waitForTransactionReceipt({ hash: eth });
+    await mintUsdg(acct.address, 10_000_000n);
+    const c = new AegisClient({ ctx: ctxOf(pk), account: acct, providerUrl: "http://127.0.0.1:4020", usdg: d.usdg, artifacts: art });
+    const p0 = await bal(providerAddr); const c0 = await bal(acct.address);
+    await c.start();                                             // deposit 1.000.000 (provider utama)
+    for (let i = 0; i < 50; i++) await c.requestUnit();          // 50 × 20.000 = 1.000.000 = seluruh deposit
+    await c.finalAck();
+    await expect(c.requestUnit()).rejects.toThrow(/402/);        // budget habis (FR-24) — bukan epoch-full; deposit ulang dulu
+    await erc20Transfer(ctxOf(pk), d.usdg, c.channel, 2_000_000n);
+    for (let i = 50; i < 128; i++) await c.requestUnit();        // sampai MAX_SEQ
+    await c.finalAck();
+    await expect(c.requestUnit()).rejects.toThrow(/epoch-full/);
+    expect(c.epoch).toBe(0);
+    await c.rollover();                                          // bayar 2.560.000, sisa 440.000 jadi budget epoch 1
+    expect(c.epoch).toBe(1); expect(c.tree.size).toBe(0);
+    expect((await c.view()).epoch).toBe(1);
+    expect((await bal(providerAddr)) - p0).toBe(2_560_000n);
+    for (let i = 0; i < 5; i++) await c.requestUnit();           // epoch 1: seq 0..4
+    await c.finalAck();
+    await c.closeCooperative();                                  // 100.000 ke provider, 340.000 kembali
+    expect((await c.view()).state).toBe("SETTLED");
+    expect((await bal(providerAddr)) - p0).toBe(2_660_000n);
+    expect(c0 - (await bal(acct.address))).toBe(2_660_000n);
+    expect(c.txs.map((t) => t.label)).toEqual(["fund", "rollover", "closeCooperative"]);
+  });
+
   it("F2: balasan provider dengan tanda tangan checkpoint SALAH ditolak SEBELUM pohon disentuh; dispute() tetap bisa memakai checkpoint co-signed sebelumnya", async () => {
     // Provider ASLI (jujur) dipanggil in-process; proxy di port 4041 meneruskan semuanya apa adanya,
     // kecuali balasan POST /job ke-K: `sigProvider` diganti tanda tangan atas checkpoint yang sama dari
@@ -303,7 +338,7 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
       const res = await honest.app.request(url.pathname, init);
       if (c.req.method === "POST" && url.pathname === "/job" && res.status === 200 && ++posts === K) {
         const body = (await res.json()) as any;
-        const cp = { seq: Number(body.checkpoint.seq), cumulativeAmount: BigInt(body.checkpoint.cumulativeAmount), receiptsRoot: BigInt(body.checkpoint.receiptsRoot) };
+        const cp = { epoch: Number(body.checkpoint.epoch), seq: Number(body.checkpoint.seq), cumulativeAmount: BigInt(body.checkpoint.cumulativeAmount), receiptsRoot: BigInt(body.checkpoint.receiptsRoot) };
         body.sigProvider = await signCheckpoint(wrongSigner, body.channel, CHAIN_ID, cp);
         return c.json(body, 200);
       }

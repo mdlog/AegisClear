@@ -18,6 +18,7 @@ export const channelAbi = parseAbi([
   "function hasProof() view returns (bool)",
   "function payToClient() view returns (uint128)",
   "function budget() view returns (uint256)",
+  "function epoch() view returns (uint32)",
   "function cfg() view returns (address client, address provider, address token, bytes32 termsCommitment, uint32 challengeWindow, uint32 responseWindow, address payoutClient, address payoutProvider, bytes32 salt)",
   "event Opened(address indexed client, address indexed provider, bytes32 termsCommitment, uint32 challengeWindow)",
   "event Funded(address indexed from, uint256 amount)",
@@ -27,9 +28,11 @@ export const channelAbi = parseAbi([
   "function settle()",
   "function sweep()",
   "function closeCooperative(uint64 seq, uint128 toProvider, bytes sigClient, bytes sigProvider)",
+  "function rollover(uint64 seq, uint128 toProvider, bytes sigClient, bytes sigProvider)",
   "event Settled(uint64 seq, uint128 cumulativeAmount, uint256 penalty, uint256 toProvider, uint256 toClient, bool cooperative)",
   "event CheckpointSubmitted(uint64 seq, uint128 cumulativeAmount, bytes32 receiptsRoot, uint64 deadline)",
   "event PenaltyClaimed(address indexed by, uint64 seq, uint128 payToClient)",
+  "event RolledOver(uint32 indexed newEpoch, uint64 closedSeq, uint256 toProvider, uint256 remaining)",
 ]);
 
 export const erc20Abi = parseAbi([
