@@ -15,16 +15,22 @@ export function PrivacyCards({ cfg, run, leak }: { cfg: ConfigResponse | null; r
       .catch((e) => { if (alive) setErr(String((e as Error).message)); });
     return () => { alive = false; };
   }, [run.id, run.status]);
+  // anchored: harga/unit (unitPrice) tersirat on-chain lewat cumulativeAmount tiap ack — bukan lagi "tidak
+  // pernah on-chain". c.seq pada channel anchored = jumlah unit ber-ack, jadi itu batas seq yang relevan
+  // untuk daftar "unit melanggar" (bukan literal 20, supaya tidak lepas sinkron dari skenario). Belum ada
+  // channel anchored termuat (chs kosong/masih fetch) → fallback ke daftar penuh, sama seperti run non-anchored.
+  const anchoredSeqs = chs.filter((c) => c.mode === "anchored").map((c) => c.seq);
+  const anchoredBound = anchoredSeqs.length ? Math.max(...anchoredSeqs) : undefined;
   return (
     <div className="cards">
       <div className="card private">
         <h3>Privat (off-chain) — hanya provider &amp; klien</h3>
         {cfg && (
           <dl className="kv">
-            <dt>harga/unit</dt><dd>{fmtUsdg(cfg.terms.unitPrice)} USDG</dd>
+            <dt>harga/unit</dt><dd>{fmtUsdg(cfg.terms.unitPrice)} USDG{anchoredBound !== undefined ? " — tersirat on-chain (A per ack)" : ""}</dd>
             <dt>ambang</dt><dd>latensi ≤ {cfg.terms.maxM1} ms · kualitas ≥ {cfg.terms.minM2}</dd>
             <dt>penalti</dt><dd>{Number(cfg.terms.penaltyBps) / 100}% per unit melanggar · cap {Number(cfg.terms.capBps) / 100}% dari total</dd>
-            <dt>unit melanggar (demo)</dt><dd>seq {cfg.breaches.join(", ")} (latensi 1200 ms)</dd>
+            <dt>unit melanggar (demo)</dt><dd>seq {(anchoredBound !== undefined ? cfg.breaches.filter((b) => b < anchoredBound) : cfg.breaches).join(", ")} (latensi 1200 ms)</dd>
           </dl>
         )}
         <p className="muted">Nilai-nilai ini tidak pernah masuk calldata maupun log; di chain hanya ada komitmen Poseidon-nya.</p>

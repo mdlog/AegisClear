@@ -16,7 +16,12 @@ import {NeedyPayout} from "./mocks/NeedyPayout.sol";
 contract HookGasTest is AegisTestBase {
     AegisTreasuryRouter router;
     address attacker = address(0xA77);
-    uint256 constant HOOK_GAS = 300_000; // = AegisChannel.HOOK_GAS (private)
+    /// Mirrors the private `AegisChannel.HOOK_GAS` — kept in sync by hand, since that constant is `private`
+    /// and cannot be imported/referenced directly from here. If the two ever drift,
+    /// `test_hook_needing_full_stipend_is_never_starved`'s calibration check
+    /// (`assertGt(cost, 250_000); assertLt(cost, HOOK_GAS - 2_000);`) would keep passing against this STALE
+    /// value instead of the real stipend, silently no longer calibrating to the actual on-chain bound.
+    uint256 constant HOOK_GAS = 300_000;
 
     function setUp() public override { super.setUp(); router = new AegisTreasuryRouter(); }
 
