@@ -36,6 +36,15 @@ contract AegisTreasuryRouter is IAegisPayoutHook, ReentrancyGuard {
 
     /// @notice Dipanggil channel setelah mentransfer `amount` token ke router. Siapa pun boleh memanggil,
     ///         tetapi kredit hanya diberikan bila saldo router benar-benar menutupinya (Σcredit ≤ saldo).
+    /// @dev PERINGATAN (I2, final-fix brief): fungsi ini permissionless DAN mengasumsikan hanya `party`
+    ///      sebenarnya (via hook channel, `AegisChannel._send`) yang mentransfer token ke router TEPAT
+    ///      SEBELUM memanggil `onPayout`. Token yang mendarat di alamat router DI LUAR jalur itu (mis.
+    ///      transfer ERC-20 langsung ke router, bukan lewat channel) TIDAK diatribusikan ke siapa pun
+    ///      secara otomatis — saldo itu hanya menambah "slack" (Σcredit < saldo) yang bisa diklaim oleh
+    ///      PEMANGGIL MANA PUN lewat `onPayout(party, token, amount)` dengan `party` pilihannya sendiri,
+    ///      karena kontrak ini tidak (dan tidak bisa) membedakan token yang baru masuk dari hook channel
+    ///      versus token yang sudah lama nongkrong di saldo. JANGAN PERNAH mengirim token langsung ke
+    ///      alamat router — channel (lewat hook `_send`) adalah satu-satunya pengirim yang dimaksud.
     function onPayout(address party, address token, uint256 amount) external nonReentrant {
         if (IERC20(token).balanceOf(address(this)) < totalCredit[token] + amount) revert Unbacked();
         address dest = destinationOf(party);

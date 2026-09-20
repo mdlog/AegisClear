@@ -298,7 +298,12 @@ contract AegisChannel is ReentrancyGuard {
     }
 
     // ---------- internal ----------
-    uint256 private constant HOOK_GAS = 150_000;
+    // I2 (final-fix brief): MockUSDG hook terukur 35-90k gas; proxy USDG bergaya Paxos (upgradeable,
+    // beberapa SLOAD tambahan lewat delegatecall) diestimasi ~115-120k — margin lama (150k) terlalu tipis
+    // untuk implementasi token production yang lebih berat. Stipend hanya benar-benar dikonsumsi bila
+    // dipakai (try/catch, T-hook): payee tanpa hook atau hook murah tidak membayar gas ekstra apa pun,
+    // jadi menaikkan batas ini tidak menaikkan biaya jalur umum sama sekali.
+    uint256 private constant HOOK_GAS = 300_000;
 
     /// @dev Transfer + hook best-effort (FR-26): payee kontrak boleh menerapkan IAegisPayoutHook (mis. AegisTreasuryRouter).
     ///      Hook dipanggil dengan stipend tetap di dalam try/catch — payee yang revert/menghabiskan gas TIDAK bisa

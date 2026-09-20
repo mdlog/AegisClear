@@ -132,15 +132,26 @@ contract AnchoredTest is AegisTestBase {
         (bytes memory rc, bytes memory rp) = rolloverSigs(ch, 2, uint128(cums[1]));
         ch.rollover(2, uint128(cums[1]), rc, rp);
         assertEq(ch.epoch(), 1); assertEq(ch.seq(), 0); assertEq(ch.receiptsRoot(), bytes32(0));
-        // Task 8 Step 3d(i) — diskriminatif: assert filledSubtrees ITU SENDIRI ter-nol, bukan cuma receiptsRoot
-        // yang kebetulan nol. `forge inspect AegisChannel storage-layout` melaporkan slot 0..6 (bukan 1..7 seperti
-        // dugaan awal brief — ReentrancyGuard OZ v5.5 di sini memakai slot namespaced/pseudo-random di luar layout
-        // sekuensial biasa, jadi TIDAK menggeser slot AegisChannel; filledSubtrees mulai langsung di slot 0).
+        // M8 (final-fix brief) — komentar diperjelas: loop `vm.load` DI BAWAH INI adalah assersi yang
+        // DISKRIMINATIF, bukan `receiptsRoot() == bytes32(0)` di atas. `receiptsRoot` kebetulan nol tidak
+        // membuktikan `filledSubtrees` (state incremental-tree per-epoch) benar-benar ter-reset — bisa saja
+        // nol untuk alasan lain. `vm.load` membaca storage slot `filledSubtrees` LANGSUNG. `forge inspect
+        // AegisChannel storage-layout` melaporkan slot 0..6 (bukan 1..7 seperti dugaan awal brief —
+        // ReentrancyGuard OZ v5.5 di sini memakai slot namespaced/pseudo-random di luar layout sekuensial
+        // biasa, jadi TIDAK menggeser slot AegisChannel; filledSubtrees mulai langsung di slot 0).
         for (uint256 slot; slot < 7; slot++) {
             assertEq(vm.load(address(ch), bytes32(slot)), bytes32(0));
         }
         _ack(0);                                       // leafSig membaca epoch() = 1
         assertEq(ch.receiptsRoot(), bytes32(roots[0]));  // pohon benar-benar kosong sebelum ack ini
+        // M8: bukti end-to-end TAMBAHAN — ack seq 1 juga di epoch baru dan cocokkan dengan `roots[1]`,
+        // fixture yang SAMA dipakai tree yang benar-benar baru dari nol (lihat
+        // test_ack_three_leaves_matches_fixture_roots). Bila `filledSubtrees` TIDAK benar-benar ter-reset
+        // (mis. sisa insertPath dari 2 ack epoch 0 lolos lewat entah bagaimana), root KEDUA ini akan
+        // menyimpang dari `roots[1]` walau root pertama (`roots[0]`) kebetulan masih cocok — dua titik data
+        // berurutan jauh lebih sulit lolos secara kebetulan dibanding satu.
+        _ack(1);
+        assertEq(ch.receiptsRoot(), bytes32(roots[1]));
     }
 
     /// Task 8 Step 3d(i): ack() menolak seq_ == MAX_SEQ (128) dengan SeqTooLarge — 128 acks berturut-turut

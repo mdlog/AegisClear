@@ -117,4 +117,16 @@ contract RolloverTest is AegisTestBase {
         _rollover(0, 0);
         assertEq(usdg.balanceOf(provider), p0); assertEq(ch.budget(), 5_000_000); assertEq(ch.epoch(), 1);
     }
+
+    /// M8 (final-fix brief): tanda tangan atas Close TIDAK sah untuk rollover() meski field-nya identik
+    /// (epoch/seq/toProvider sama) — CLOSE_TYPEHASH != ROLLOVER_TYPEHASH (nama struct beda di EIP-712),
+    /// jadi digest yang ditandatangani berbeda dan SignatureChecker menolaknya. Ini pasangan kontrak dari
+    /// jaminan yang sudah diuji di level SDK (`typedData.test.ts`, "close & rollover roundtrip; close ≠
+    /// rollover meski isi sama") — M7 memisahkan `RolloverMsg`/`CloseMsg` sebagai tipe agar niat ini
+    /// eksplisit di call site, tapi jaminan sebenarnya selalu di sini (typehash kontrak).
+    function test_close_signature_rejected_by_rollover() public {
+        (bytes memory sc, bytes memory sp) = closeSigs(ch, 10, 200_000);
+        vm.expectRevert(AegisChannel.BadSignature.selector);
+        ch.rollover(10, 200_000, sc, sp);
+    }
 }

@@ -75,7 +75,13 @@ contract TreasuryRouterTest is AegisTestBase {
         vm.warp(block.timestamp + 121);
         uint256 g0 = gasleft();
         ch.settle();
-        assertLt(g0 - gasleft(), 400_000);             // stipend 150k + transfer, bukan seluruh gas blok
+        uint256 gasUsed = g0 - gasleft();
+        emit log_named_uint("settle (GasBurnerPayout, HOOK_GAS 300k stipend) gas", gasUsed);
+        // I2 (final-fix brief): HOOK_GAS naik 150k -> 300k (margin proxy USDG bergaya Paxos); batas di
+        // bawah sengaja diberi headroom -- < 600k, bukan dipatok pas ke angka terukur -- supaya test ini
+        // tidak rapuh terhadap kenaikan gas kecil dari perubahan tak terkait (opcode pricing, dst.).
+        // Nomor SEBENARNYA yang terukur dicatat di final-fix-report.md.
+        assertLt(gasUsed, 600_000);                    // stipend 300k + transfer, bukan seluruh gas blok
         assertEq(usdg.balanceOf(address(burner)), 200_000);
         assertEq(usdg.balanceOf(client), 100e6 - 5_000_000 + 4_800_000);
     }
