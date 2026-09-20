@@ -58,6 +58,16 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
   });
   const mkClient = (pk: Hex) => new AegisClient({ ctx: ctxOf(pk), account: privateKeyToAccount(pk), providerUrl: "http://127.0.0.1:4020", usdg: d.usdg, artifacts: art });
   const bal = (who: Address) => erc20Balance(ctxOf(PK.provider), d.usdg, who);
+  /**
+   * RPC publik (load balancer) bisa melayani eth_call dari node yang tertinggal beberapa blok setelah
+   * waitForTransactionReceipt kembali: saldo pasca-settle sempat terbaca 0 padahal event Settled sudah ada
+   * (testnet v2, 20 Sep 2026). Polling sampai nilai yang diharapkan muncul (maks 15 s), lalu assert tegas.
+   */
+  const expectEventually = async (read: () => Promise<bigint>, expected: bigint, ms = 15_000) => {
+    const t0 = Date.now(); let v = await read();
+    while (v !== expected && Date.now() - t0 < ms) { await new Promise((r) => setTimeout(r, 750)); v = await read(); }
+    expect(v).toBe(expected);
+  };
   const providerAccount = privateKeyToAccount(PK.provider);
   const providerAddr = providerAccount.address;
   const mintUsdg = async (to: Address, amount: bigint) => {
@@ -105,8 +115,8 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
     await c.finalAck();
     await c.closeCooperative();
     expect((await c.view()).state).toBe("SETTLED");
-    expect((await bal(providerAddr)) - p0).toBe(200_000n);
-    expect(c0 - (await bal(me))).toBe(200_000n);
+    await expectEventually(async () => (await bal(providerAddr)) - p0, 200_000n);
+    await expectEventually(async () => c0 - (await bal(me)), 200_000n);
   });
 
   it("sengketa: 1 pelanggaran → bukti → 190.000 / refund 810.000", async () => {
@@ -121,8 +131,8 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
     if (CHAIN_ID === 31337) { await publicClient.request({ method: "evm_increaseTime", params: [121] } as any); await publicClient.request({ method: "evm_mine", params: [] } as any); }
     else await new Promise((r) => setTimeout(r, 125_000));   // jendela demo 120 s nyata di testnet
     await c.settle();
-    expect((await bal(providerAddr)) - p0).toBe(190_000n);
-    expect(c0 - (await bal(me))).toBe(190_000n);
+    await expectEventually(async () => (await bal(providerAddr)) - p0, 190_000n);
+    await expectEventually(async () => c0 - (await bal(me)), 190_000n);
     expect(c.provingMs).toBeGreaterThan(0);
     console.table(c.txs.map((t) => ({ label: t.label, gasUsed: t.gasUsed.toString() })));
   });
@@ -175,8 +185,8 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
     // jalur yang benar tetap bisa menutup channel secara normal (tanda tangan baru atas pesan yang sama)
     await c.closeCooperative();
     expect((await c.view()).state).toBe("SETTLED");
-    expect((await bal(providerAddr)) - p0).toBe(200_000n);
-    expect(c0 - (await bal(me))).toBe(200_000n);
+    await expectEventually(async () => (await bal(providerAddr)) - p0, 200_000n);
+    await expectEventually(async () => c0 - (await bal(me)), 200_000n);
   });
 
   it("T19: payTo palsu (≠ predictChannel(cfg)) ditolak oleh start(); tidak ada transfer", async () => {
@@ -195,7 +205,7 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
       const c = new AegisClient({ ctx: ctxOf(PK.clientB), account: privateKeyToAccount(PK.clientB), providerUrl: "http://127.0.0.1:4023", usdg: d.usdg, artifacts: art });
       const before = await bal(me);
       await expect(c.start()).rejects.toThrow(/T19/);
-      expect(await bal(me)).toBe(before);
+      await expectEventually(async () => bal(me), before);
     } finally { evilServer.close(); }
   });
 
@@ -216,7 +226,7 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
       const c = new AegisClient({ ctx: ctxOf(PK.clientB), account: privateKeyToAccount(PK.clientB), providerUrl: "http://127.0.0.1:4024", usdg: d.usdg, artifacts: art });
       const before = await bal(me);
       await expect(c.start()).rejects.toThrow(/payoutClient/);
-      expect(await bal(me)).toBe(before);
+      await expectEventually(async () => bal(me), before);
     } finally { evilServer.close(); }
   });
 
@@ -237,7 +247,7 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
       const c = new AegisClient({ ctx: ctxOf(PK.clientB), account: privateKeyToAccount(PK.clientB), providerUrl: "http://127.0.0.1:4029", usdg: d.usdg, artifacts: art });
       const before = await bal(me);
       await expect(c.start()).rejects.toThrow(/mode mismatch/);
-      expect(await bal(me)).toBe(before);
+      await expectEventually(async () => bal(me), before);
     } finally { evilServer.close(); }
   });
 
@@ -250,7 +260,7 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
     else await new Promise((r) => setTimeout(r, 125_000));   // jendela demo 120 s nyata di testnet
     await c.settle();
     expect((await c.view()).state).toBe("SETTLED");
-    expect(await bal(me)).toBe(c0);
+    await expectEventually(async () => bal(me), c0);
   });
 
   it.skipIf(LOCAL_ONLY)("Task 15 fix round 1: startProviderWatcher in-process mengganti checkpoint basi klien (seq 5) dengan seq 10 co-signed asli, lalu settle membayar 200.000", async () => {
@@ -291,7 +301,7 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
         const r2 = await w.tick();
         expect(r2.settled).toContain(c.channel);
         expect((await c.view()).state).toBe("SETTLED");
-        expect((await bal(providerAddr)) - p0).toBe(200_000n);
+        await expectEventually(async () => (await bal(providerAddr)) - p0, 200_000n);
       } finally {
         w.stop();
       }
@@ -342,7 +352,7 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
     // SEBELUM tx rollover di-broadcast (exitSigNext, lihat AegisClient.rollover()) — buktikan di sini
     // bahwa c.exitSig memang sah untuk epoch yang baru, bukan cuma "ada".
     expect(await verifyCheckpointSig(providerAddr, c.channel, CHAIN_ID, { epoch: 1, seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) }, c.exitSig!)).toBe(true);
-    expect((await bal(providerAddr)) - p0).toBe(2_560_000n);
+    await expectEventually(async () => (await bal(providerAddr)) - p0, 2_560_000n);
     // Idempotensi /rollover/confirm (resiliency review): panggilan kedua manual (mis. mensimulasikan
     // retry klien setelah balasan pertama putus di jalan) harus 200 dengan exitSig PERSIS SAMA, tanpa
     // menyentuh sesi lagi — epoch tidak berubah dan provider tetap melayani (dibuktikan oleh 5 unit +
@@ -355,8 +365,8 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
     await c.finalAck();
     await c.closeCooperative();                                  // 100.000 ke provider, 340.000 kembali
     expect((await c.view()).state).toBe("SETTLED");
-    expect((await bal(providerAddr)) - p0).toBe(2_660_000n);
-    expect(c0 - (await bal(acct.address))).toBe(2_660_000n);
+    await expectEventually(async () => (await bal(providerAddr)) - p0, 2_660_000n);
+    await expectEventually(async () => c0 - (await bal(acct.address)), 2_660_000n);
     expect(c.txs.map((t) => t.label)).toEqual(["fund", "rollover", "closeCooperative"]);
   });
 
@@ -533,12 +543,12 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
       const meA = privateKeyToAccount(PK.clientA).address;
       const a0 = await bal(meA);
       await expect(a.start()).rejects.toThrow(/maxDeposit/);
-      expect(await bal(meA)).toBe(a0);
+      await expectEventually(async () => bal(meA), a0);
       expect(a.txs.length).toBe(0);
       // (a') jendela tantangan 60 s > policy.maxChallengeWindow 30 → juga ditolak sebelum transfer
       const a2 = new AegisClient({ ctx: ctxOf(PK.clientA), account: privateKeyToAccount(PK.clientA), providerUrl: "http://127.0.0.1:4042", usdg: d.usdg, artifacts: art, policy: { maxChallengeWindow: 30 } });
       await expect(a2.start()).rejects.toThrow(/maxChallengeWindow/);
-      expect(await bal(meA)).toBe(a0);
+      await expectEventually(async () => bal(meA), a0);
 
       // (b) provider unitQty 5 vs klien maxQtyPerUnit 1 → start() lolos (deposit/jendela OK), requestUnit() menolak
       //     receipt qty 5: tidak ada tanda tangan klien yang dibuat, pohon tidak berubah.
@@ -557,7 +567,7 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
       else await new Promise((r) => setTimeout(r, 65_000));
       await b.settle();
       expect((await b.view()).state).toBe("SETTLED");
-      expect(await bal(meB)).toBe(b0);
+      await expectEventually(async () => bal(meB), b0);
     } finally { server3.close(); }
   });
 
@@ -585,9 +595,9 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
       await c.finalAck();
       const p0 = await bal(providerAddr);
       await c.closeCooperative();
-      expect(await bal(treasury)).toBe(100_000n);              // 5 × 20.000 langsung ke treasury
-      expect(await bal(providerAddr)).toBe(p0);                // EOA provider tidak tersentuh
-      expect(await bal(dd.router)).toBe(0n);
+      await expectEventually(async () => bal(treasury), 100_000n);              // 5 × 20.000 langsung ke treasury
+      await expectEventually(async () => bal(providerAddr), p0);                // EOA provider tidak tersentuh
+      await expectEventually(async () => bal(dd.router), 0n);
     } finally { server3.close(); }
   });
 
@@ -635,8 +645,8 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
       if (CHAIN_ID === 31337) { await publicClient.request({ method: "evm_increaseTime", params: [121] } as any); await publicClient.request({ method: "evm_mine", params: [] } as any); }
       else await new Promise((r) => setTimeout(r, 125_000));
       await c.settle();
-      expect((await bal(providerAddr)) - p0).toBe(190_000n);
-      expect(c0 - (await bal(acct.address))).toBe(190_000n);
+      await expectEventually(async () => (await bal(providerAddr)) - p0, 190_000n);
+      await expectEventually(async () => c0 - (await bal(acct.address)), 190_000n);
       // Privasi anchored (spec §6.7): metrik & ambang tidak pernah masuk calldata/log ack — hanya hash daun + kumulatif.
       for (const t of c.txs.filter((x) => x.label === "ack")) {
         const tx = await publicClient.getTransaction({ hash: t.hash }); const rc = await publicClient.getTransactionReceipt({ hash: t.hash });
@@ -663,8 +673,8 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
       if (CHAIN_ID === 31337) { await publicClient.request({ method: "evm_increaseTime", params: [121] } as any); await publicClient.request({ method: "evm_mine", params: [] } as any); }
       else await new Promise((r) => setTimeout(r, 125_000));
       await c.settle();
-      expect((await bal(providerAddr)) - p0).toBe(190_000n);
-      expect(c0 - (await bal(acct.address))).toBe(190_000n);
+      await expectEventually(async () => (await bal(providerAddr)) - p0, 190_000n);
+      await expectEventually(async () => c0 - (await bal(acct.address)), 190_000n);
     });
 
     it("kooperatif anchored: 5 ack → close (klien menandatangani dulu) → provider +100.000", async () => {
@@ -676,8 +686,8 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
       await c.finalAck();                                  // no-op di anchored
       await c.closeCooperative();
       expect((await c.view()).state).toBe("SETTLED");
-      expect((await bal(providerAddr)) - p0).toBe(100_000n);
-      expect(c0 - (await bal(acct.address))).toBe(100_000n);
+      await expectEventually(async () => (await bal(providerAddr)) - p0, 100_000n);
+      await expectEventually(async () => c0 - (await bal(acct.address)), 100_000n);
     });
 
     it("keluar unilateral anchored: provider tidak menjawab → startClose → settle → deposit kembali penuh", async () => {
@@ -690,7 +700,7 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
       if (CHAIN_ID === 31337) { await publicClient.request({ method: "evm_increaseTime", params: [121] } as any); await publicClient.request({ method: "evm_mine", params: [] } as any); }
       else await new Promise((r) => setTimeout(r, 125_000));
       await c.settle();
-      expect(await bal(acct.address)).toBe(c0);
+      await expectEventually(async () => bal(acct.address), c0);
     });
   });
 });
