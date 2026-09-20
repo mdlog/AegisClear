@@ -32,6 +32,9 @@ export interface WebServer {
 
 export function createWebServer(cfg: WebConfig): WebServer {
   const app = new Hono();
+  // Fallback: RPC hiccup di /api/channels* atau throw dari leakCheck jadi 502 JSON, bukan 500 polos.
+  // Rute yang sudah punya response error sendiri (400/404/409/dst.) tidak pernah sampai ke sini.
+  app.onError((e, c) => c.json({ error: String((e as Error).message) }, 502));
   const chain = makeChain(cfg);
   const providerAccount = privateKeyToAccount(cfg.keys.provider);
   const provider = providerAccount.address;
@@ -97,16 +100,26 @@ export function createWebServer(cfg: WebConfig): WebServer {
   });
   // 402 mentah yang dilihat klien x402 — membuat sesi provider untuk klien demo bila belum ada (tanpa efek on-chain).
   app.get("/api/offer", async (c) => {
-    const addr = chain.addressOf(cfg.keys[c.req.query("client") === "B" ? "b" : "a"]);
+    const client = c.req.query("client");
+    if (client !== "A" && client !== "B") return c.json({ error: "client must be A or B" }, 400);
+    const addr = chain.addressOf(cfg.keys[client === "B" ? "b" : "a"]);
     const res = await app.request("/provider/job", { headers: { "Aegis-Client": addr } });
-    return c.json({ status: res.status, body: await res.json() });
+    // Balasan upstream bisa non-JSON (mis. error text polos) — jangan lempar, teruskan apa adanya di `body`.
+    const text = await res.text();
+    let body: unknown = text;
+    try { body = JSON.parse(text); } catch { /* bukan JSON — body tetap string mentah */ }
+    return c.json({ status: res.status, body });
   });
 
   // ---- static (web/dist) dengan fallback SPA; selalu terdaftar TERAKHIR ----
   app.get("/*", (c) => {
-    let p = decodeURIComponent(new URL(c.req.url).pathname);
+    let p: string;
+    try { p = decodeURIComponent(new URL(c.req.url).pathname); } catch { return c.text("bad path", 400); }
     if (p === "/" || !path.extname(p)) p = "/index.html";
-    const file = path.join(DIST, path.normalize(p));
+    // path.resolve (bukan path.join) supaya ".." di `p` benar-benar bisa membawa hasilnya keluar dari DIST —
+    // itulah yang membuat pengecekan startsWith(DIST) di bawah jadi guard sungguhan, bukan cabang yang tidak
+    // pernah tercapai (path.join + path.normalize pada path absolut selalu jatuh kembali ke dalam DIST).
+    const file = path.resolve(DIST, "." + p);
     if (!file.startsWith(DIST)) return c.text("forbidden", 403);
     if (!existsSync(file)) return c.text(p === "/index.html" ? "web/dist belum ada — jalankan `pnpm --filter @aegisclear/web build`" : "not found", 404);
     return c.body(readFileSync(file), 200, { "content-type": MIME[path.extname(file)] ?? "application/octet-stream" });

@@ -8,9 +8,10 @@
     "test:circuits": "pnpm --filter @aegisclear/circuits test",
     "test:contracts": "cd contracts && forge test -vv",
     "test:web": "pnpm --filter @aegisclear/web test",
+    "test:demo": "pnpm --filter @aegisclear/demo test",
     "web": "pnpm --filter @aegisclear/web start",
     "web:dev": "pnpm --filter @aegisclear/web dev",
-    "test": "pnpm test:sdk && pnpm test:circuits && pnpm test:contracts && pnpm test:web"
+    "test": "pnpm test:sdk && pnpm test:circuits && pnpm test:contracts && pnpm test:web && pnpm test:demo"
   },
   "devDependencies": {
     "tsx": "^4.23.13",

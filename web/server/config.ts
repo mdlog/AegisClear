@@ -38,7 +38,13 @@ export function loadDotEnv(file = path.join(REPO_ROOT, ".env"), env: NodeJS.Proc
     const m = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
     if (!m || line.trim().startsWith("#")) continue;
     let v = m[2];
-    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+    const quote = v[0] === '"' || v[0] === "'" ? v[0] : undefined;
+    if (quote && v.length >= 2 && v.endsWith(quote)) {
+      v = v.slice(1, -1);
+    } else if (!quote) {
+      const hash = v.indexOf(" #");
+      if (hash !== -1) v = v.slice(0, hash).trimEnd();
+    }
     if (env[m[1]] === undefined) { env[m[1]] = v; n++; }
   }
   return n;
@@ -47,7 +53,7 @@ export function loadDotEnv(file = path.join(REPO_ROOT, ".env"), env: NodeJS.Proc
 export function readDeployment(file: string): Deployment {
   if (!existsSync(file)) throw new Error(`deployment file tidak ada: ${file} (jalankan DeployLocal/DeployTestnet dulu)`);
   const raw = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
-  for (const k of ["usdg", "factory", "escrow", "verifier"]) if (!raw[k]) throw new Error(`deployment ${file}: field ${k} hilang`);
+  for (const k of ["chainId", "usdg", "factory", "escrow", "verifier"]) if (!raw[k]) throw new Error(`deployment ${file}: field ${k} hilang`);
   const d: Record<string, unknown> = { ...raw };
   for (const k of ADDRESS_KEYS) if (typeof raw[k] === "string") d[k] = getAddress(raw[k] as string);
   return d as unknown as Deployment;
@@ -60,9 +66,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WebConfig {
   if (!Number.isInteger(port) || port <= 0) throw new Error(`WEB_PORT tidak valid: ${env.WEB_PORT}`);
   if (network === "local") {
     const deployFile = path.resolve(REPO_ROOT, env.DEPLOY_FILE ?? "contracts/deployments/local.json");
+    const deployment = readDeployment(deployFile);
+    if (Number(deployment.chainId) !== 31337) throw new Error(`deployment ${deployFile} untuk chainId ${deployment.chainId}, bukan 31337`);
     return {
       network, chainId: 31337, rpcUrl: env.RPC_URL ?? "http://127.0.0.1:8545", chain: foundry, port,
-      deployment: readDeployment(deployFile), deployFile, deployBlock: 0n, keys: { ...ANVIL_KEYS }, windows: { challenge: 120, response: 60 },
+      deployment, deployFile, deployBlock: 0n, keys: { ...ANVIL_KEYS }, windows: { challenge: 120, response: 60 },
     };
   }
   const missing = ["RPC_URL", "PK_PROVIDER", "PK_CLIENT_A", "PK_CLIENT_B", "PK_DEPLOYER"].filter((k) => !env[k]);

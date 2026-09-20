@@ -43,6 +43,13 @@ describe("loadConfig", () => {
   it("AEGIS_NETWORK tidak dikenal ditolak", () => {
     expect(() => loadConfig({ AEGIS_NETWORK: "mainnet", DEPLOY_FILE: LOCAL })).toThrow(/local\|testnet/);
   });
+  it("readDeployment: chainId hilang di file deployment ditolak, pesan menyebut chainId", () => {
+    const noChainId = dep("no-chainid.json", { usdg: "0x5fbdb2315678afecb367f032d93f642f64180aa3", verifier: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512", factory: "0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0", escrow: "0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9" });
+    expect(() => loadConfig({ DEPLOY_FILE: noChainId })).toThrow(/chainId/);
+  });
+  it("local: deployment untuk chainId lain (mis. testnet) ditolak", () => {
+    expect(() => loadConfig({ DEPLOY_FILE: TESTNET })).toThrow(/chainId 46630, bukan 31337/);
+  });
 });
 
 describe("loadDotEnv", () => {
@@ -53,5 +60,14 @@ describe("loadDotEnv", () => {
     expect(loadDotEnv(f, env)).toBe(3);
     expect(env).toEqual({ EXISTING: "old", FOO: "bar", BAR: "baz qux", BAZ: "q" });
     expect(loadDotEnv(path.join(dir, "missing.env"), env)).toBe(0);
+  });
+  it("membuang sufiks komentar inline pada nilai tanpa kutip, tapi bukan yang berkutip", () => {
+    const f = path.join(dir, "comment.env");
+    writeFileSync(f, `UNQUOTED=bar # ini komentar\nQUOTED="baz # bukan komentar"\nHASHNOSPACE=q#r\n`);
+    const env: NodeJS.ProcessEnv = {};
+    loadDotEnv(f, env);
+    expect(env.UNQUOTED).toBe("bar");
+    expect(env.QUOTED).toBe("baz # bukan komentar");
+    expect(env.HASHNOSPACE).toBe("q#r"); // '#' tanpa spasi di depan bukan komentar
   });
 });

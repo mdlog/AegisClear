@@ -9,6 +9,7 @@ export function PrivacyCards({ cfg, run, leak }: { cfg: ConfigResponse | null; r
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
+    setChs([]); setErr(null); // buang kartu/banner sisa run sebelumnya sebelum fetch run baru selesai
     Promise.all(run.channels.map(getChannel))
       .then((cs) => { if (alive) { setChs(cs); setErr(null); } })
       .catch((e) => { if (alive) setErr(String((e as Error).message)); });

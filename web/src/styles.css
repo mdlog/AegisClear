@@ -23,7 +23,7 @@ a.mono { color: var(--accent); text-decoration: none; } a.mono:hover { text-deco
 .table th, .table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; }
 .table th { color: var(--muted); font-weight: 500; font-size: 12px; }
 .row-click { cursor: pointer; } .row-click:hover { background: var(--panel2); }
-.table.result { table-layout: auto; width: 100%; }
+.table.result { width: 100%; min-width: 880px; }
 .table.result td { white-space: normal; }
 .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 button { background: var(--panel2); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; cursor: pointer; font: inherit; }
@@ -46,4 +46,4 @@ button:hover:not(:disabled) { border-color: var(--accent); } button:disabled { o
 .drawer-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .offer { margin-top: 12px; } .offer summary { cursor: pointer; color: var(--muted); }
 pre.json { max-height: 320px; overflow: auto; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 10px; white-space: pre-wrap; word-break: break-all; }
-.txlink { margin-right: 4px; }
+.txlink { display: inline-block; white-space: nowrap; margin-right: 6px; }

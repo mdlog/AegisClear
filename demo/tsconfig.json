@@ -1,0 +1,1 @@
+{ "extends": "../tsconfig.base.json", "compilerOptions": { "rootDir": "..", "noEmit": true, "types": ["node"] }, "include": ["src", "test", "run.ts", "leak-check.ts", "../sdk/src/types.d.ts"] }

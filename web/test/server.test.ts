@@ -62,6 +62,11 @@ describe.skipIf(!DEPLOY_EXISTS)("web console server (Anvil)", () => {
     expect((await fetch(`${BASE}/api/channels/not-an-address`)).status).toBe(404);
   });
 
+  it("GET /%zz (path persen tidak valid) → 400, bukan 500", async () => {
+    const r = await fetch(`${BASE}/%zz`);
+    expect(r.status).toBe(400);
+  });
+
   const waitRun = async (id: string) => {
     for (let i = 0; i < 600; i++) { const r = await get<RunSnapshot>(`/api/demo/runs/${id}`); if (r.status !== "running") return r; await new Promise((res) => setTimeout(res, 500)); }
     throw new Error("run timeout");
