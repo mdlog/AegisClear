@@ -125,6 +125,8 @@ Manual verification of the `_send` path (the reasoning the brief asked to docume
 | Severity | **Low** (not exploitable against the shipped router with USDG; exploitable against any payee hook costing ≈230-300k gas) |
 | Class | Insufficient-gas griefing of a sub-call (the pattern OZ `ERC2771Forwarder._checkForwardedGas` and Gnosis Safe `execTransaction` guard against) |
 
+Catatan presisi: pemeriksaan `gasleft() ≥ HOOK_GAS/63` membuktikan hook ditawari ≥ 63·⌊300000/63⌋ = 299.943 gas (selisih ≤ 57 gas adalah pembulatan bawaan pola OZ). Pengamatan tambahan yang memperkuat alasan perbaikan: sebelum perbaikan, `eth_estimateGas` untuk `sweep`/`settle` sendiri akan mengembalikan gas limit terendah yang lolos (≈ pre-hook + 230k) sehingga hook berbiaya 227k–300k akan kekurangan gas juga tanpa penyerang — ini bahaya keandalan, bukan hanya griefing.
+
 **Issue.** `{gas: HOOK_GAS}` caps the hook at 300k but does not *guarantee* it: by EIP-150 the callee receives
 `min(300k, 63/64 · gasleft)`. `settle()` and `sweep()` are permissionless, so a third party chooses the gas limit. If the
 hook runs out of gas while the outer call still completes, the tokens have already been transferred to the payee
@@ -160,7 +162,7 @@ the previous code, verified by re-running them against `git show 4144d3d:contrac
 - `test_hook_needing_full_stipend_is_never_starved` — a legitimate hook that needs 288k of the 300k; success ⇒ served.
   Failed before the fix.
 - `test_starved_hook_reverts_InsufficientGas` — 200k gas limit ⇒ revert with `InsufficientGas()` and nothing moves;
-  full gas ⇒ success even though the payee burns its whole stipend. Failed before the fix (silent success).
+  full gas ⇒ success even though the payee burns its whole stipend. Failed before the fix (at 200k the outer call itself ran out of gas at the post-hook SSTORE sentry → empty revert data, so the `ret.length` assertion fails — not a silent success).
 - `test_settle_caller_cannot_starve_router_hook` — `_payout` path guard (passed before too, as predicted).
 - `test_eoa_payee_has_no_stipend_requirement` — EOA payee sweeps fine at 120k.
 

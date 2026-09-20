@@ -318,6 +318,9 @@ contract AegisChannel is ReentrancyGuard {
     ///      Pemeriksaan pasca-panggilan bergaya OZ ERC2771Forwarder._checkForwardedGas: bila callee kehabisan gas, ia
     ///      menerima tepat 63/64 gas tersisa X, jadi gasleft() = X/64; X/64 < HOOK_GAS/63 ⟹ X < 64/63·HOOK_GAS ⟹
     ///      hook TIDAK ditawari stipend penuh → revert (pemanggil harus memberi gas cukup; estimateGas monoton).
+    ///      Presisi: yang dibuktikan adalah stipend ≥ 63·⌊HOOK_GAS/63⌋ = 299.943 gas (selisih ≤ 57 gas = pembulatan pola
+    ///      OZ); pada pita sempit tepat di atas ambang, hook yang membakar seluruh stipend masih bisa memicu revert —
+    ///      pemanggil cukup menambah sedikit gas. Jangan "memperbaiki" ini menjadi perbandingan eksak.
     ///      Hook yang gagal karena ulahnya sendiri (revert / membakar stipend penuh) tetap diabaikan (T-hook utuh).
     function _send(address to, address party, uint256 amount) internal {
         if (amount == 0) return;
