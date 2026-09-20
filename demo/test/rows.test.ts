@@ -33,3 +33,18 @@ test("privateValues: 6 syarat + 3 metrik demo", () => {
   const v = privateValues({ ...TERMS_BASE, nonce: 7n });
   assert.deepEqual(v, [20_000n, 800n, 90n, 5000n, 3000n, 7n, 1200n, 300n, 95n]);
 });
+
+test("toRows: baris anchored dan rollover", () => {
+  const tx = { label: "x", hash: "0x01" as const, gasUsed: 10n };
+  const base = { channel: "0x0000000000000000000000000000000000000001" as const, txs: [tx], gasTotal: 1n, clientDelta: 0n, terms: { ...TERMS_BASE, nonce: 1n } };
+  const anch = { ...base, provingMs: 4000, providerDelta: 380_000n, local: { cumulativeAmount: 400_000n, breaches: 2, penRaw: 20_000n, cap: 120_000n, payToClient: 20_000n, payToProvider: 380_000n } };
+  const roll = { ...base, provingMs: 0, providerDelta: 2_660_000n, local: { cumulativeAmount: 100_000n, breaches: 0, penRaw: 0n, cap: 30_000n, payToClient: 0n, payToProvider: 100_000n }, epoch: 1, units: 133 };
+  const rows = toRows({ bAnch: anch, bRoll: roll });
+  assert.deepEqual(rows.map((r) => r.pasar), ["B: AegisClear anchored (ack on-chain, sengketa)", "B: AegisClear rollover (128 + 5 unit, 1 deposit)"]);
+  assert.equal(rows[0].klien_provider, "0.02 / 0.38"); assert.equal(rows[0].penentu, "bukti Groth16 atas R on-chain");
+  assert.equal(rows[1].klien_provider, "0.00 / 2.66"); assert.equal(rows[1].terlihat, "T, R, epoch, jumlah");
+});
+test("privateValues anchored: tanpa unitPrice (A per ack ada di chain)", () => {
+  const v = privateValues({ ...TERMS_BASE, nonce: 7n }, { anchored: true });
+  assert.deepEqual(v, [800n, 90n, 5000n, 3000n, 7n, 1200n, 300n, 95n]);
+});
