@@ -1,0 +1,33 @@
+{
+  "name": "@aegisclear/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite --port 4043 --strictPort",
+    "serve": "tsx server/index.ts",
+    "start": "vite build && tsx server/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@aegisclear/demo": "workspace:*",
+    "@aegisclear/sdk": "workspace:*",
+    "@hono/node-server": "^2.1.1",
+    "hono": "^4.13.8",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "viem": "^2.56.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.5.0",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "vite": "^6.3.5",
+    "vitest": "^5.0.1"
+  }
+}
