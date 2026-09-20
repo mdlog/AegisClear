@@ -8,7 +8,7 @@
 - web console (Task 7, 2026-09-20; `pnpm --filter @aegisclear/web list --depth 0`): vite 6.4.3, react 18.3.1, @vitejs/plugin-react 4.7.0, vitest 5.0.1
 - Stylus P1 (Task 6b/9, 2026-09-20; `stylus/aegis-poseidon/Cargo.toml`): cargo-stylus 0.10.9, stylus-sdk 0.10.9, ark-ff 0.5.0, ark-bn254 0.5.0, rustc/cargo 1.92.0
 
-## Stylus `AegisPoseidon` v1 + deploy testnet v1 (Task 6b/9, 2026-09-20)
+## Stylus `AegisPoseidon` v1 + deploy testnet v1/v2 (Task 6b/9, 2026-09-20; v2 = ship Task 6, program Stylus yang sama dipakai ulang)
 - Toolchain: cargo-stylus 0.10.9, stylus-sdk 0.10.9, ark-ff 0.5.0, ark-bn254 0.5.0 (fitur `scalar_field`), rustc/cargo 1.92.0 (target `wasm32-unknown-unknown`), profil release LTO + `opt-level = 3`, `codegen-units = 1` (lihat `stylus/aegis-poseidon/Cargo.toml`).
 - WASM `AegisPoseidon` (port circomlib Poseidon v1, algoritma teroptimasi — matriks jarang untuk partial round + `Fr::sum_of_products`): **21.662 byte terkompresi** (21,7 KB). Aktif di testnet 46630: `0x1027cf7DC26152012ed9Ef949Aa1432Bf1C7ef34`, dipakai `factoryAnchored`. Detail ukuran per-build & gas terukur: `docs/benchmarks/poseidon.md` §5, `stylus/aegis-poseidon/README.md`.
 
