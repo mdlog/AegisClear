@@ -13,7 +13,8 @@ export const ESCROW_AMOUNT_A = 2_000_000n;  // 2 USDG (SimpleJobEscrow.fund)
 export const ANCHORED_UNITS = 20;           // unit dilayani skenario anchored (mencakup breach EX1 seq 3 & 17)
 /**
  * Nilai privat sesi Pasar B yang TIDAK boleh muncul di calldata/log mana pun (leak-check).
- * anchored: A per unit (unitPrice) sudah ter-commit on-chain lewat leaf per ack, jadi bukan lagi nilai
+ * anchored: A per unit (unitPrice) tersirat on-chain lewat argumen `cumulativeAmount` tiap `ack()` (dan
+ * event `Acked`, nilai ack pertama = unitPrice) — daun sendiri tetap hash Poseidon; jadi bukan lagi nilai
  * privat — dikeluarkan dari himpunan yang diperiksa leak-check.
  */
 export const privateValues = (t: Terms, opts: { anchored?: boolean } = {}): bigint[] => [
@@ -52,6 +53,18 @@ export const escrowAbi = parseAbi([
 ]);
 export const fmtUsdg = (x: bigint) => (Number(x) / 1e6).toFixed(2);
 const B32 = (d: string) => ("0x" + d.padStart(64, "0")) as Hex;
+
+/** Baca saldo sampai berbeda dari `previous` (atau `ms` habis) — RPC publik 46630 ber-load-balancer bisa mengembalikan
+ *  balanceOf basi tepat setelah receipt; di Anvil bacaan pertama sudah final. Mengembalikan bacaan terakhir. */
+export async function balanceEventually(ctx: ChainCtx, token: Address, who: Address, previous: bigint, ms = 15_000, everyMs = 750): Promise<bigint> {
+  const t0 = Date.now();
+  let v = await erc20Balance(ctx, token, who);
+  while (v === previous && Date.now() - t0 < ms) {
+    await new Promise((r) => setTimeout(r, everyMs));
+    v = await erc20Balance(ctx, token, who);
+  }
+  return v;
+}
 
 /** Pasar B: 402 → dana → `units` unit di-ack → sengketa (bukti + settle) atau cooperative close. */
 export async function runMarketB(env: ScenarioEnv, pk: Hex, dispute: boolean, emit: Emit, units = 100): Promise<MarketBResult> {
@@ -117,8 +130,8 @@ export async function runMarketB(env: ScenarioEnv, pk: Hex, dispute: boolean, em
   // c.terms = terms sesi ini (nonce per sesi dari provider) — nilai privat yang benar-benar ter-commit on-chain.
   return {
     channel: c.channel, txs: c.txs, gasTotal, provingMs: c.provingMs,
-    clientDelta: c0 - (await erc20Balance(ctx, env.d.usdg, me)),
-    providerDelta: (await erc20Balance(ctx, env.d.usdg, env.providerAddress)) - p0,
+    clientDelta: c0 - (await balanceEventually(ctx, env.d.usdg, me, c0)),
+    providerDelta: (await balanceEventually(ctx, env.d.usdg, env.providerAddress, p0)) - p0,
     local: settle(c.tree.receipts, c.terms), terms: c.terms,
   };
 }
@@ -143,7 +156,7 @@ export async function runRollover(env: ScenarioEnv, pk: Hex, emit: Emit): Promis
   await c.closeCooperative(); flush("close");
   return {
     channel: c.channel, txs: c.txs, gasTotal: c.txs.reduce((s, t) => s + t.gasUsed, 0n), provingMs: 0,
-    clientDelta: c0 - (await erc20Balance(ctx, env.d.usdg, me)), providerDelta: (await erc20Balance(ctx, env.d.usdg, env.providerAddress)) - p0,
+    clientDelta: c0 - (await balanceEventually(ctx, env.d.usdg, me, c0)), providerDelta: (await balanceEventually(ctx, env.d.usdg, env.providerAddress, p0)) - p0,
     local: settle(c.tree.receipts, c.terms), terms: c.terms, epoch: c.epoch, units: 133,
   };
 }

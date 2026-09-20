@@ -41,6 +41,10 @@ export interface ClientOptions {
 }
 export interface TxLog { label: string; hash: Hex; gasUsed: bigint }
 const bi = (x: string | number | bigint) => BigInt(x);
+// RPC publik 46630 ber-load-balancer bisa membalas eth_call dari node yang belum menerapkan block
+// terbaru; dipakai oleh rollover()'s confirm-retry di bawah (lihat dokumentasi method itu).
+const ROLLOVER_CONFIRM_MS = 15_000;
+const ROLLOVER_CONFIRM_EVERY_MS = 750;
 
 export class AegisClient {
   cfg!: ChannelConfig; channel!: Address; terms!: Terms; deposit = 0n; epoch = 0;
@@ -229,8 +233,9 @@ export class AegisClient {
    *
    * Setelah `rolloverTx` masuk, epoch SUDAH naik on-chain — tidak bisa dibatalkan lagi. `/rollover/confirm`
    * di sisi provider idempoten dan tidak butuh tanda tangan (murni turunan state on-chain, lihat
-   * `provider/server.ts`), jadi confirm+verifikasi di bawah aman dicoba ulang (hingga 3x, jeda 500 ms) bila
-   * balasannya gagal transien (koneksi putus, dst.) — tidak ada risiko provider mereset sesi dua kali.
+   * `provider/server.ts`), jadi confirm+verifikasi di bawah aman dicoba ulang (budget waktu, bukan lagi
+   * hitungan tetap — lihat `ROLLOVER_CONFIRM_MS`/`ROLLOVER_CONFIRM_EVERY_MS` di atas) bila balasannya gagal
+   * transien (koneksi putus, RPC publik yang basi, dst.) — tidak ada risiko provider mereset sesi dua kali.
    * `this.epoch`/`this.tree`/`this.checkpoints`/`this.pendingAck` BARU di-commit sebagai satu blok SETELAH
    * tiket keluar epoch baru terverifikasi: bila semua percobaan retry habis, method ini melempar dan state
    * klien persis seperti sebelum confirm dipanggil. Pemanggil boleh memanggil `rollover()` lagi dengan
@@ -268,8 +273,13 @@ export class AegisClient {
       this.txs.push({ label: "rollover", ...(await rolloverTx(this.o.ctx, this.channel, seq, toProvider, sigClient, b.sigProvider)) });
     }
 
+    // RPC publik 46630 ber-load-balancer: eth_call tepat setelah tx bisa mengenai node yang belum
+    // menerapkan block terbaru, jadi readChannel() di bawah bisa membaca epoch basi (stale
+    // read-after-write) — dan provider sendiri re-read chain di TIAP panggilan /rollover/confirm (409
+    // rollover-not-onchain bila basi di sisinya), jadi budget retry ini menutupi basi di kedua sisi.
     let lastErr: unknown;
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    const t0 = Date.now();
+    for (;;) {
       try {
         const confirm = await fetch(`${this.o.providerUrl}/rollover/confirm`, { method: "POST", headers: this.hdr() });
         if (confirm.status !== 200) throw new Error(`POST /rollover/confirm ${confirm.status}: ${await confirm.text()}`);
@@ -296,7 +306,8 @@ export class AegisClient {
         return;
       } catch (e) {
         lastErr = e;
-        if (attempt < 3) await new Promise((r) => setTimeout(r, 500));
+        if (Date.now() - t0 >= ROLLOVER_CONFIRM_MS) break;
+        await new Promise((r) => setTimeout(r, ROLLOVER_CONFIRM_EVERY_MS));
       }
     }
     throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
