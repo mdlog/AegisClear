@@ -10,7 +10,7 @@ contracts/out/
 contracts/cache/
 contracts/broadcast/
 contracts/deployments/local.json
-contracts/deployments/testnet-46630.json
+contracts/deployments/*.v0.json
 demo/out/
 stylus/**/target/
 vectors/RAND_*.json
