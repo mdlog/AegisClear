@@ -46,6 +46,17 @@ contract CheckpointTest is AegisTestBase {
         assertEq(ch.seq(), 128);
     }
 
+    /// Task 8 Step 3: named boundary test — seq == MAX_SEQ (128) succeeds, then seq == 129 reverts SeqTooLarge
+    /// (129 reverts regardless of state/signatures — the check runs before StaleCheckpoint and signature verification).
+    function test_checkpoint_seq_128_accepted() public {
+        (bytes memory sc, bytes memory sp) = checkpointSigs(ch, 128, 1_000_000, ROOT);
+        ch.submitCheckpoint(128, 1_000_000, ROOT, sc, sp);
+        assertEq(ch.seq(), 128);
+        (bytes memory sc2, bytes memory sp2) = checkpointSigs(ch, 129, 1_000_000, ROOT);
+        vm.expectRevert(AegisChannel.SeqTooLarge.selector);
+        ch.submitCheckpoint(129, 1_000_000, ROOT, sc2, sp2);
+    }
+
     function test_stale_seq_reverts_in_closing() public {
         _cp(50, 1_000_000);
         (bytes memory sc, bytes memory sp) = checkpointSigs(ch, 50, 1_000_000, ROOT);

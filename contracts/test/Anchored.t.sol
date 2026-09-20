@@ -132,8 +132,59 @@ contract AnchoredTest is AegisTestBase {
         (bytes memory rc, bytes memory rp) = rolloverSigs(ch, 2, uint128(cums[1]));
         ch.rollover(2, uint128(cums[1]), rc, rp);
         assertEq(ch.epoch(), 1); assertEq(ch.seq(), 0); assertEq(ch.receiptsRoot(), bytes32(0));
+        // Task 8 Step 3d(i) — diskriminatif: assert filledSubtrees ITU SENDIRI ter-nol, bukan cuma receiptsRoot
+        // yang kebetulan nol. `forge inspect AegisChannel storage-layout` melaporkan slot 0..6 (bukan 1..7 seperti
+        // dugaan awal brief — ReentrancyGuard OZ v5.5 di sini memakai slot namespaced/pseudo-random di luar layout
+        // sekuensial biasa, jadi TIDAK menggeser slot AegisChannel; filledSubtrees mulai langsung di slot 0).
+        for (uint256 slot; slot < 7; slot++) {
+            assertEq(vm.load(address(ch), bytes32(slot)), bytes32(0));
+        }
         _ack(0);                                       // leafSig membaca epoch() = 1
         assertEq(ch.receiptsRoot(), bytes32(roots[0]));  // pohon benar-benar kosong sebelum ack ini
+    }
+
+    /// Task 8 Step 3d(i): ack() menolak seq_ == MAX_SEQ (128) dengan SeqTooLarge — 128 acks berturut-turut
+    /// (leaf fixture dipakai berputar; cumulativeAmount_ dijaga tak pernah turun) mengisi seq sampai 128 persis,
+    /// lalu ack ke-129 (seq_ == 128) harus revert.
+    function test_ack_seq_128_reverts_SeqTooLarge() public {
+        uint128 amt;
+        for (uint64 i; i < 128; i++) {
+            uint256 idx = i % leaves.length;
+            uint128 candidate = uint128(cums[idx]);
+            if (candidate > amt) amt = candidate;
+            bytes memory sig = leafSig(ch, i, bytes32(leaves[idx]), amt);
+            vm.prank(client);
+            ch.ack(i, bytes32(leaves[idx]), amt, sig);
+        }
+        assertEq(ch.seq(), 128);
+        bytes memory sig128 = leafSig(ch, 128, bytes32(leaves[0]), amt);
+        vm.prank(client);
+        vm.expectRevert(AegisChannel.SeqTooLarge.selector);
+        ch.ack(128, bytes32(leaves[0]), amt, sig128);
+    }
+
+    /// Task 8 Step 3d(i): Leaf ditandatangani atas epoch 0 tidak sah lagi setelah rollover menaikkan epoch — sinyal
+    /// FR-10 yang sama dengan Checkpoint/Close, kini untuk ack() anchored.
+    function test_old_epoch_leaf_signature_rejected_after_rollover() public {
+        bytes memory staleSig = leafSig(ch, 0, bytes32(leaves[0]), uint128(cums[0]));  // ditandatangani epoch 0
+        (bytes memory rc, bytes memory rp) = rolloverSigs(ch, 0, 0);
+        ch.rollover(0, 0, rc, rp);                                                      // epoch -> 1; seq tetap 0
+        assertEq(ch.epoch(), 1); assertEq(ch.seq(), 0);
+        vm.prank(client);
+        vm.expectRevert(AegisChannel.BadSignature.selector);
+        ch.ack(0, bytes32(leaves[0]), uint128(cums[0]), staleSig);
+    }
+
+    /// Task 8 Step 3d(i): cumulativeAmount_ SAMA dengan cumulativeAmount saat ini (tidak turun, tidak naik) sah —
+    /// hanya penurunan yang ditolak (AmountDecreased memakai `<`, bukan `<=`).
+    function test_ack_equal_amount_allowed() public {
+        _ack(0);
+        uint128 sameAmt = ch.cumulativeAmount();
+        bytes memory sig = leafSig(ch, 1, bytes32(leaves[1]), sameAmt);
+        vm.prank(client);
+        ch.ack(1, bytes32(leaves[1]), sameAmt, sig);
+        assertEq(ch.cumulativeAmount(), sameAmt);
+        assertEq(ch.seq(), 2);
     }
 
     function test_close_cooperative_in_anchored() public {

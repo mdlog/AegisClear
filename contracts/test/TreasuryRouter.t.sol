@@ -6,6 +6,7 @@ import {AegisTreasuryRouter} from "../src/AegisTreasuryRouter.sol";
 import {RevertingPayout} from "./mocks/RevertingPayout.sol";
 import {GasBurnerPayout} from "./mocks/GasBurnerPayout.sol";
 import {FreezableToken} from "./mocks/FreezableToken.sol";
+import {GarbageReturnToken} from "./mocks/GarbageReturnToken.sol";
 
 contract TreasuryRouterTest is AegisTestBase {
     AegisTreasuryRouter router;
@@ -88,6 +89,8 @@ contract TreasuryRouterTest is AegisTestBase {
         c.token = address(frz); c.payoutProvider = address(router);
         AegisChannel ch = openByClient(c);
         vm.prank(client); frz.transfer(address(ch), 5_000_000);
+        vm.expectEmit(true, true, true, true, address(router));
+        emit AegisTreasuryRouter.PayoutRouted(provider, address(frz), treasury, 2_000_000, false);
         _close(ch, 100, 2_000_000);
         assertEq(frz.balanceOf(address(router)), 2_000_000);
         assertEq(router.credit(provider, address(frz)), 2_000_000);
@@ -107,6 +110,20 @@ contract TreasuryRouterTest is AegisTestBase {
         assertEq(usdg.balanceOf(provider), 100);
         vm.expectRevert(AegisTreasuryRouter.Unbacked.selector);
         router.onPayout(provider, address(usdg), 1);        // saldo router 0 lagi
+    }
+
+    /// Task 8 Step 3c: transfer() sukses (tidak revert) tapi balik 1 byte sampah — bukan bool 32-byte, bukan pula
+    /// kembalian kosong. _tryTransfer harus memperlakukan ini sebagai kegagalan (kredit tetap) TANPA revert
+    /// abi.decode — sebelum perbaikan ini, ret.length==1 membuat abi.decode(ret,(bool)) revert dan mendampar dana.
+    function test_transfer_returns_garbage_credit_stays_no_revert() public {
+        GarbageReturnToken g = new GarbageReturnToken();
+        g.mint(address(router), 1_000);
+        vm.expectEmit(true, true, true, true, address(router));
+        emit AegisTreasuryRouter.PayoutRouted(provider, address(g), provider, 1_000, false);
+        router.onPayout(provider, address(g), 1_000);   // tidak revert walau transfer() balas 1 byte sampah
+        assertEq(router.credit(provider, address(g)), 1_000);
+        assertEq(router.totalCredit(address(g)), 1_000);
+        assertEq(g.balanceOf(address(router)), 1_000);  // saldo mock tak berubah — transfer() dianggap gagal
     }
 
     function test_claim_nothing_reverts() public {

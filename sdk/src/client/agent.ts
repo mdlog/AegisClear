@@ -318,7 +318,9 @@ export class AegisClient {
       } else if (view.state === "CLOSING") {
         // sudah dibuka pihak lain — tidak ada yang perlu dilakukan.
       } else {
-        throw new Error(`cannot dispute in state ${view.state}`);
+        // Task 8 Step 4b: teks error milik exitUnilateral() sendiri — sebelumnya menyalin pesan dispute()
+        // (copy-paste), membingungkan pemanggil yang membaca error dari exitUnilateral().
+        throw new Error(`cannot exit in state ${view.state}`);
       }
       return;
     }

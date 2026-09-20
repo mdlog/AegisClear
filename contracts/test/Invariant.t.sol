@@ -18,6 +18,9 @@ contract Handler is Test {
     uint128 public amountAtSettle;
     bool public settled;
     bool public cooperative;
+    /// Task 8 Step 3b: seluruh dana yang PERNAH keluar channel (rollover ke provider + payout settle/close akhir)
+    /// — lintas epoch, bukan hanya event terminal — supaya balance conservation tetap teruji setelah rollover.
+    uint256 public totalPaidOut;
 
     constructor(AegisChannel _ch, MockUSDG _usdg, uint256 _cpk, uint256 _ppk, address _c, address _p) {
         ch = _ch; usdg = _usdg; clientPk = _cpk; providerPk = _ppk; client = _c; provider = _p;
@@ -62,6 +65,7 @@ contract Handler is Test {
         ch.settle();
         paidProvider = usdg.balanceOf(provider) - p0;
         paidClient = usdg.balanceOf(client) - c0;
+        totalPaidOut += paidProvider + paidClient;
         settled = true;
     }
 
@@ -75,7 +79,19 @@ contract Handler is Test {
         ch.closeCooperative(s, tp, Sigs.sign(clientPk, d), Sigs.sign(providerPk, d));
         paidProvider = usdg.balanceOf(provider) - p0;
         paidClient = usdg.balanceOf(client) - c0;
+        totalPaidOut += paidProvider + paidClient;
         settled = true; cooperative = true;
+    }
+
+    /// Task 8 Step 3b (Task 1 review carry-over): rollover kooperatif — lets the invariant fuzzer cross epochs.
+    /// Bounded so it never reverts: seq_ in [ch.seq(), MAX_SEQ], toProvider in [0, budget].
+    function rollover(uint64 seq_, uint128 toProvider) external {
+        if (settled) return;
+        uint64 s = uint64(bound(seq_, ch.seq(), 128));
+        uint128 tp = uint128(bound(toProvider, 0, ch.budget()));
+        bytes32 d = Sigs.digest(ch.domainSeparator(), ch.hashRollover(ch.epoch(), s, tp));
+        ch.rollover(s, tp, Sigs.sign(clientPk, d), Sigs.sign(providerPk, d));
+        totalPaidOut += tp;
     }
 }
 
@@ -89,12 +105,16 @@ contract InvariantTest is AegisTestBase {
         targetContract(address(h));
     }
 
-    /// INV-9: tidak ada USDG keluar sebelum SETTLED
-    function invariant_no_outflow_before_settle() public view {
-        if (!h.settled()) assertEq(usdg.balanceOf(address(h.ch())), h.totalFunded());
+    /// INV-9 diperluas lintas epoch (Task 8 Step 3b): saldo channel + seluruh yang PERNAH keluar (rollover ke
+    /// provider maupun payout settle/close akhir) == seluruh yang pernah didanai. Sebelum Step 3b ini dulunya
+    /// "tidak ada outflow sebelum SETTLED"; itu tidak lagi benar sejak rollover bisa membayar provider tanpa
+    /// men-settle — bentuk konservasi yang berlaku sebelum MAUPUN sesudah SETTLED adalah persamaan saldo ini.
+    function invariant_balance_conservation() public view {
+        assertEq(usdg.balanceOf(address(h.ch())) + h.totalPaidOut(), h.totalFunded());
     }
 
-    /// INV-1: konservasi saat settle
+    /// INV-1: konservasi saat settle (snapshot lokal event terminal; tidak terpengaruh rollover sebelumnya
+    /// karena _payout selalu mengirim SELURUH budget epoch saat ini ke provider+klien).
     function invariant_conservation_at_settle() public view {
         if (h.settled()) assertEq(h.paidProvider() + h.paidClient(), h.settledBudget());
     }
@@ -108,10 +128,35 @@ contract InvariantTest is AegisTestBase {
         }
     }
 
-    /// INV-2 (versi observabel): seq tidak pernah turun
+    /// Task 8 Step 3b: state selalu salah satu dari OPEN/CLOSING/SETTLED setelah open() — rollover membawa
+    /// CLOSING kembali ke OPEN, tetapi UNINIT tidak pernah boleh terlihat lagi.
+    function invariant_state_in_valid_range() public view {
+        AegisChannel.State s = h.ch().state();
+        assertTrue(s == AegisChannel.State.OPEN || s == AegisChannel.State.CLOSING || s == AegisChannel.State.SETTLED);
+    }
+
+    /// Task 8 Step 3b: setelah SETTLED, tidak ada lagi yang berubah — state tetap SETTLED dan saldo channel beku
+    /// (Handler sendiri sudah menolak semua aksi lain begitu `settled`; invariant ini menguji itu benar-benar berlaku).
+    bool sawSettled;
+    uint256 balanceAtFirstSettle;
+    function invariant_settled_is_terminal() public {
+        if (!h.settled()) return;
+        assertEq(uint8(h.ch().state()), uint8(AegisChannel.State.SETTLED));
+        if (!sawSettled) {
+            sawSettled = true;
+            balanceAtFirstSettle = usdg.balanceOf(address(h.ch()));
+        } else {
+            assertEq(usdg.balanceOf(address(h.ch())), balanceAtFirstSettle);
+        }
+    }
+
+    /// INV-2, per epoch (Task 8 Step 3b): seq tidak pernah turun SELAMA epoch tidak berubah — rollover me-reset
+    /// epoch DAN seq bersamaan (FR-10), jadi monotonicity global tidak lagi berlaku lintas rollover secara desain.
+    uint32 lastEpoch;
     uint64 lastSeq;
-    function invariant_seq_monotonic() public {
-        assertGe(h.ch().seq(), lastSeq);
+    function invariant_seq_monotonic_within_epoch() public {
+        if (h.ch().epoch() == lastEpoch) assertGe(h.ch().seq(), lastSeq);
+        lastEpoch = h.ch().epoch();
         lastSeq = h.ch().seq();
     }
 }

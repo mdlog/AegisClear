@@ -6,19 +6,43 @@
  * challenge responder. Seorang provider WAJIB menjalankan `startProviderWatcher(...)` (diekspor dari
  * `provider/server.ts`) di proses provider itu sendiri untuk mendapat perlindungan T1 terhadap
  * checkpoint basi (Task 15) — menjalankan CLI ini saja TIDAK cukup untuk keamanan dana provider.
+ *
+ * Task 8 Step 4: parsing env dipindah ke `./env.js` (`parseWatcherEnv`, murni — tanpa efek samping)
+ * supaya bisa diuji (`sdk/test/cli.test.ts`) tanpa proses/RPC. `main()` di bawah hanya berjalan bila
+ * file ini adalah entry point proses (`tsx sdk/src/watcher/cli.ts`) — mengimpornya (mis. dari test)
+ * TIDAK lagi memvalidasi env atau menyalakan watcher sebagai efek samping.
  */
-import { createPublicClient, createWalletClient, defineChain, http, type Address, type Hex } from "viem";
+import path from "node:path";
+import { createPublicClient, createWalletClient, defineChain, http, type Address } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { Watcher } from "./watcher.js";
+import { parseWatcherEnv } from "./env.js";
 
-const RPC = process.env.RPC_URL; const FACTORY = process.env.FACTORY; const PK = process.env.PRIVATE_KEY; const CHAIN_ID_RAW = process.env.CHAIN_ID;
-if (!RPC || !FACTORY || !PK || !CHAIN_ID_RAW) throw new Error("watcher: RPC_URL, FACTORY, PRIVATE_KEY, CHAIN_ID required");
-const CHAIN_ID = Number(CHAIN_ID_RAW);
-// FROM_BLOCK (opsional): blok deployment factory. scan() memanggil eth_getLogs(ChannelOpened) dari sini sampai latest
-// tiap tick; default 0 memindai seluruh riwayat dan biasanya ditolak RPC publik (batas rentang blok / jumlah log).
-const FROM_BLOCK = process.env.FROM_BLOCK ? BigInt(process.env.FROM_BLOCK) : undefined;
-const chain = defineChain({ id: CHAIN_ID, name: `chain-${CHAIN_ID}`, nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: [RPC] } } });
-const publicClient = createPublicClient({ chain, transport: http(RPC) });
-const walletClient = createWalletClient({ account: privateKeyToAccount(PK as Hex), chain, transport: http(RPC) });
-new Watcher({ ctx: { publicClient, walletClient, factory: FACTORY as Address, chainId: CHAIN_ID }, fromBlock: FROM_BLOCK, log: console.log, intervalMs: 10_000 }).start();
-console.log(`watcher: factory ${FACTORY} on ${CHAIN_ID} from block ${FROM_BLOCK ?? 0n} (settle/sweep only — no challenge responder; run startProviderWatcher in-process for that)`);
+function main(): void {
+  let env: ReturnType<typeof parseWatcherEnv>;
+  try {
+    env = parseWatcherEnv(process.env);
+  } catch (e) {
+    console.error(e instanceof Error ? e.message : String(e));
+    process.exit(1);
+    return; // unreachable — keeps TS control-flow analysis happy regardless of @types/node's `never` typing
+  }
+  const chain = defineChain({
+    id: env.chainId, name: `chain-${env.chainId}`,
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    rpcUrls: { default: { http: [env.rpcUrl] } },
+  });
+  const publicClient = createPublicClient({ chain, transport: http(env.rpcUrl) });
+  const walletClient = createWalletClient({ account: privateKeyToAccount(env.privateKey), chain, transport: http(env.rpcUrl) });
+  const w = new Watcher({
+    ctx: { publicClient, walletClient, factory: env.factory as Address, chainId: env.chainId },
+    fromBlock: env.fromBlock, log: console.log, intervalMs: 10_000,
+  });
+  w.start();
+  process.on("SIGINT", () => { w.stop(); process.exit(0); });
+  console.log(`watcher: factory ${env.factory} on ${env.chainId} from block ${env.fromBlock ?? 0n} (settle/sweep only — no challenge responder; run startProviderWatcher in-process for that)`);
+}
+
+if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]))) {
+  main();
+}

@@ -14,6 +14,7 @@ contract AegisChannelFactory {
 
     event ChannelOpened(address indexed channel, address indexed client, address indexed provider, bytes32 termsCommitment);
     error WindowTooShort();
+    error AlreadyOpen();
 
     constructor(address verifier, address permit2, uint32 minChallengeWindow, address poseidonPath) {
         IMPLEMENTATION = address(new AegisChannel(verifier, permit2, poseidonPath));
@@ -22,7 +23,7 @@ contract AegisChannelFactory {
 
     function salt(AegisChannel.Config calldata c) public pure returns (bytes32) { return keccak256(abi.encode(c)); }
 
-    function predict(AegisChannel.Config calldata c) external view returns (address) {
+    function predict(AegisChannel.Config calldata c) public view returns (address) {
         return Clones.predictDeterministicAddress(IMPLEMENTATION, salt(c), address(this));
     }
 
@@ -31,6 +32,7 @@ contract AegisChannelFactory {
         external returns (address channel)
     {
         if (c.challengeWindow < MIN_CHALLENGE_WINDOW) revert WindowTooShort();
+        if (predict(c).code.length != 0) revert AlreadyOpen();
         channel = Clones.cloneDeterministic(IMPLEMENTATION, salt(c));
         AegisChannel(channel).initialize(c, msg.sender, sigClient, sigProvider);
         emit ChannelOpened(channel, c.client, c.provider, c.termsCommitment);

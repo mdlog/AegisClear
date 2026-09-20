@@ -3,12 +3,13 @@ pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IAegisPayoutHook} from "./interfaces/IAegisPayoutHook.sol";
 
 /// @title AegisTreasuryRouter — memetakan agen → treasury per armada (FR-26, spec §8.4). Tanpa owner, tanpa custody
 ///        yang disengaja: onPayout meneruskan dalam tx yang sama; bila transfer ke tujuan gagal (mis. alamat dibekukan
 ///        USDG) jumlahnya tercatat sebagai kredit yang bisa ditarik agen lewat claim(). Invarian: Σcredit[token] ≤ saldo.
-contract AegisTreasuryRouter is IAegisPayoutHook {
+contract AegisTreasuryRouter is IAegisPayoutHook, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     mapping(address agent => address treasury) public treasuryOf;
@@ -35,7 +36,7 @@ contract AegisTreasuryRouter is IAegisPayoutHook {
 
     /// @notice Dipanggil channel setelah mentransfer `amount` token ke router. Siapa pun boleh memanggil,
     ///         tetapi kredit hanya diberikan bila saldo router benar-benar menutupinya (Σcredit ≤ saldo).
-    function onPayout(address party, address token, uint256 amount) external {
+    function onPayout(address party, address token, uint256 amount) external nonReentrant {
         if (IERC20(token).balanceOf(address(this)) < totalCredit[token] + amount) revert Unbacked();
         address dest = destinationOf(party);
         credit[party][token] += amount;
@@ -49,7 +50,7 @@ contract AegisTreasuryRouter is IAegisPayoutHook {
     }
 
     /// @notice Tarik kredit yang gagal diteruskan (mis. treasury sempat dibekukan) ke alamat pilihan agen.
-    function claim(address token, address to) external {
+    function claim(address token, address to) external nonReentrant {
         uint256 a = credit[msg.sender][token];
         if (a == 0) revert NothingToClaim();
         credit[msg.sender][token] = 0;
@@ -58,8 +59,14 @@ contract AegisTreasuryRouter is IAegisPayoutHook {
         emit Claimed(msg.sender, token, to, a);
     }
 
+    /// @dev Decode kembalian HANYA bila persis 32 byte (bool ABI standar); selain itu (kosong ATAU sampah dengan
+    ///      panjang lain) tidak boleh membuat abi.decode revert — itu akan menggagalkan seluruh onPayout dan
+    ///      men-dampar token yang sudah nyata masuk router tanpa jejak kredit (Task 8 Step 3c).
     function _tryTransfer(address token, address to, uint256 amount) internal returns (bool) {
         (bool success, bytes memory ret) = token.call(abi.encodeCall(IERC20.transfer, (to, amount)));
-        return success && (ret.length == 0 || abi.decode(ret, (bool)));
+        if (!success) return false;
+        if (ret.length == 0) return true;
+        if (ret.length != 32) return false;
+        return abi.decode(ret, (bool));
     }
 }

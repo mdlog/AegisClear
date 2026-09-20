@@ -9,6 +9,7 @@ import {AegisChannelFactory} from "../src/AegisChannelFactory.sol";
 import {SimpleJobEscrow} from "../src/SimpleJobEscrow.sol";
 import {AegisTreasuryRouter} from "../src/AegisTreasuryRouter.sol";
 import {PoseidonPathYul} from "../src/PoseidonPathYul.sol";
+import {IPoseidonPath} from "../src/interfaces/IPoseidonPath.sol";
 
 /// @dev Precompile ArbSys (0x64) — nomor blok L2 asli di Arbitrum/Robinhood Chain (Orbit). Di luar Arbitrum
 ///      (mis. fork lokal) panggilan gagal dan run() jatuh ke block.number.
@@ -35,13 +36,25 @@ contract DeployTestnet is Script {
             poseidon = address(new PoseidonPathYul());
             console.log("POSEIDON_STYLUS not set - deployed PoseidonPathYul (Plan B) at", poseidon);
         }
+        // Known-answer check (Task 8 Step 3d-ii): hash2(1,2) circomlib v1 t=3 — jalan untuk KEDUANYA, override
+        // Stylus (POSEIDON_STYLUS di-set) maupun fallback Yul di atas; salah wiring/deploy Poseidon gagal jelas
+        // di sini, bukan diam-diam menghasilkan root yang salah di factoryAnchored.
+        require(
+            IPoseidonPath(poseidon).hash2(1, 2)
+                == 7853200120776062878684798364095072458815029376092732009249414926327459813530,
+            "POSEIDON_STYLUS: wrong Poseidon"
+        );
         AegisChannelFactory factoryAnchored = new AegisChannelFactory(address(verifier), PERMIT2, 60, poseidon);
         SimpleJobEscrow escrow = new SimpleJobEscrow(address(usdg));
         AegisTreasuryRouter router = new AegisTreasuryRouter();
         usdg.mint(msg.sender, 1_000e6);
         vm.stopBroadcast();
-        uint256 deployBlock;
-        try IArbSys(ARB_SYS).arbBlockNumber() returns (uint256 bn) { deployBlock = bn; } catch { deployBlock = block.number; }
+        // Task 8 Step 3d(ii): staticcall + guard panjang balasan menggantikan try/catch — ArbSys ada di alamat
+        // presisi tetap di setiap chain (juga di luar Arbitrum, mis. anvil fork lokal) tetapi TIDAK selalu
+        // mengembalikan data yang bisa didekode; try/catch sebelumnya cukup untuk revert langsung, tidak untuk
+        // balasan pendek/aneh dari precompile yang tidak ada.
+        (bool ok, bytes memory ret) = ARB_SYS.staticcall(abi.encodeCall(IArbSys.arbBlockNumber, ()));
+        uint256 deployBlock = (ok && ret.length == 32) ? abi.decode(ret, (uint256)) : block.number;
         string memory j = "deploy";
         vm.serializeAddress(j, "usdg", address(usdg));
         vm.serializeAddress(j, "verifier", address(verifier));

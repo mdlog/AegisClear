@@ -55,7 +55,7 @@ contract FactoryTest is AegisTestBase {
         openByClient(c);
         bytes memory sigP = Sigs.sign(providerPk, termsDigest(c));
         vm.prank(client);
-        vm.expectRevert();
+        vm.expectRevert(AegisChannelFactory.AlreadyOpen.selector);
         factory.open(c, "", sigP);
     }
 

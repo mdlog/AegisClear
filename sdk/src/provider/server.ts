@@ -69,7 +69,14 @@ export function createProviderApp(o: ProviderOptions) {
         if (anchoredOnChain !== !!o.anchored) {
           throw new Error(`provider misconfigured: ctx.factory POSEIDON=${poseidon} (anchored=${anchoredOnChain}) but ProviderOptions.anchored=${!!o.anchored}`);
         }
-      })();
+      })().catch((e) => {
+        // Task 8 Step 4b: sebuah rejection (mis. RPC turun sesaat saat readContract) TIDAK BOLEH mengunci
+        // provider selamanya di balik promise gagal yang di-cache permanen — bersihkan cache di sini supaya
+        // panggilan BERIKUTNYA mencoba lagi (readContract) alih-alih mewarisi kegagalan lama yang sudah basi.
+        // Rethrow: caller sesi INI tetap melihat error yang sama seperti sebelumnya.
+        modeCheck = undefined;
+        throw e;
+      });
     }
     return modeCheck;
   }

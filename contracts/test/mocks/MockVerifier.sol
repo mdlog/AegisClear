@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-contract MockVerifier {
+import {ISLASettlementVerifier} from "../../src/interfaces/ISLASettlementVerifier.sol";
+
+contract MockVerifier is ISLASettlementVerifier {
     bool public result;
     constructor(bool r) { result = r; }
     function set(bool r) external { result = r; }
