@@ -579,15 +579,15 @@ Tidak ada `owner`, `pause`, proxy, atau `upgradeTo` di jalur dana. Matriks ini d
 
 | Operasi | Estimasi (v1.0) | Terukur (Foundry / testnet) |
 |---|---|---|
-| `open` (clone + initialize; klien = `msg.sender`, 1 verifikasi tanda tangan provider) | ≈ 180k | **295.634** (Foundry `--gas-report`, `Cooperative.t.sol`, 8 panggilan identik, 20 Sep 2026); dengan dua tanda tangan / di testnet: belum diukur terpisah |
-| Transfer USDG ke channel (proxy Paxos) | ≈ 60k | MockUSDG: **51.577** (Anvil) · **58.413** (testnet 46630); v1: 57.905 (co-signed) · 59.872 (anchored); proxy Paxos di mainnet belum diukur |
+| `open` (clone + initialize; klien = `msg.sender`, 1 verifikasi tanda tangan provider) | ≈ 180k | **295.634** (Foundry `--gas-report`, `Cooperative.t.sol`, 8 panggilan identik, 20 Sep 2026); testnet v2 (konsol, `open` oleh provider dengan tanda tangan klien): **308.476–312.398** (4 channel, 20 Sep 2026) |
+| Transfer USDG ke channel (proxy Paxos) | ≈ 60k | MockUSDG: **51.577** (Anvil) · **58.413** (testnet 46630); v1: 57.905 (co-signed) · 59.872 (anchored); v2: 56.214–58.389; proxy Paxos di mainnet belum diukur |
 | `submitCheckpoint` (2 tanda tangan EOA) | ≈ 80k | **102.825** (Anvil) · **118.929** (testnet v0) · **118.113** (testnet v1) · **119.336** (testnet v2) |
-| `closeCooperative` (2 tanda tangan + 2 transfer ke EOA) | ≈ 190k | median **100.191**, maks **109.003** (Foundry `--gas-report`, `Cooperative.t.sol`, 20 Sep 2026); testnet: belum diukur terpisah |
+| `closeCooperative` (2 tanda tangan + 2 transfer ke EOA) | ≈ 190k | median **100.191**, maks **109.003** (Foundry `--gas-report`, `Cooperative.t.sol`, 20 Sep 2026); testnet v2 (konsol): **124.764** (2 transfer, `B-cooperative`) · **105.068** (close epoch 1 setelah `rollover`, `B-rollover`) |
 | `claimPenalty` (verifier 6 input + storage) | ≈ 260k | verifier saja: **229.241**; total **293.880** (Anvil) · **309.373** (testnet v0, tx `0x54355aef…`) · **308.256** (testnet v1) · 312.706 (testnet v1, anchored) · **309.342** (testnet v2) · 307.625 (testnet v2, anchored) |
 | `settle` (2 transfer) | ≈ 130k | **93.900** (Anvil) · **98.291** (testnet v0) · **102.427** (testnet v1, co-signed dan anchored) · **101.474** / 100.988 (testnet v2, co-signed / anchored) |
 | `settle` dengan payee kontrak yang membakar stipend hook (T20, Foundry) | — | **212.572** (ledger P1 Task 3; `HOOK_GAS` saat itu 150k) — dengan router nyata: belum diukur terpisah |
-| `rollover` (2 tanda tangan + 1 transfer + reset) | — | belum diukur terpisah (ada di dalam skenario 11 testnet, channel `0x188febd7…37c7`) |
-| `ack` anchored (7 hash t=3 + storage) — Stylus / Yul | ≈ 83k / 140k | Stylus (testnet 46630): 357.028 pertama, ≈211k–217k stabil; Yul (Anvil): 449.142 pertama, ≈303k–309k stabil |
+| `rollover` (2 tanda tangan + 1 transfer + reset) | — | **137.539** (testnet v2, konsol `B-rollover`, channel `0xD1F69213…2b1D`, 20 Sep 2026) |
+| `ack` anchored (7 hash t=3 + storage) — Stylus / Yul | ≈ 83k / 140k | Stylus (testnet 46630 v2): 349.751–352.421 pertama, ≈201k–213k stabil (v1: 357.028 / ≈211k–217k); Yul (Anvil): 449.142 pertama, ≈303k–309k stabil. Siklus anchored 20 `ack` + sengketa: **4.799.914** (testnet v2, Stylus) vs 6.766.593 (Anvil, Yul) |
 | `startClose` (anchored, membuka jendela tantangan) | — | **65.484** (testnet v1) · **64.045** (testnet v2) |
 | `insertPath` 7 hash Poseidon t=3 (`cast estimate`, kontrak Poseidon berdiri sendiri) — Stylus teroptimasi / Yul | ≈ 83k / 140k | Stylus **144.076** vs Yul **252.271** (1,75×); `hash2` tunggal Yul 62.138 vs Stylus 82.593 |
 | Aktivasi `AegisPoseidon` (sekali) | 1.659.168 + data fee | AegisPoseidon aktif di `0x1027cf7D…ef34`, 21,7 KB; *data fee* estimasi `cargo stylus check` 0,000095 ETH (build referensi) / 0,000091 ETH (build teroptimasi, `stylus/aegis-poseidon/README.md`); gas aktivasi aktual belum dicatat |
@@ -823,7 +823,7 @@ Skrip menjalankan skenario 1 dan 2 (§13) di kedua pasar dan mencetak:
 | Hasil klien / provider | 0 / 2,00 **atau** 2,00 / 0 | 0,07 / 1,93 (sengketa) · 0,00 / 2,00 (kooperatif) |
 | Siapa yang memutuskan | alamat evaluator | bukti Groth16 · dua tanda tangan |
 | Field yang terbaca di explorer | harga, ambang, `reason` (string di calldata) | `T`, `R`, jumlah, `payToClient` |
-| Gas siklus penuh (**terukur Anvil, Task 16**) | 347.918 (complete) · 330.781 (reject) | 542.194 (sengketa, 100 unit + bukti) · 162.079 (kooperatif) |
+| Gas siklus penuh (**terukur Anvil, Task 16**; testnet v2 lewat konsol 20 Sep 2026 dalam kurung) | 347.918 (complete; testnet 384.176) · 330.781 (reject; testnet 367.017) | 542.194 (sengketa, 100 unit + bukti; testnet 575.544) · 162.079 (kooperatif; testnet 182.452) |
 | Waktu proving (**terukur**) | — | 4.245 ms (N=128, snarkjs) |
 | `leak-check` calldata+log tx channel B | — | **bocor: 0**, ambigu: 0 |
 
@@ -831,8 +831,8 @@ Skrip menjalankan skenario 1 dan 2 (§13) di kedua pasar dan mencetak:
 
 | Baris (`toRows`) | Hasil klien / provider | Siapa yang memutuskan | Field yang terbaca di explorer | Catatan |
 |---|---|---|---|---|
-| `B: AegisClear anchored (ack on-chain, sengketa)` — skenario `B-anchored-dispute`, `factoryAnchored`, klien A | **0,02 / 0,38** | bukti Groth16 atas `R` on-chain | hash daun, `A` per ack, `payToClient` | 20 unit × 0,02 USDG (`A` = 0,40), pelanggaran di seq 3 & 17 → penalti 2 × 0,01; `leak-check` anchored mengecualikan `unitPrice` (§6.7), metrik/ambang tetap tidak muncul; gas siklus: belum dicatat di dokumen ini |
-| `B: AegisClear rollover (128 + 5 unit, 1 deposit)` — skenario `B-rollover`, klien B | **0,00 / 2,66** | dua tanda tangan ×2 (rollover + close) | `T`, `R`, `epoch`, jumlah | 133 unit dengan satu deposit 5 USDG, `epoch` on-chain berakhir 1; gas siklus: belum dicatat di dokumen ini |
+| `B: AegisClear anchored (ack on-chain, sengketa)` — skenario `B-anchored-dispute`, `factoryAnchored`, klien A | **0,02 / 0,38** | bukti Groth16 atas `R` on-chain | hash daun, `A` per ack, `payToClient` | 20 unit × 0,02 USDG (`A` = 0,40), pelanggaran di seq 3 & 17 → penalti 2 × 0,01; `leak-check` anchored mengecualikan `unitPrice` (§6.7), metrik/ambang tetap tidak muncul; gas siklus **4.799.914** (testnet v2, Stylus, konsol 20 Sep 2026: `fund` 56.214 · 20 `ack` · `startClose` 63.108 · `claimPenalty` 304.420 · `settle` 100.077; Anvil/Yul 6.766.593), proving 3.404 ms, durasi 140 s, leak-check bocor 0 dari 25 tx |
+| `B: AegisClear rollover (128 + 5 unit, 1 deposit)` — skenario `B-rollover`, klien B | **0,00 / 2,66** | dua tanda tangan ×2 (rollover + close) | `T`, `R`, `epoch`, jumlah | 133 unit dengan satu deposit 5 USDG, `epoch` on-chain berakhir 1; gas siklus **298.821** (testnet v2, konsol 20 Sep 2026: `fund` 56.214 · `rollover` 137.539 · `closeCooperative` 105.068), durasi 135 s, leak-check bocor 0 dari 4 tx |
 
 Lingkungan: Anvil **fork mainnet 4663** (USDG asli, Permit2 & proxy x402 asli, `vm.warp` untuk jendela) untuk uji; **testnet 46630** dengan `MockUSDG` untuk bukti liveness; **mainnet 4663** dengan USDG sen-level untuk demo video (D1 — belum, deployer 0 ETH). Kontrak produksi dipakai apa adanya — tidak ada `AegisClock`; jendela pendek datang dari factory demo (`MIN_CHALLENGE_WINDOW = 60 s`, D5), bukan dari kode kontrak yang berbeda.
 
