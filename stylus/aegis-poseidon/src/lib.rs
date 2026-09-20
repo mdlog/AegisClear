@@ -31,7 +31,8 @@ impl AegisPoseidon {
         let fl = to_fr(leaf).ok_or_else(|| ERR_NOT_FIELD.to_vec())?;
         let mut ff = [ark_ff::Zero::zero(); 7];
         for i in 0..7 { ff[i] = to_fr(filled[i]).ok_or_else(|| ERR_NOT_FIELD.to_vec())?; }
-        let (root, nodes) = ip(fl, index.to::<usize>(), &ff);
+        // index < 128 sudah dijamin → limb terendah cukup (`U256::to::<usize>` membawa jalur panic ber-format ≈ 3 KB kode).
+        let (root, nodes) = ip(fl, index.as_limbs()[0] as usize, &ff);
         let mut out = [U256::ZERO; 7];
         for i in 0..7 { out[i] = to_u256(nodes[i]); }
         Ok((to_u256(root), out))
