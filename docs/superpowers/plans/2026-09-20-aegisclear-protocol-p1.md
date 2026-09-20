@@ -277,7 +277,7 @@ Replace `checkpointSigs` and `closeSigs`, add `rolloverSigs`:
         sp = Sigs.sign(providerPk, d);
     }
 ```
-Grep the other tests for direct `hashCheckpoint(`/`hashClose(` calls (e.g. `Wallet1271.t.sol`, `Events.t.sol`, `Invariant.t.sol`) and add the `ch.epoch()` first argument there.
+Direct call sites that need the `ch.epoch()` first argument (verified by grep on 20 Sep 2026): `contracts/test/Checkpoint.t.sol:31` (`ch.hashCheckpoint(1, 20_000, …)`), `contracts/test/Wallet1271.t.sol:25` (`ch.hashCheckpoint(10, 200_000, …)`), `contracts/test/Invariant.t.sol:27` (`ch.hashCheckpoint(s, a, r)`) and `:72` (`ch.hashClose(s, tp)`). Re-grep before finishing: `grep -rn -E "hashCheckpoint\(|hashClose\(" contracts/test contracts/script`.
 
 - [ ] **Step 5: Run the whole Foundry suite**
 
@@ -296,7 +296,7 @@ git commit -m "contracts: epoch in Checkpoint/Close signatures and cooperative r
 ### Task 2: SDK — epoch in typed data, authenticated `/close`, `rollover` flow
 
 **Files:**
-- Modify: `sdk/src/core/typedData.ts`, `sdk/src/core/receipts.ts`, `sdk/src/chain/abi.ts`, `sdk/src/chain/channel.ts`, `sdk/src/provider/server.ts`, `sdk/src/client/agent.ts`, `sdk/src/watcher/watcher.ts`, `sdk/test/typedData.test.ts`, `sdk/test/integration.test.ts`
+- Modify: `sdk/src/core/typedData.ts`, `sdk/src/core/receipts.ts`, `sdk/src/chain/abi.ts`, `sdk/src/chain/channel.ts`, `sdk/src/provider/server.ts`, `sdk/src/client/agent.ts`, `sdk/src/watcher/watcher.ts`, `sdk/test/typedData.test.ts`, `sdk/test/integration.test.ts`, `sdk/test/watcher.test.ts` (every `Checkpoint` literal at lines 27, 55–56, 98–99, 142 gains `epoch: 0`; the stale-vs-latest responder tests keep their semantics)
 
 **Interfaces:**
 - Consumes: Task 1 contract (`epoch()`, `rollover`, new hash functions).
@@ -1428,7 +1428,7 @@ contract AnchoredPenaltyTest is AegisTestBase {
         return Sigs.sign(providerPk, Sigs.digest(ch.domainSeparator(), ch.hashLeaf(ch.epoch(), s, leaf, amount)));
     }
 ```
-Grep for `new AegisChannelFactory(` across `contracts/test` and `contracts/script` and add the 4th argument (`address(0)` for co-signed). `Invariant.t.sol` handlers: no change beyond the constructor.
+Call sites of `new AegisChannelFactory(` that need the 4th argument (verified by grep on 20 Sep 2026): `contracts/test/Penalty.t.sol:26` (`address(0)`), `contracts/script/DeployLocal.s.sol:23` (`address(0)` for the co-signed demo factory), `contracts/script/DeployTestnet.s.sol:21-22` (`address(0)` for `factoryDemo`/`factoryProd`), plus `Base.t.sol`. Re-grep before finishing. `Invariant.t.sol` handlers: no change beyond the constructor.
 
 Deploy scripts:
 - `DeployLocal.s.sol`: `PoseidonPathYul yul = new PoseidonPathYul(); AegisChannelFactory factoryAnchored = new AegisChannelFactory(address(verifier), PERMIT2, 60, address(yul));` + JSON `poseidon`, `factoryAnchored`, and `vm.serializeUint(j, "deployBlock", block.number)`.
