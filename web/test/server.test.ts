@@ -81,9 +81,21 @@ describe.skipIf(!DEPLOY_EXISTS)("web console server (Anvil)", () => {
     expect(ch?.runId).toBe(runId);
   });
 
+  it("dua POST /api/demo/run bersamaan: satu 202, satu 409 busy (tanpa unhandled rejection)", async () => {
+    const [r1, r2] = await Promise.all([post("B-cooperative"), post("B-cooperative")]);
+    expect([r1.status, r2.status].sort()).toEqual([202, 409]);
+    const [accepted, rejected] = r1.status === 202 ? [r1, r2] : [r2, r1];
+    expect(await rejected.json()).toEqual({ error: "busy" });
+    const { runId } = (await accepted.json()) as { runId: string };
+    const run = await waitRun(runId);
+    expect(run.status, run.error).toBe("done");
+    expect(run.result!.map((x) => x.pasar)).toEqual(["B: AegisClear kooperatif"]);
+  });
+
   it("B-dispute: busy saat berjalan; hasil 0.07 / 1.93 dengan bukti; SSE replay + done", async () => {
     const r = await post("B-dispute"); expect(r.status).toBe(202);
     const { runId } = (await r.json()) as { runId: string };
+    const ssePromise = fetch(`${BASE}/api/demo/runs/${runId}/events`);
     expect((await post("A-complete")).status).toBe(409);
     const run = await waitRun(runId);
     expect(run.status, run.error).toBe("done");
@@ -91,7 +103,7 @@ describe.skipIf(!DEPLOY_EXISTS)("web console server (Anvil)", () => {
     expect(Number(run.result![0].proving_ms)).toBeGreaterThan(0);
     expect(run.steps.map((s) => s.phase)).toEqual(expect.arrayContaining(["fund", "serve", "dispute", "prove", "wait", "settle"]));
     expect(run.steps.filter((s) => s.txHash).map((s) => s.label)).toEqual(expect.arrayContaining(["fund", "submitCheckpoint", "claimPenalty", "settle"]));
-    const sse = await (await fetch(`${BASE}/api/demo/runs/${runId}/events`)).text();
+    const sse = await (await ssePromise).text();
     expect(sse).toMatch(/event: step\n/); expect(sse).toMatch(/event: done\n/);
     expect(sse.split("event: step").length - 1).toBe(run.steps.length);
   });

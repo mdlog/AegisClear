@@ -7,12 +7,13 @@ import {
 import type { ScenarioId } from "../shared/types.js";
 import { REPO_ROOT, type WebConfig } from "./config.js";
 import type { ChainServices } from "./chain.js";
+import type { ChannelIndex } from "./channels.js";
 import type { RunStore } from "./runs.js";
 
-export type StartResult = { runId: string } | { error: "busy" } | { error: "unknown-scenario" } | { error: "client-has-open-channel"; channel: Address };
+export type StartResult = { runId: string } | { error: "busy" } | { error: "unknown-scenario" } | { error: "client-has-open-channel"; channel: Address } | { error: "preflight-failed"; message: string };
 export interface RunnerDeps {
   cfg: WebConfig; chain: ChainServices; store: RunStore; provider: ReturnType<typeof createProviderApp>;
-  runIdOf: Map<Address, string>; providerUrl: string;
+  runIdOf: Map<Address, string>; providerUrl: string; index: ChannelIndex;
 }
 export interface PrivateRecord { channel: Address; values: bigint[]; txs: Hex[] }
 type Single = Exclude<ScenarioId, "all">;
@@ -21,6 +22,7 @@ const ALL: Single[] = ["B-cooperative", "B-dispute", "A-complete", "A-reject"]; 
 
 export function makeRunner(d: RunnerDeps) {
   const privates = new Map<string, PrivateRecord[]>();
+  let starting = false;
   const env: ScenarioEnv = {
     ctx: d.chain.ctx, publicClient: d.chain.publicClient, d: d.cfg.deployment, art: defaultArtifacts(REPO_ROOT),
     providerUrl: d.providerUrl, providerAddress: d.chain.addressOf(d.cfg.keys.provider), providerPk: d.cfg.keys.provider,
@@ -43,22 +45,32 @@ export function makeRunner(d: RunnerDeps) {
 
   async function start(scenario: ScenarioId): Promise<StartResult> {
     if (scenario !== "all" && !(scenario in CLIENT_OF)) return { error: "unknown-scenario" };
-    if (d.store.busy) return { error: "busy" };
-    const parts: Single[] = scenario === "all" ? ALL : [scenario];
-    for (const p of parts) {
-      if (!p.startsWith("B-")) continue;
-      const open = await resetSession(d.chain.addressOf(d.cfg.keys[CLIENT_OF[p]]));
-      if (open) return { error: "client-has-open-channel", channel: open };
+    if (starting || d.store.busy) return { error: "busy" };
+    starting = true;
+    try {
+      const parts: Single[] = scenario === "all" ? ALL : [scenario];
+      for (const p of parts) {
+        if (!p.startsWith("B-")) continue;
+        const open = await resetSession(d.chain.addressOf(d.cfg.keys[CLIENT_OF[p]]));
+        if (open) return { error: "client-has-open-channel", channel: open };
+      }
+      const run = d.store.create(scenario);
+      void execute(run.id, parts)
+        .then((rows) => { d.index.invalidate(); d.store.finish(run.id, rows); })
+        .catch((e) => { d.index.invalidate(); d.store.fail(run.id, e instanceof Error ? e.message : String(e)); });
+      return { runId: run.id };
+    } catch (e) {
+      return { error: "preflight-failed", message: e instanceof Error ? e.message : String(e) };
+    } finally {
+      starting = false;
     }
-    const run = d.store.create(scenario);
-    void execute(run.id, parts)
-      .then((rows) => d.store.finish(run.id, rows))
-      .catch((e) => d.store.fail(run.id, e instanceof Error ? e.message : String(e)));
-    return { runId: run.id };
   }
 
   async function execute(runId: string, parts: Single[]) {
-    const emit = (s: StepInput) => { if (s.channel) d.runIdOf.set(s.channel, runId); d.store.emit(runId, s); };
+    const emit = (s: StepInput) => {
+      if (s.channel && !d.runIdOf.has(s.channel)) { d.runIdOf.set(s.channel, runId); d.index.invalidate(); }
+      d.store.emit(runId, s);
+    };
     const res: { aOk?: MarketAResult; aRej?: MarketAResult; bCoop?: MarketBResult; bDisp?: MarketBResult } = {};
     for (const p of parts) {
       const pk = d.cfg.keys[CLIENT_OF[p]]; const who = d.chain.addressOf(pk); const isB = p.startsWith("B-");

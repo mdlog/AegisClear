@@ -38,14 +38,14 @@ export function createWebServer(cfg: WebConfig): WebServer {
   const clients = [{ label: "A" as const, address: privateKeyToAccount(cfg.keys.a).address }, { label: "B" as const, address: privateKeyToAccount(cfg.keys.b).address }];
   const { chainId: _c, deployBlock: _b, ...addresses } = cfg.deployment as unknown as Record<string, unknown>;
   const runIdOf = new Map<Address, string>();   // channel → runId (diisi Task 4)
-  const index = new ChannelIndex(cfg, chain.ctx(cfg.keys.provider), (ch) => runIdOf.get(ch), 1000);
+  const index = new ChannelIndex(cfg, chain.ctx(cfg.keys.provider), (ch) => runIdOf.get(ch));
   const providerApp = createProviderApp({
     ctx: chain.ctx(cfg.keys.provider), account: providerAccount, usdg: cfg.deployment.usdg, terms: TERMS_BASE, unitQty: 1n, deposit: DEPOSIT_B,
     challengeWindow: cfg.windows.challenge, responseWindow: cfg.windows.response, metrics: metricsFor,
   });
   app.route("/provider", providerApp.app);
   const store = new RunStore();
-  const runner = makeRunner({ cfg, chain, store, provider: providerApp, runIdOf, providerUrl: `http://127.0.0.1:${cfg.port}/provider` });
+  const runner = makeRunner({ cfg, chain, store, provider: providerApp, runIdOf, providerUrl: `http://127.0.0.1:${cfg.port}/provider`, index });
 
   app.get("/api/config", (c) => {
     const body: ConfigResponse = {
@@ -66,7 +66,9 @@ export function createWebServer(cfg: WebConfig): WebServer {
     const body = (await c.req.json().catch(() => ({}))) as { scenario?: string };
     const r = await runner.start(body.scenario as ScenarioId);
     if ("runId" in r) return c.json(r, 202);
-    return c.json(r, r.error === "unknown-scenario" ? 400 : 409);
+    if (r.error === "unknown-scenario") return c.json(r, 400);
+    if (r.error === "preflight-failed") return c.json(r, 502);
+    return c.json(r, 409);
   });
   app.get("/api/demo/runs", (c) => c.json(store.list()));
   app.get("/api/demo/runs/:id", (c) => { const r = store.get(c.req.param("id")); return r ? c.json(r) : c.json({ error: "unknown run" }, 404); });

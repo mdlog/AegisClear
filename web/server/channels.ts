@@ -13,6 +13,8 @@ export class ChannelIndex {
     private readonly cfg: WebConfig, private readonly ctx: ChainCtx,
     private readonly runIdOf: (channel: Address) => string | undefined = () => undefined, private readonly ttlMs = 3000,
   ) {}
+  /** Buang cache: pembaca berikutnya (`list()`) akan memindai ulang on-chain. */
+  invalidate(): void { this.cache = undefined; }
   factories(): { name: string; address: Address }[] {
     return FACTORY_KEYS.flatMap((k) => (this.cfg.deployment[k] ? [{ name: k, address: this.cfg.deployment[k]! }] : []));
   }
