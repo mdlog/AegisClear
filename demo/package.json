@@ -1,6 +1,10 @@
 {
-  "name": "@aegisclear/demo", "private": true, "type": "module",
-  "scripts": { "demo": "tsx run.ts", "leak-check": "tsx leak-check.ts" },
+  "name": "@aegisclear/demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "demo": "tsx run.ts", "leak-check": "tsx leak-check.ts", "test": "node --import tsx --test test/*.test.ts" },
   "dependencies": { "@aegisclear/sdk": "workspace:*", "@hono/node-server": "^2.1.1", "viem": "^2.56.8" },
   "devDependencies": { "tsx": "^4.23.13", "typescript": "^5.9.3" }
 }
