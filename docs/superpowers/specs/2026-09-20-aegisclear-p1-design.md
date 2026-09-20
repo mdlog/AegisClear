@@ -26,7 +26,7 @@ Non-goal: multi-user, autentikasi, persistensi (state run hanya di memori proses
 
 ```
 browser ──HTTP/SSE──▶ web/server (Hono, :4040)
-                         ├─ /            static  web/dist (Vite build)   [dev: Vite :4041 proxy → :4040]
+                         ├─ /            static  web/dist (Vite build)   [dev: Vite :4043 proxy → :4040]
                          ├─ /provider/*  createProviderApp(...) + startProviderWatcher (responder T1 in-process)
                          └─ /api/*       config · channels · demo runs (SSE) · leak-check · offer
                                 │
@@ -38,7 +38,7 @@ browser ──HTTP/SSE──▶ web/server (Hono, :4040)
 - `web/server/*.ts` — Node 22, tsx, Hono 4, `@hono/node-server`, viem, `@aegisclear/sdk`, `@aegisclear/demo` (skenario di-refactor menjadi library, lihat A.5).
 - `web/src/*` — Vite 6 + React 18 + TypeScript; tanpa framework CSS (satu `styles.css`, tema gelap, monospace untuk alamat); tanpa state library (hooks + `fetch`/`EventSource`).
 
-**Port:** `WEB_PORT` default **4040** (server + halaman produksi). Dev: Vite **4041** dengan proxy `/api` dan `/provider` → 4040. Port 4020/4031 (test/demo CLI) tidak disentuh.
+**Port:** `WEB_PORT` default **4040** (server + halaman produksi). Dev: Vite **4043** dengan proxy `/api` dan `/provider` → 4040. Port 4020/4031 (test/demo CLI) tidak disentuh.
 
 **Network profile** (`AEGIS_NETWORK`, default `local`):
 

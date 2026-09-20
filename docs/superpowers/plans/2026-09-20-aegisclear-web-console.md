@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Ports: web server **4040** (`WEB_PORT`), Vite dev **4041**, tests use **4042**. Never use 4020 (SDK integration tests), 4031 (demo CLI), 8545 (a foreign Anvil may run there — use a private Anvil on **8547** with `RPC_URL=http://127.0.0.1:8547` for every test run in this plan).
+- Ports: web server **4040** (`WEB_PORT`), Vite dev **4043**, tests use **4042**. Never use 4020 (SDK integration tests), 4031 (demo CLI), 8545 (a foreign Anvil may run there — use a private Anvil on **8547** with `RPC_URL=http://127.0.0.1:8547` for every test run in this plan).
 - `AEGIS_NETWORK ∈ {local, testnet}`; `local` keys = Anvil defaults (#0 faucet, #1 client A, #2 provider, #3 client B — same as `demo/run.ts`); `testnet` keys from `.env` (`PK_PROVIDER`, `PK_CLIENT_A`, `PK_CLIENT_B`, `PK_DEPLOYER`) — the server may read `.env` but must never log or return any private key.
 - Provider windows: local 120 s / 60 s (`evm_increaseTime`), testnet 60 s / 30 s (real wait). Deposit Pasar B = 5 USDG (`5_000_000n`), escrow Pasar A = 2 USDG. Breach seqs `[3,17,29,44,58,71,90]` (EX1), breach metrics m1 1200 / normal 300, m2 95 — identical to `demo/run.ts` so the §14 numbers (0,07 / 1,93 USDG) still hold.
 - JSON responses: every `bigint` serialised as decimal string; addresses checksummed (viem `getAddress`).
@@ -432,7 +432,7 @@ packages:
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "dev": "vite --port 4041 --strictPort",
+    "dev": "vite --port 4043 --strictPort",
     "serve": "tsx server/index.ts",
     "start": "vite build && tsx server/index.ts",
     "test": "vitest run",
@@ -480,11 +480,11 @@ packages:
 ```ts
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-// dev: halaman di :4041, API & provider di-proxy ke server :4040 (`pnpm --filter @aegisclear/web serve`).
+// dev: halaman di :4043, API & provider di-proxy ke server :4040 (`pnpm --filter @aegisclear/web serve`).
 export default defineConfig({
   plugins: [react()],
   build: { outDir: "dist", emptyOutDir: true },
-  server: { port: 4041, proxy: { "/api": "http://127.0.0.1:4040", "/provider": "http://127.0.0.1:4040" } },
+  server: { port: 4043, proxy: { "/api": "http://127.0.0.1:4040", "/provider": "http://127.0.0.1:4040" } },
 });
 ```
 
@@ -2008,7 +2008,7 @@ pnpm web                                  # = pnpm --filter @aegisclear/web star
 AEGIS_NETWORK=testnet pnpm web
 ```
 
-Halaman `http://localhost:4040` (port `WEB_PORT`) memuat: **dashboard channel** (semua `ChannelOpened` di factory deployment, state/seq/A/budget/deadline/bukti, klik untuk detail + event), **panel demo** Pasar A vs Pasar B — tombol menjalankan skenario §14 di server (provider, klien A/B, proving Groth16 semuanya di proses Node; tidak ada wallet di browser) dan men-stream langkahnya (SSE) dengan tautan explorer, lalu tabel perbandingan, kartu **"privat"** (syarat & metrik yang tidak pernah masuk chain) vs **"yang dilihat chain"** (T, R, A, payToClient) dan tombol **leak-check**; serta JSON 402 mentah yang dilihat klien x402. Provider yang sama di-mount di `http://localhost:4040/provider` (`GET /job` → 402) lengkap dengan challenge responder in-process. Pengembangan UI: `pnpm web:dev` (Vite di :4041, proxy ke :4040). API: `GET /api/config`, `/api/channels`, `/api/channels/:addr`, `POST /api/demo/run {scenario}`, `/api/demo/runs/:id`, `/api/demo/runs/:id/events` (SSE), `/api/demo/leak-check/:runId`, `/api/offer?client=A|B`.
+Halaman `http://localhost:4040` (port `WEB_PORT`) memuat: **dashboard channel** (semua `ChannelOpened` di factory deployment, state/seq/A/budget/deadline/bukti, klik untuk detail + event), **panel demo** Pasar A vs Pasar B — tombol menjalankan skenario §14 di server (provider, klien A/B, proving Groth16 semuanya di proses Node; tidak ada wallet di browser) dan men-stream langkahnya (SSE) dengan tautan explorer, lalu tabel perbandingan, kartu **"privat"** (syarat & metrik yang tidak pernah masuk chain) vs **"yang dilihat chain"** (T, R, A, payToClient) dan tombol **leak-check**; serta JSON 402 mentah yang dilihat klien x402. Provider yang sama di-mount di `http://localhost:4040/provider` (`GET /job` → 402) lengkap dengan challenge responder in-process. Pengembangan UI: `pnpm web:dev` (Vite di :4043, proxy ke :4040). API: `GET /api/config`, `/api/channels`, `/api/channels/:addr`, `POST /api/demo/run {scenario}`, `/api/demo/runs/:id`, `/api/demo/runs/:id/events` (SSE), `/api/demo/leak-check/:runId`, `/api/offer?client=A|B`.
 ```
 
 Also in the existing "Menjalankan secara lokal" steps, after the demo CLI lines, add one line: `pnpm test:web   # butuh Anvil + DeployLocal seperti test SDK (RPC_URL untuk port lain)`.
