@@ -5,12 +5,13 @@
  */
 import { Hono } from "hono";
 import { randomBytes } from "node:crypto";
-import type { Address, Hex, PrivateKeyAccount } from "viem";
+import { zeroAddress, type Address, type Hex, type PrivateKeyAccount } from "viem";
 import { type Terms, type Receipt, ReceiptTree, commitTerms, makeReceipt, MAX_SEQ, merkleRoot, randomNonce, settle } from "../core/index.js";
 import {
   type ChannelConfig, type Checkpoint, type LeafMsg, signCheckpoint, signChannelTerms, signClose, signRollover, signLeaf, rootHex, makeTypedDataVerifier,
 } from "../core/typedData.js";
 import { type ChainCtx, predictChannel, openChannel, erc20Balance, readChannel } from "../chain/channel.js";
+import { factoryAbi } from "../chain/abi.js";
 import { Watcher } from "../watcher/watcher.js";
 
 export interface ProviderOptions {
@@ -52,10 +53,32 @@ export function createProviderApp(o: ProviderOptions) {
   // `SignatureChecker.isValidSignatureNow` yang dipakai AegisChannel; ecrecover murni menolak akun kontrak.
   const verify = makeTypedDataVerifier(o.ctx.publicClient);
 
+  /**
+   * Review round 1 (minor 3b): kesalahan konfigurasi jujur — `ProviderOptions.anchored` tidak cocok dengan
+   * `POSEIDON()` factory di `o.ctx.factory` yang sesungguhnya — harus tersurat segera, bukan diam-diam
+   * salah melayani (mis. anchored:false padahal factory anchored → tidak pernah membaca on-chain seq).
+   * Di-cache lewat Promise (bukan boolean) sehingga hanya SATU pembacaan RPC pernah terjadi, tetapi setiap
+   * sesi klien baru berikutnya tetap konsisten gagal (bukan cuma yang pertama) bila memang salah konfigurasi.
+   */
+  let modeCheck: Promise<void> | undefined;
+  function ensureModeMatchesFactory(): Promise<void> {
+    if (!modeCheck) {
+      modeCheck = (async () => {
+        const poseidon = await o.ctx.publicClient.readContract({ address: o.ctx.factory, abi: factoryAbi, functionName: "POSEIDON" });
+        const anchoredOnChain = poseidon !== zeroAddress;
+        if (anchoredOnChain !== !!o.anchored) {
+          throw new Error(`provider misconfigured: ctx.factory POSEIDON=${poseidon} (anchored=${anchoredOnChain}) but ProviderOptions.anchored=${!!o.anchored}`);
+        }
+      })();
+    }
+    return modeCheck;
+  }
+
   async function session(client: Address): Promise<Session> {
     const key = client.toLowerCase();
     const found = sessions.get(key);
     if (found) return found;
+    await ensureModeMatchesFactory();   // hanya jalan (RPC) sekali; sesi baru berikutnya menunggu promise yang sama
     const terms: Terms = { ...o.terms, nonce: randomNonce() };   // nonce per sesi (lihat ProviderOptions.terms)
     const cfg: ChannelConfig = {
       client, provider: o.account.address, token: o.usdg, termsCommitment: rootHex(await commitTerms(terms)),
@@ -109,20 +132,22 @@ export function createProviderApp(o: ProviderOptions) {
     }
     // (2) ack unit sebelumnya (§6.2, FR-24)
     const n = s.tree.size;
-    if (n > 0) {
-      if (o.anchored) {
-        // (2') anchored: unit n-1 harus sudah di-ack ON-CHAIN oleh klien (tidak ada header Aegis-Ack); epoch harus sama.
-        const v = await readChannel(o.ctx, s.channel);
-        if (v.epoch !== s.epoch || v.seq < n) return c.json({ error: "ack-required", seq: n - 1 }, 409);
-      } else {
-        const pending = s.checkpoints.get(n)!;
-        if (!pending.sigClient) {
-          const hdr = c.req.header("Aegis-Ack");
-          const ack = hdr ? (JSON.parse(hdr) as { seq: number; signature: Hex }) : undefined;
-          if (!ack || ack.seq !== n || !(await verify.verifyCheckpointSig(client, s.channel, chainId, pending.cp, ack.signature)))
-            return c.json({ error: "ack-required", seq: n }, 409);
-          pending.sigClient = ack.signature;
-        }
+    if (o.anchored) {
+      // (2') anchored: baca state on-chain untuk SEMUA n (termasuk n===0, minor 3a) — channel yang sudah
+      // CLOSING (mis. salah satu pihak memanggil startClose()) tidak boleh terus dilayani unit baru sama
+      // sekali. Untuk n>0, unit n-1 juga harus sudah di-ack ON-CHAIN oleh klien (tidak ada header Aegis-Ack
+      // di mode ini); epoch harus sama.
+      const v = await readChannel(o.ctx, s.channel);
+      if (v.state !== "OPEN") return c.json({ error: "channel-not-open", state: v.state }, 409);
+      if (n > 0 && (v.epoch !== s.epoch || v.seq < n)) return c.json({ error: "ack-required", seq: n - 1 }, 409);
+    } else if (n > 0) {
+      const pending = s.checkpoints.get(n)!;
+      if (!pending.sigClient) {
+        const hdr = c.req.header("Aegis-Ack");
+        const ack = hdr ? (JSON.parse(hdr) as { seq: number; signature: Hex }) : undefined;
+        if (!ack || ack.seq !== n || !(await verify.verifyCheckpointSig(client, s.channel, chainId, pending.cp, ack.signature)))
+          return c.json({ error: "ack-required", seq: n }, 409);
+        pending.sigClient = ack.signature;
       }
     }
     if (n >= MAX_SEQ) return c.json({ error: "epoch-full" }, 409);

@@ -12,7 +12,7 @@ import { createProviderApp } from "../src/provider/server.js";
 import { AegisClient } from "../src/client/agent.js";
 import {
   randomNonce, defaultArtifacts, erc20Balance, erc20Abi, erc20Transfer, commitTerms, signChannelTerms, signCheckpoint,
-  signClose, signRollover, rootHex, predictChannel, merkleRoot, submitCheckpointTx, routerAbi, type ChainCtx, type ChannelConfig,
+  signClose, signRollover, rootHex, predictChannel, merkleRoot, submitCheckpointTx, startCloseTx, routerAbi, type ChainCtx, type ChannelConfig,
 } from "../src/index.js";
 
 // DEPLOY_FILE (env) diresolve relatif terhadap REPO ROOT, bukan cwd proses: `pnpm --filter
@@ -212,6 +212,27 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
       const c = new AegisClient({ ctx: ctxOf(PK.clientB), account: privateKeyToAccount(PK.clientB), providerUrl: "http://127.0.0.1:4024", usdg: d.usdg, artifacts: art });
       const before = await bal(me);
       await expect(c.start()).rejects.toThrow(/payoutClient/);
+      expect(await bal(me)).toBe(before);
+    } finally { evilServer.close(); }
+  });
+
+  it("T-mode: 402 mengklaim anchored=true padahal factory klien (POSEIDON=0) co-signed → start() menolak /mode mismatch/; tidak ada transfer", async () => {
+    const me = privateKeyToAccount(PK.clientB).address; // sesi asli klien ini di provider utama sudah SETTLED; app jahat ini terpisah
+    const { cfg, terms } = await buildCfgAndTerms(me);
+    const realPayTo = await predictChannel(ctxOf(PK.provider), cfg); // sah di factory co-signed (default ctxOf → d.factory)
+    const sigProvider = await signChannelTerms(providerAccount, realPayTo, CHAIN_ID, cfg);
+    const evilApp = new Hono();
+    evilApp.get("/job", (c) => c.json({
+      x402Version: 1,
+      accepts: [{ scheme: "exact", network: `eip155:${CHAIN_ID}`, asset: d.usdg, payTo: realPayTo, maxAmountRequired: "1000000",
+        // jahat: mengklaim anchored meski cfg/payTo/sigProvider di atas sah untuk factory CO-SIGNED klien (ctxOf → d.factory).
+        extra: { aegis: { config: j(cfg), sigProvider, terms: j(terms), exitSig: "0x", anchored: true } } }],
+    }, 402));
+    const evilServer = serve({ fetch: evilApp.fetch, port: 4029 });
+    try {
+      const c = new AegisClient({ ctx: ctxOf(PK.clientB), account: privateKeyToAccount(PK.clientB), providerUrl: "http://127.0.0.1:4029", usdg: d.usdg, artifacts: art });
+      const before = await bal(me);
+      await expect(c.start()).rejects.toThrow(/mode mismatch/);
       expect(await bal(me)).toBe(before);
     } finally { evilServer.close(); }
   });
@@ -517,6 +538,27 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
         for (const secret of [1200n, 300n, 95n, 800n, 90n, 5000n, 3000n]) expect(ws).not.toContain(secret);
       }
       console.table(c.txs.map((t) => ({ label: t.label, gasUsed: t.gasUsed.toString() })));
+    });
+
+    it("anchored: provider memanggil startClose() lebih dulu (CLOSING) → dispute() tetap lanjut ke bukti tanpa startClose lagi", async () => {
+      const { pk, acct } = await fresh(2_000_000n);
+      const c = mkAnchoredClient(pk);
+      const c0 = await bal(acct.address); const p0 = await bal(providerAddr);
+      await c.start();
+      for (let i = 0; i < 10; i++) await c.requestUnit();
+      // Provider (bukan klien) membuka jendela tantangan lebih dulu — channel sudah CLOSING sebelum dispute().
+      await startCloseTx({ ...ctxOf(PK.provider), factory: (d as any).factoryAnchored }, c.channel);
+      expect((await c.view()).state).toBe("CLOSING");
+      const { payToClient } = await c.dispute();
+      expect(payToClient).toBe(10_000n);
+      expect((await c.view()).hasProof).toBe(true);
+      expect(c.txs.map((t) => t.label)).toContain("claimPenalty");
+      expect(c.txs.map((t) => t.label)).not.toContain("startClose");
+      if (CHAIN_ID === 31337) { await publicClient.request({ method: "evm_increaseTime", params: [121] } as any); await publicClient.request({ method: "evm_mine", params: [] } as any); }
+      else await new Promise((r) => setTimeout(r, 125_000));
+      await c.settle();
+      expect((await bal(providerAddr)) - p0).toBe(190_000n);
+      expect(c0 - (await bal(acct.address))).toBe(190_000n);
     });
 
     it("kooperatif anchored: 5 ack → close (klien menandatangani dulu) → provider +100.000", async () => {

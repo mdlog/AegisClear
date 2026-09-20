@@ -1,4 +1,4 @@
-import type { Address, Hex, PrivateKeyAccount } from "viem";
+import { zeroAddress, type Address, type Hex, type PrivateKeyAccount } from "viem";
 import { type Terms, type Receipt, ReceiptTree, settle, buildCircuitInput, commitTerms, merkleRoot, leafHash } from "../core/index.js";
 import {
   type ChannelConfig, type Checkpoint, type LeafMsg, type TypedDataVerifier, signCheckpoint, signChannelTerms, signClose, signRollover, rootHex,
@@ -8,6 +8,7 @@ import {
   type ChainCtx, erc20Transfer, predictChannel, openChannel, submitCheckpointTx, claimPenaltyTx, settleTx,
   closeCooperativeTx, rolloverTx, readChannel, ackTx, startCloseTx,
 } from "../chain/channel.js";
+import { factoryAbi } from "../chain/abi.js";
 import { prove, toCalldata, type Artifacts } from "../core/prover.js";
 
 /**
@@ -43,7 +44,11 @@ const bi = (x: string | number | bigint) => BigInt(x);
 
 export class AegisClient {
   cfg!: ChannelConfig; channel!: Address; terms!: Terms; deposit = 0n; epoch = 0;
-  /** Mode anchored (FR-25), terdeteksi dari 402 (`extra.aegis.anchored`): ack unit = tx `ack()` on-chain, tidak ada checkpoint co-signed. */
+  /**
+   * Mode anchored (FR-25): ack unit = tx `ack()` on-chain, tidak ada checkpoint co-signed. Diturunkan dari
+   * `ctx.factory` milik KLIEN SENDIRI on-chain (T-mode) di `start()` — bukan dari flag `anchored` yang
+   * diklaim provider di 402, yang hanya dipakai sebagai cross-check (mismatch ditolak).
+   */
   anchored = false;
   readonly tree = new ReceiptTree();
   readonly checkpoints = new Map<number, { cp: Checkpoint; sigProvider: Hex; sigClient: Hex }>();
@@ -74,7 +79,15 @@ export class AegisClient {
     if (res.status !== 402) throw new Error(`expected 402, got ${res.status}`);
     const offer = ((await res.json()) as any).accepts[0];
     const a = offer.extra.aegis;
-    this.anchored = !!a.anchored;
+    // T-mode (review round 1, CRITICAL): mode (anchored vs co-signed) TIDAK BOLEH dipercaya dari klaim
+    // provider di 402 — provider jahat bisa berbohong soal mode untuk membuat klien melewati verifikasi
+    // tiket keluar co-signed di bawah. Kebenaran satu-satunya adalah `POSEIDON()` pada factory milik KLIEN
+    // SENDIRI (`ctx.factory`, yang klien pilih sendiri) — dibaca SEBELUM transfer apa pun. Klaim provider
+    // hanya dipakai sebagai cross-check; ketidakcocokan ditolak sebelum efek samping apa pun.
+    const poseidon = await this.o.ctx.publicClient.readContract({ address: this.o.ctx.factory, abi: factoryAbi, functionName: "POSEIDON" });
+    const anchored = poseidon !== zeroAddress;
+    if (!!a.anchored !== anchored) throw new Error(`mode mismatch: 402 says anchored=${!!a.anchored} but factory POSEIDON=${poseidon} (T-mode)`);
+    this.anchored = anchored;
     const cfg: ChannelConfig = { ...a.config, challengeWindow: Number(a.config.challengeWindow), responseWindow: Number(a.config.responseWindow) };
     if (cfg.client.toLowerCase() !== this.o.account.address.toLowerCase()) throw new Error("config.client mismatch");
     if (cfg.token.toLowerCase() !== this.o.usdg.toLowerCase()) throw new Error("config.token mismatch");
@@ -139,6 +152,7 @@ export class AegisClient {
       throw new Error(`receipt ${r.seq} qty ${r.qty} exceeds maxQtyPerUnit ${this.maxQtyPerUnit}`);
     if (this.o.accept && !this.o.accept(r)) throw new Error(`receipt ${r.seq} rejected by policy`);
     if (this.anchored) {
+      if (!b?.leaf || typeof b.sigProvider !== "string") throw new Error("anchored reply missing leaf/sigProvider");
       const lf: LeafMsg = { epoch: Number(b.leaf.epoch), seq: Number(b.leaf.seq), leaf: b.leaf.leaf as Hex, cumulativeAmount: bi(b.leaf.cumulativeAmount) };
       if (lf.epoch !== this.epoch || lf.seq !== this.tree.size) throw new Error("leaf epoch/seq mismatch");
       if (rootHex(await leafHash(r)) !== lf.leaf) throw new Error("leaf hash mismatch");
@@ -238,7 +252,20 @@ export class AegisClient {
   /** Unilateral: anchored → `startClose()` (state on-chain sudah otoritatif); co-signed → checkpoint TERTINGGI yang dipegang. Lalu bukti penalti bila ada (§6.4). */
   async dispute(): Promise<{ payToClient: bigint }> {
     if (this.anchored) {
-      this.txs.push({ label: "startClose", ...(await startCloseTx(this.o.ctx, this.channel)) });
+      // Review round 1 (IMPORTANT): channel bisa sudah CLOSING karena pihak lain (mis. provider) lebih
+      // dulu memanggil startClose() — dispute() tetap harus bisa lanjut ke bukti tanpa memanggil
+      // startClose() lagi (yang akan revert WrongState di kontrak).
+      const view = await readChannel(this.o.ctx, this.channel);
+      if (view.state === "OPEN") {
+        this.txs.push({ label: "startClose", ...(await startCloseTx(this.o.ctx, this.channel)) });
+      } else if (view.state === "CLOSING") {
+        // sudah dibuka pihak lain — lanjut langsung ke bukti di bawah.
+      } else {
+        throw new Error(`cannot dispute in state ${view.state}`);
+      }
+      // Minor 6: pohon lokal harus persis mencerminkan seq on-chain sebelum membangun bukti — bila tidak,
+      // input sirkuit (dibangun dari this.tree.receipts) tidak akan cocok dengan receiptsRoot on-chain.
+      if (view.seq !== this.tree.size) throw new Error(`tree desynced from chain (seq ${view.seq}) — reconcile acks first`);
     } else {
       if (this.checkpoints.size === 0) throw new Error("no co-signed checkpoint");
       // Kunci tertinggi di `checkpoints`, bukan `tree.size` — keduanya sama berkat invarian requestUnit(),
@@ -283,7 +310,16 @@ export class AegisClient {
       // otoritatif — tidak ada tiket Checkpoint(0,0,...) terpisah untuk dibangun/ditandatangani; startClose()
       // langsung membuka jendela tantangan atas state itu (deployment channel di atas tetap wajib: `startClose()`
       // adalah panggilan kontrak, bukan tx transfer biasa).
-      this.txs.push({ label: "startClose", ...(await startCloseTx(this.o.ctx, this.channel)) });
+      // Review round 1 (IMPORTANT): channel bisa sudah CLOSING (mis. provider lebih dulu memanggil
+      // startClose()) — tidak ada lagi yang perlu dilakukan di sini, memanggil startClose() lagi akan revert.
+      const view = await readChannel(this.o.ctx, this.channel);
+      if (view.state === "OPEN") {
+        this.txs.push({ label: "startClose", ...(await startCloseTx(this.o.ctx, this.channel)) });
+      } else if (view.state === "CLOSING") {
+        // sudah dibuka pihak lain — tidak ada yang perlu dilakukan.
+      } else {
+        throw new Error(`cannot dispute in state ${view.state}`);
+      }
       return;
     }
     const cp0: Checkpoint = { epoch: this.epoch, seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };
