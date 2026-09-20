@@ -5,7 +5,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { AegisClient, defaultArtifacts } from "@aegisclear/sdk";
 import { loadConfig, REPO_ROOT } from "../server/config.js";
 import { createWebServer, type WebServer } from "../server/app.js";
-import type { ChannelSummary, ConfigResponse, RunSnapshot } from "../shared/types.js";
+import type { ChannelSummary, ConfigResponse, LeakResponse, RunSnapshot } from "../shared/types.js";
 
 const DEPLOY = path.resolve(REPO_ROOT, process.env.DEPLOY_FILE ?? "contracts/deployments/local.json");
 const DEPLOY_EXISTS = existsSync(DEPLOY);
@@ -114,5 +114,19 @@ describe.skipIf(!DEPLOY_EXISTS)("web console server (Anvil)", () => {
     const run = await waitRun(((await r.json()) as { runId: string }).runId);
     expect(run.status, run.error).toBe("done"); expect(run.result![0].klien_provider).toBe("2.00 / 0");
     expect(run.steps.filter((s) => s.phase === "escrow" && s.txHash).length).toBe(5);
+  });
+
+  it("leak-check untuk run Pasar B: bocor 0; offer 402 memuat extra.aegis tanpa nonce di config", async () => {
+    const runs = await get<RunSnapshot[]>("/api/demo/runs");
+    const disp = runs.find((r) => r.scenario === "B-dispute" && r.status === "done")!;
+    const rep = await get<LeakResponse[]>(`/api/demo/leak-check/${disp.id}`);
+    expect(rep.length).toBe(1); expect(rep[0].channel).toBe(disp.channels[0]);
+    expect(rep[0].leaks).toBe(0); expect(rep[0].ambiguous).toBe(0); expect(rep[0].txs.length).toBe(5); // open + fund + submitCheckpoint + claimPenalty + settle
+    const aRun = runs.find((r) => r.scenario === "A-reject")!;
+    expect((await fetch(`${BASE}/api/demo/leak-check/${aRun.id}`)).status).toBe(404);
+    const offer = await get<{ status: number; body: any }>("/api/offer?client=B");
+    expect(offer.status).toBe(402);
+    expect(offer.body.accepts[0].extra.aegis.config.client).toBe(privateKeyToAccount(srv.cfg.keys.b).address);
+    expect(offer.body.accepts[0].payTo).toMatch(/^0x[0-9a-fA-F]{40}$/);
   });
 });

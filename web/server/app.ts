@@ -6,8 +6,8 @@ import { serve, type ServerType } from "@hono/node-server";
 import { privateKeyToAccount } from "viem/accounts";
 import type { Address } from "viem";
 import { createProviderApp, type Watcher } from "@aegisclear/sdk";
-import { BREACHES, DEPOSIT_B, TERMS_BASE, metricsFor } from "@aegisclear/demo";
-import type { ConfigResponse } from "../shared/types.js";
+import { BREACHES, DEPOSIT_B, TERMS_BASE, metricsFor, leakCheck } from "@aegisclear/demo";
+import type { ConfigResponse, LeakResponse } from "../shared/types.js";
 import type { WebConfig } from "./config.js";
 import { makeChain, type ChainServices } from "./chain.js";
 import { ChannelIndex } from "./channels.js";
@@ -86,6 +86,20 @@ export function createWebServer(cfg: WebConfig): WebServer {
       }
       unsub();
     });
+  });
+
+  app.get("/api/demo/leak-check/:runId", async (c) => {
+    const recs = runner.privateOf(c.req.param("runId"));
+    if (!recs?.length) return c.json({ error: "run tidak dikenal atau tidak punya channel Pasar B" }, 404);
+    const out: LeakResponse[] = [];
+    for (const p of recs) out.push({ channel: p.channel, ...(await leakCheck(chain.publicClient, cfg.deployment.factory, p.channel, p.txs, p.values, cfg.deployBlock)) });
+    return c.json(out);
+  });
+  // 402 mentah yang dilihat klien x402 — membuat sesi provider untuk klien demo bila belum ada (tanpa efek on-chain).
+  app.get("/api/offer", async (c) => {
+    const addr = chain.addressOf(cfg.keys[c.req.query("client") === "B" ? "b" : "a"]);
+    const res = await app.request("/provider/job", { headers: { "Aegis-Client": addr } });
+    return c.json({ status: res.status, body: await res.json() });
   });
 
   // ---- static (web/dist) dengan fallback SPA; selalu terdaftar TERAKHIR ----
