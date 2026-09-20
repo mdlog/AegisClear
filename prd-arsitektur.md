@@ -3,8 +3,8 @@
 **Produk:** AegisClear — escrow & penyelesaian sengketa privacy-preserving untuk pembayaran agen-ke-agen (x402/MPP) dalam USDG, diadili oleh bukti zero-knowledge
 **Chain:** Robinhood Chain (Arbitrum Dedicated Chain / Nitro) — mainnet `4663`, testnet `46630`. **Stylus aktif di keduanya (diverifikasi on-chain 19 Sep 2026, §19)**
 **Event:** Arbitrum Open House Singapore: Online Buildathon (submission **4 Okt 2026 15:59 UTC**)
-**Versi:** 1.0 — 19 September 2026 (menggantikan draft §3.1–3.2; daftar koreksi di §23)
-**Status:** draft implementasi. Item yang bertanda ✅ di §19 sudah diverifikasi hari ini dengan `cast`/`curl`; sisanya **wajib diverifikasi sebelum Hari 2**. Semua angka gas kontrak sendiri adalah estimasi sampai diukur (§8.7). Angka model penyelesaian di §6 sudah diverifikasi numerik (Python, aritmetika integer) dan menjadi vektor uji.
+**Versi:** 1.1 — 20 September 2026 (sistem **sebagaimana dibangun** setelah P1; v1.0 = 19 September 2026; daftar perubahan di §23)
+**Status:** **P0 + P1 dikirim (20 Sep 2026).** P0: sirkuit + verifier + `AegisChannel` + SDK + demo A vs B. P1: web console (`web/`, `http://localhost:4040`), epoch & `rollover` (FR-10), `AegisTreasuryRouter` + hook payout (FR-26), anchored mode + program Stylus `AegisPoseidon` (FR-25, D2 terukur **1,75×**). Deploy **testnet 46630 v1** 20 Sep 2026: 7/7 kontrak terverifikasi Blockscout (blok 121.982.356), suite integrasi SDK **13 lulus / 4 dilewati** di chain publik (§19 V18b); self-audit Slither: nol temuan High/Medium yang benar, 2 Low + 1 temuan manual (M-1) diperbaiki (§12, `docs/audit/slither-2026-09.md`). Semua angka gas di §8.7 **terukur** (Foundry + testnet 46630). **Belum:** deploy mainnet 4663 (deployer 0 ETH — menunggu pemilik), facilitator Mesh nyata (V8), video; **redeploy testnet v2** menyusul — `HOOK_GAS` 300k + `InsufficientGas` (M-1) + pemeriksaan alamat nol di factory sudah ada di source, tetapi kontrak v1 on-chain mendahului ketiganya. Angka yang tidak ada di sumber terukur ditandai "belum diukur".
 
 ---
 
@@ -17,8 +17,8 @@ Standar yang sedang lahir untuk celah ini, **ERC-8183 (Agentic Commerce)**, memb
 AegisClear adalah evaluator itu. Ia adalah **sirkuit**, bukan manusia atau LLM:
 
 1. **Micro-escrow state channel** — klien mendanai satu channel USDG per pasangan agen; setiap unit layanan menghasilkan *receipt* yang ditandatangani kedua pihak dan terakumulasi off-chain. Chain hanya melihat komitmen.
-2. **ZK settlement** — jika klien menuntut penalti SLA, ia mengirim bukti Groth16 bahwa *"di bawah syarat yang berkomitmen di `termsCommitment` dan receipt di bawah `receiptsRoot` yang kami berdua tanda tangani, penalti yang sah adalah X"*. Kontrak memverifikasi (~194k gas) dan membagi dana **proporsional** — tanpa pernah melihat harga, ambang, atau metrik.
-3. **Treasury routing** — payout diarahkan ke brankas armada / smart account ERC-4337, bukan ke hot wallet agen.
+2. **ZK settlement** — jika klien menuntut penalti SLA, ia mengirim bukti Groth16 bahwa *"di bawah syarat yang berkomitmen di `termsCommitment` dan receipt di bawah `receiptsRoot` yang kami berdua tanda tangani, penalti yang sah adalah X"*. Kontrak memverifikasi (**229.241 gas** terukur untuk verifier 6 input publik, §8.2) dan membagi dana **proporsional** — tanpa pernah melihat harga, ambang, atau metrik.
+3. **Treasury routing** — payout diarahkan ke brankas armada / smart account ERC-4337, bukan ke hot wallet agen; di P1 lewat `AegisTreasuryRouter` (hook payout + buku kredit, §8.4), live di testnet 46630.
 
 **Satu perbandingan yang menjelaskan seluruh produk.** 100 request seharga 0,02 USDG, 7 di antaranya melanggar SLA latensi (§6.5):
 
@@ -28,21 +28,21 @@ AegisClear adalah evaluator itu. Ia adalah **sirkuit**, bukan manusia atau LLM:
 | ERC-8183 dengan evaluator | 0 **atau** 2,00 — biner, tergantung kepercayaan pada evaluator | syarat & bukti (`reason`) |
 | **AegisClear** | **1,93 ke provider / 0,07 kembali ke klien**, deterministik | dua komitmen + pembagian akhir |
 
-**Dua koreksi jujur terhadap draft** yang menjadi fondasi dokumen ini: (i) "Servo Protocol" bukan infrastruktur M2M — ia protokol revenue-share RWA; rel M2M yang nyata di chain ini adalah MeshGateway/x402; (ii) verifier Groth16 di Stylus **tidak lebih murah** dari Solidity (256.334 vs 194.396 gas — pairing sudah precompile). Stylus dipakai hanya di tempat ia terbukti menang: hashing Poseidon on-chain (11.887 vs 19.313 gas Yul), digerbangi benchmark Hari 4 (D2). Klaim gas Stylus **tidak boleh** masuk pitch selain angka yang diukur sendiri.
+**Dua koreksi jujur terhadap draft** yang menjadi fondasi dokumen ini: (i) "Servo Protocol" bukan infrastruktur M2M — ia protokol revenue-share RWA; rel M2M yang nyata di chain ini adalah MeshGateway/x402; (ii) verifier Groth16 di Stylus **tidak lebih murah** dari Solidity (256.334 vs 194.396 gas — pairing sudah precompile). Stylus dipakai hanya di tempat ia terbukti menang — dan itu **sudah diukur sendiri** (D2 ✅, 20 Sep 2026, testnet 46630): jalur 7 hash Poseidon per `ack` anchored (`insertPath`) **144.076 gas di Stylus vs 252.271 di Yul (1,75× total, ≈1,9× eksekusi)**, dengan port circomlib Poseidon **v1** yang kompatibel sirkuit; hash tunggal justru lebih murah di Yul (62.138 vs 82.593) sehingga tidak ada Poseidon satu-hash on-chain di mana pun (§8.3). Klaim gas Stylus **tidak boleh** masuk pitch selain angka yang diukur sendiri.
 
 ---
 
 ## 1. SCOPE & DOCUMENT CONTROL
 
-### Di dalam scope (MVP hackathon)
-- `AegisChannel` (EVM, EIP-1167 clone per pasangan agen): open, fund (transfer/Permit2/x402 `payTo`), checkpoint co-signed, cooperative close, unilateral close dengan jendela tantangan, klaim penalti dengan bukti ZK, settle permissionless, sweep
-- `AegisChannelFactory` (CREATE2, alamat channel deterministik)
-- `SLASettlementVerifier` (Solidity, ekspor snarkjs Groth16 BN254)
-- Sirkuit `sla_settlement.circom`: komitmen syarat (Poseidon), pohon receipt 128 slot, evaluasi skedul penalti, konservasi jumlah
-- `aegis-sdk` (TypeScript): pertukaran receipt/ack EIP-712, checkpoint, prover (snarkjs/rapidsnark), middleware provider x402-compatible, klien agen
-- `MockUSDG` (6 desimal) untuk testnet 46630; USDG asli di mainnet 4663 (D1)
-- Demo harness: cooperative close vs sengketa dengan bukti, dibandingkan dengan escrow gaya ERC-8183 evaluator-biner sebagai kontrol
-- **P1, digerbangi:** `AegisPoseidon.rs` (Stylus) untuk *anchored mode* (ack on-chain, pohon Merkle inkremental) — hanya jika benchmark Hari 4 ≥ 1,5× vs Yul (D2); `AegisTreasuryRouter`; event berbentuk ERC-8183
+### Di dalam scope (MVP hackathon) — status 20 Sep 2026
+- ✅ `AegisChannel` (EVM, EIP-1167 clone per pasangan agen): open, fund (transfer/Permit2/x402 `payTo`), checkpoint co-signed, cooperative close, unilateral close dengan jendela tantangan, klaim penalti dengan bukti ZK, settle permissionless, sweep; **P1:** `rollover` per epoch, `ack`/`startClose` (anchored), hook payout `_send` (§8.1)
+- ✅ `AegisChannelFactory` (CREATE2, alamat channel deterministik; **P1:** mode per factory lewat immutable `POSEIDON`, tiga factory di testnet — demo, produksi, anchored)
+- ✅ `SLASettlementVerifier` (Solidity, ekspor snarkjs Groth16 BN254; tidak berubah di P1, release `v0.1.0-zkey`)
+- ✅ Sirkuit `sla_settlement.circom`: komitmen syarat (Poseidon), pohon receipt 128 slot, evaluasi skedul penalti, konservasi jumlah (tidak berubah di P1)
+- ✅ `aegis-sdk` (TypeScript): pertukaran receipt/ack EIP-712, checkpoint, prover (snarkjs), middleware provider x402-compatible (Hono), klien agen, watcher/challenge responder; **P1:** `/rollover` + `/rollover/confirm`, opsi `anchored`, `payoutProvider`, mode diturunkan dari factory (§11)
+- ✅ `MockUSDG` (6 desimal) untuk testnet 46630; USDG asli di mainnet 4663 (D1) — **mainnet belum di-deploy (deployer 0 ETH)**
+- ✅ Demo harness: cooperative close vs sengketa dengan bukti, dibandingkan dengan escrow gaya ERC-8183 evaluator-biner sebagai kontrol (§14); **P1:** web console `web/` (dashboard channel, panel demo A vs B, leak-check, skenario anchored & rollover)
+- ✅ **P1 (dikirim, testnet v1):** `AegisPoseidon` (Stylus, port circomlib Poseidon v1) untuk *anchored mode* — gerbang D2 terpenuhi dengan angka on-chain **1,75×** vs Yul (§8.3); `AegisTreasuryRouter` (§8.4); event berbentuk ERC-8183 (FR-27); epoch/`rollover` (FR-10)
 
 ### Di luar scope
 - Attestor pihak ketiga, zkTLS (Reclaim/Opacity), TEE — jalur ekspansi untuk metrik yang tidak bisa dikonfirmasi klien
@@ -60,7 +60,7 @@ AegisClear adalah evaluator itu. Ia adalah **sirkuit**, bukan manusia atau LLM:
 | Pembayaran berbasis pemakaian | **x402 `upto`** (klien tanda tangan maksimum, server settle aktual — Permit2), **MPP `session`** (deposit & refund otomatis sisa) | Keduanya tetap *pay-then-trust*; tidak ada adjudikasi. AegisClear menyisipkan escrow + bukti di antara deposit dan pelepasan |
 | Rel M2M di Robinhood Chain | **MeshGateway**: x402/MPP, USDG via Permit2 witness transfer (USDG tidak punya EIP-3009), MeshIdentity ERC-8004, facilitator terbuka | AegisClear tidak membangun rel. `payTo` = alamat channel memakai proxy Permit2 kanonik **tanpa perubahan** (§10.2) |
 | Escrow dengan adjudikasi | **Kleros Escrow** (juri manusia), **UMA Optimistic Oracle** (asersi + bond + sengketa) | Keduanya manusia/optimistik dan publik. AegisClear deterministik dan privat; tidak ada bond arbitrase |
-| ZK di Stylus | **Renegade** (PLONK verifier produksi di Stylus), **zk-sunade** (Groth16 di Stylus, 256k gas), **ZeroStyl** (toolkit privasi Stylus — verifikasi Hari 1, V16), **OpenZeppelin `openzeppelin-crypto` Poseidon2** (11.887 gas) | AegisClear memakai Stylus hanya untuk Poseidon on-chain, dengan angka yang diukur sendiri |
+| ZK di Stylus | **Renegade** (PLONK verifier produksi di Stylus), **zk-sunade** (Groth16 di Stylus, 256k gas), **ZeroStyl** (toolkit privasi Stylus — verifikasi Hari 1, V16), **OpenZeppelin `openzeppelin-crypto` Poseidon2** (11.887 gas) | AegisClear memakai Stylus hanya untuk Poseidon on-chain (jalur 7-hash `insertPath` di anchored mode), dengan port circomlib Poseidon **v1** — bukan Poseidon2 OZ, yang tidak kompatibel sirkuit — dan angka yang diukur sendiri: 1,75× vs Yul (§8.3) |
 | Payment channel | Raiden / Perun / state channel generik | Pola checkpoint co-signed + jendela tantangan diambil dari sana dan **dikreditkan**; kontribusi ada di objek yang di-channel-kan (receipt SLA) dan penyelesaiannya (bukti) |
 
 ### Koreksi terhadap draft (ringkas; detail di §23)
@@ -84,7 +84,7 @@ AegisClear adalah evaluator itu. Ia adalah **sirkuit**, bukan manusia atau LLM:
 | P3 | ERC-8183: *"Evaluator is trusted for completion and rejection once the job is Submitted; a malicious evaluator can complete or reject arbitrarily"*; *"No dispute resolution or arbitration; reject/expire is final"*; payout biner | Escrow ada, adjudikasi tidak. Syarat dan `reason` publik |
 | P4 | ERC-8004 Validation Registry menerima skor 0–100 dari validator; metode yang disebut: re-eksekusi berjamin, zkML, TEE | Ada slot untuk "bukti", belum ada bukti untuk SLA komersial |
 | P5 | Robinhood Chain: sequencing **first-come-first-served**, *"Priority gas auctions do not exist here"*; block time terukur **0,101 s** (1.000 blok, 19 Sep 2026); gas price mainnet 0,068 gwei saat diukur | Jendela waktu adalah satu-satunya tuas sengketa; biaya verifikasi 194k gas ≈ 13 µETH — sengketa mikro **ekonomis** di sini, tidak di L1 |
-| P6 | Stylus aktif (`stylusVersion()=3`), tetapi pairing BN254 sudah precompile EVM: verifier Groth16 Stylus 256k vs Solidity 194k gas; Poseidon Stylus 11.887 vs Yul 19.313 vs Solidity polos 220.244 gas | Stylus menang hanya di komputasi **tanpa precompile** — hashing, bukan pairing |
+| P6 | Stylus aktif (`stylusVersion()=3`), tetapi pairing BN254 sudah precompile EVM: verifier Groth16 Stylus 256k vs Solidity 194k gas; Poseidon Stylus 11.887 vs Yul 19.313 vs Solidity polos 220.244 gas (OpenZeppelin, Poseidon2). **Terukur sendiri (20 Sep 2026, Poseidon v1 kompatibel sirkuit, testnet 46630):** 7 hash `insertPath` Stylus 144.076 vs Yul 252.271; hash tunggal Stylus 82.593 vs Yul 62.138 (§8.3) | Stylus menang hanya di komputasi **tanpa precompile** — hashing, bukan pairing — dan hanya bila satu panggilan cukup besar untuk mengamortisasi init program (8.832 gas, tanpa CacheManager di chain ini) |
 | P7 | Chain publik dengan explorer Blockscout; agen bisnis punya harga satuan, ambang SLA, dan telemetri yang bernilai komersial | Escrow transparan = membocorkan struktur harga ke pesaing setiap sengketa |
 
 ### 2.2 Konsekuensi ekonomi
@@ -99,7 +99,7 @@ Tanpa recourse, pembeli membatasi eksposur dengan **memperkecil ukuran pembelian
 > Klaim "OKX Agent Payments Protocol menandai escrow & dispute sebagai *coming soon*" (liputan bex.co, Mei 2026) **belum bersumber primer** — tambahkan tautan whitepaper sebelum dipakai di pitch (§22).
 
 ### 2.4 Dua hipotesis yang HARUS tetap ditolak
-1. **"ZK verification di Stylus lebih murah dari EVM."** Salah untuk Groth16/PLONK atas BN254: bagian mahal (pairing, ecMul) adalah precompile `0x06–0x08` yang dipanggil kedua implementasi. zk-sunade memanggilnya lewat `RawCall` dan membayar 32% lebih mahal karena overhead host I/O. Yang benar dan terukur: **hashing Poseidon** 1,6× lebih murah dari Yul terbaik, 18× dari Solidity polos. Pitch memakai angka kedua, bukan yang pertama.
+1. **"ZK verification di Stylus lebih murah dari EVM."** Salah untuk Groth16/PLONK atas BN254: bagian mahal (pairing, ecMul) adalah precompile `0x06–0x08` yang dipanggil kedua implementasi. zk-sunade memanggilnya lewat `RawCall` dan membayar 32% lebih mahal karena overhead host I/O. Yang benar dan **terukur sendiri**: **hashing Poseidon** dalam satu panggilan 7-hash (`insertPath`, jalur `ack` anchored) 1,75× lebih murah dari Yul (144.076 vs 252.271 gas, testnet 46630, 20 Sep 2026); hash tunggal justru **lebih mahal** di Stylus (82.593 vs 62.138) karena init program 8.832 gas per panggilan tanpa CacheManager. Angka 1,6×/18× OpenZeppelin adalah Poseidon2, bukan hash kami. Pitch memakai angka yang kami ukur, bukan yang pertama.
 2. **"Bukti ZK membuat penyelesaian tidak butuh kerja sama sama sekali."** Salah: bukti bekerja atas receipt yang **ditandatangani kedua pihak**. Yang ZK hilangkan adalah kebutuhan kerja sama **saat sengketa** dan kebutuhan **membuka data** — bukan kebutuhan ack saat layanan diterima. Unit yang tidak di-ack tidak dibayar; itu risiko provider sebesar satu unit (T2), sama seperti API prabayar mana pun.
 
 ---
@@ -114,7 +114,7 @@ Tanpa recourse, pembeli membatasi eksposur dengan **memperkecil ukuran pembelian
 | G3 | Penyelesaian proporsional, bukan biner | 100 request / 7 pelanggaran → 1,93 / 0,07 USDG (§6.5) tereksekusi on-chain |
 | G4 | Kompatibel dengan rel yang ada | Klien Mesh/x402 standar mendanai channel lewat 402 `payTo` tanpa perubahan SDK klien (FR-23) |
 | G5 | Gagal secara konservatif | Tanpa bukti dan tanpa checkpoint baru, jendela tantangan membayar tepat checkpoint co-signed terakhir — tidak pernah lebih, tidak pernah kurang |
-| G6 | Setiap klaim gas diukur, bukan dikutip | Tabel §8.7 terisi dari Foundry/`cargo stylus` sebelum Hari 12 |
+| G6 | Setiap klaim gas diukur, bukan dikutip | ✅ Tabel §8.7 terisi dari Foundry + testnet 46630 (`cast estimate`, receipt tx) per 20 Sep 2026; yang belum diukur ditulis "belum diukur" |
 
 ### Non-goals
 - Bukan rel pembayaran baru. AegisClear tidak menggantikan x402/MPP/Mesh; ia duduk di alamat `payTo`.
@@ -151,10 +151,10 @@ Tanpa recourse, pembeli membatasi eksposur dengan **memperkecil ukuran pembelian
 ### 5.1 Channel lifecycle
 | ID | Requirement | Prioritas |
 |---|---|---|
-| FR-1 | Setiap channel MUST berupa kontrak sendiri (EIP-1167 clone) dengan alamat deterministik (CREATE2 dari `client, provider, termsCommitment, salt`), sehingga transfer USDG apa pun ke alamat itu — termasuk settlement x402 — teratribusi tanpa data tambahan | P0 |
+| FR-1 | Setiap channel MUST berupa kontrak sendiri (EIP-1167 clone) dengan alamat deterministik (CREATE2; **sebagaimana dibangun:** salt = `keccak256(abi.encode(Config))` — seluruh Config termasuk jendela, payout, dan `salt`), sehingga transfer USDG apa pun ke alamat itu — termasuk settlement x402 — teratribusi tanpa data tambahan | P0 ✅ |
 | FR-2 | `open` MUST mengikat `(client, provider, token, termsCommitment, challengeWindow, responseWindow, payoutClient, payoutProvider, salt)` dan MUST disetujui kedua pihak: untuk masing-masing pihak, `msg.sender == pihak` **atau** tanda tangan EIP-712 `ChannelTerms` yang sah | P0 |
 | FR-3 | Pendanaan MUST permissionless dan berulang: saldo USDG kontrak adalah `budget`; `fundWithPermit2` disediakan untuk klien tanpa allowance | P0 |
-| FR-4 | State: `OPEN → CLOSING → SETTLED`; transisi hanya lewat fungsi §8.1; tidak ada `pause`, tidak ada upgrade | P0 |
+| FR-4 | State: `OPEN → CLOSING → SETTLED`; transisi hanya lewat fungsi §8.1; tidak ada `pause`, tidak ada upgrade. **P1:** `rollover` (dua tanda tangan) adalah satu-satunya transisi `OPEN/CLOSING → OPEN` — epoch baru, bukti tertunda dihapus | P0 ✅ |
 | FR-5 | Semua pemeriksaan tanda tangan MUST menerima EOA **dan** ERC-1271 (agen di smart account ERC-4337; EntryPoint v0.6/v0.7 ada di kedua jaringan, §19 V5) | P0 |
 | FR-6 | Setelah `SETTLED`, USDG yang masih masuk MUST bisa di-`sweep` ke `payoutClient` oleh siapa pun | P0 |
 
@@ -162,14 +162,14 @@ Tanpa recourse, pembeli membatasi eksposur dengan **memperkecil ukuran pembelian
 | ID | Requirement | Prioritas |
 |---|---|---|
 | FR-7 | Leaf receipt MUST = `Poseidon(seq, qty, m1, m2, due)` atas field BN254 (§6.2); pohon biner 128 slot, `EMPTY_LEAF = 0`; slot `≥ seq` MUST kosong | P0 |
-| FR-8 | Checkpoint MUST = EIP-712 `Checkpoint(channelId, seq, cumulativeAmount, receiptsRoot)` ditandatangani **kedua** pihak; `seq` strictly increasing; checkpoint dengan `seq` lebih tinggi MUST menggantikan yang lebih rendah | P0 |
-| FR-9 | Kontrak MUST menerima checkpoint hanya dari tanda tangan — tidak pernah memerlukan receipt | P0 |
-| FR-10 | Satu epoch MUST ≤ 128 receipt (`MAX_SEQ`); `rollover` kooperatif membayar epoch dan me-reset `seq/root` dengan syarat & sisa budget yang sama | P1 (MVP: close & reopen) |
+| FR-8 | Checkpoint MUST = EIP-712 `Checkpoint(epoch, seq, cumulativeAmount, receiptsRoot)` ditandatangani **kedua** pihak (`channelId` ada di domain, `epoch` di struct — §6.2); `seq` strictly increasing dalam satu epoch; checkpoint dengan `seq` lebih tinggi MUST menggantikan yang lebih rendah | P0 ✅ |
+| FR-9 | Kontrak MUST menerima checkpoint hanya dari tanda tangan — tidak pernah memerlukan receipt | P0 ✅ |
+| FR-10 | Satu epoch MUST ≤ 128 receipt (`MAX_SEQ`); `rollover` kooperatif membayar epoch dan me-reset `seq/root` dengan syarat & sisa budget yang sama. **Dikirim:** `rollover(seq, toProvider, sigClient, sigProvider)` di `OPEN`/`CLOSING`, `seq ≥ latest.seq`, dua tanda tangan `Rollover(epoch, seq, toProvider)`, `toProvider ≤ budget()`; membayar provider lewat `_send` (hook, §8.4), **sisa tetap di channel** sebagai budget epoch berikutnya, me-reset `seq/A/R/deadline/bukti` (anchored: juga pohon inkremental), `epoch++` sehingga semua tanda tangan epoch lama mati (`BadSignature`). SDK: provider menolak unit ke-129 dengan `409 epoch-full`; klien `rollover()` → `POST /rollover` (+ tiket keluar epoch berikutnya, pra-tanda-tangan) → tx → `POST /rollover/confirm` (idempoten). Uji: `Rollover.t.sol` (12 test), skenario 11 lulus di testnet (§13) | P1 ✅ |
 
 ### 5.3 Penyelesaian & sengketa
 | ID | Requirement | Prioritas |
 |---|---|---|
-| FR-11 | Cooperative close: kedua pihak menandatangani `Close(seq, toProvider)` → settle seketika, tanpa jendela; `toClient = budget − toProvider` | P0 |
+| FR-11 | Cooperative close: kedua pihak menandatangani `Close(epoch, seq, toProvider)` → settle seketika, tanpa jendela; `toClient = budget − toProvider` | P0 ✅ |
 | FR-12 | Unilateral close: pihak mana pun mengirim checkpoint co-signed → `CLOSING`, `deadline = now + challengeWindow` | P0 |
 | FR-13 | Selama `CLOSING`, checkpoint co-signed dengan `seq` lebih tinggi MUST menggantikan state dan MUST memperpanjang deadline ke `max(deadline, now + responseWindow)`, `responseWindow ≤ challengeWindow` | P0 |
 | FR-14 | Klaim penalti MUST berupa bukti Groth16 yang input publiknya terikat ke `(channelIdField, termsCommitment, receiptsRoot, seq, cumulativeAmount)` **yang tersimpan saat ini** dan menghasilkan `payToClient`; hanya `client`/`provider` yang boleh mengirim | P0 |
@@ -189,15 +189,15 @@ Tanpa recourse, pembeli membatasi eksposur dengan **memperkecil ukuran pembelian
 | ID | Requirement | Prioritas |
 |---|---|---|
 | FR-22 | Token MUST USDG (6 desimal, `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168` mainnet); `MockUSDG` 6 desimal di testnet; **jangan pernah** asumsikan 18 desimal | P0 |
-| FR-23 | Provider middleware MUST bisa menjawab 402 dengan `payTo = alamat channel` memakai skema `exact`/Permit2 standar; proxy kanonik dan facilitator **tidak dimodifikasi** | P1 |
-| FR-24 | Provider middleware MUST menolak melayani jika `budget − cumulativeAmount − due < 0` | P1 (SDK) |
+| FR-23 | Provider middleware MUST bisa menjawab 402 dengan `payTo = alamat channel` memakai skema `exact`/Permit2 standar; proxy kanonik dan facilitator **tidak dimodifikasi** | P1 ✅ (middleware `GET /job` → 402 `payTo = predict(cfg)`; uji terhadap facilitator Mesh nyata = V8, menunggu pemilik) |
+| FR-24 | Provider middleware MUST menolak melayani jika `budget − cumulativeAmount − due < 0` | P1 ✅ (`POST /job` membaca `balanceOf(channel)` → 402 bila kurang) |
 
 ### 5.6 Anchored mode, treasury, ekosistem
 | ID | Requirement | Prioritas |
 |---|---|---|
-| FR-25 | Anchored mode: ack on-chain `ack(seq, leaf, sigProvider)` — hanya **hash** leaf yang naik (metrik tetap privat) — + pohon Poseidon inkremental di kontrak; hash node di Stylus **jika** D2 positif, selain itu Yul (`poseidon-solidity`) | P1 |
-| FR-26 | `payoutClient`/`payoutProvider` MUST bebas dipilih saat open (treasury, Safe, 4337); `AegisTreasuryRouter` opsional memetakan agen → treasury per armada | P1 |
-| FR-27 | Kontrak SHOULD memancarkan event berbentuk ERC-8183 (`JobFunded`, `PaymentReleased`, `Refunded`) agar indexer 8183/8004 memahaminya | P1 |
+| FR-25 | Anchored mode: ack on-chain — hanya **hash** leaf (+ kumulatif) yang naik, metrik tetap privat — + pohon Poseidon inkremental di kontrak; hash node di Stylus **jika** D2 positif, selain itu Yul (`poseidon-solidity`). **Dikirim:** mode **per factory** (`POSEIDON` immutable ≠ 0 ⇒ `ANCHORED`); klien memanggil `ack(seq, leaf, cumulativeAmount, sigProvider)` (hanya `client`, `seq == latest.seq`, `A` tidak boleh turun) dengan tanda tangan provider atas `Leaf(epoch, seq, leaf, cumulativeAmount)`; kontrak memasukkan `leaf` lewat **satu** panggilan `IPoseidonPath.insertPath` (7 hash t=3) dan menyimpan `receiptsRoot`, `seq+1`, `A`; `startClose()` (pihak mana pun) membuka jendela atas state on-chain; `submitCheckpoint` → `WrongMode`. D2 ✅: Stylus `AegisPoseidon` (`0x1027cf7D…ef34`, 1,75× vs Yul) di `factoryAnchored` testnet; `PoseidonPathYul` = Foundry/Anvil/Rencana B. Uji: `Anchored.t.sol` (18 test, termasuk 100 ack + bukti asli), skenario 12 ×4 lulus di testnet (§13) | P1 ✅ |
+| FR-26 | `payoutClient`/`payoutProvider` MUST bebas dipilih saat open (treasury, Safe, 4337); `AegisTreasuryRouter` opsional memetakan agen → treasury per armada. **Dikirim:** channel memanggil hook `IAegisPayoutHook.onPayout(party, token, amount)` pada payee **kontrak** setelah transfer (`_send`, stipend `HOOK_GAS` = 300.000 dalam try/catch + penjaga `InsufficientGas`, §8.1); `AegisTreasuryRouter` = hook + buku kredit + `claim` tanpa owner: `setTreasury(treasury)` hanya untuk `msg.sender` sendiri, `onPayout` permissionless tetapi dijaga invarian `Σcredit[token] ≤ balanceOf(router)` (`Unbacked`), transfer gagal (mis. treasury dibekukan) → kredit yang bisa ditarik lewat `claim(token, to)`. Live di testnet `0xe4A87335…7689`; uji `TreasuryRouter.t.sol` (11 test), skenario "13 (FR-26)" suite SDK lulus di testnet (§13) | P1 ✅ |
+| FR-27 | Kontrak SHOULD memancarkan event berbentuk ERC-8183 (`JobFunded`, `PaymentReleased`, `Refunded`) agar indexer 8183/8004 memahaminya. **Dikirim:** `JobFunded` di `fundWithPermit2`, `PaymentReleased` + `Refunded` di setiap settle (`jobId = channelIdField()`), `PaymentReleased` di `rollover`; uji `Events.t.sol` | P1 ✅ |
 | FR-28 | Hook pasca-settle ke ERC-8004 Reputation (`giveFeedback` dengan `proofOfPayment`) | P2 / roadmap |
 
 ---
@@ -226,30 +226,45 @@ Semua nilai selain `ν` dan hash adalah integer ≤ 2⁶⁴; semua aritmetika in
 
 ### 6.2 Struktur data & pesan yang ditandatangani
 
-**Off-chain (SDK):**
+**Off-chain (SDK, `sdk/src/core/typedData.ts`):**
 ```
-Terms     { unitPrice, maxM1, minM2, penaltyBps, capBps, nonce }      → T (disimpan kedua pihak)
-Receipt   { channelId, seq, qty, m1, m2, due }                         → ℓ
-Checkpoint{ channelId, seq, cumulativeAmount, receiptsRoot }           → ditandatangani kedua pihak
+Terms      { unitPrice, maxM1, minM2, penaltyBps, capBps, nonce }        → T (disimpan kedua pihak)
+Receipt    { seq, qty, m1, m2, due }                                     → ℓ = leafHash(receipt)
+Checkpoint { epoch, seq, cumulativeAmount, receiptsRoot }                → ditandatangani kedua pihak (co-signed)
+CloseMsg   { epoch, seq, toProvider }   RolloverMsg { epoch, seq, toProvider }
+LeafMsg    { epoch, seq, leaf, cumulativeAmount }                        → ditandatangani provider (anchored)
 ```
 
-**EIP-712 (domain `AegisClear`, versi `1`, `chainId`, `verifyingContract = channel`):**
+**EIP-712 (domain `AegisClear`, versi `1`, `chainId`, `verifyingContract = channel`) — string typehash persis seperti di `AegisChannel.sol`:**
 ```
 ChannelTerms(address client,address provider,address token,bytes32 termsCommitment,uint32 challengeWindow,uint32 responseWindow,address payoutClient,address payoutProvider,bytes32 salt)
-Checkpoint(uint64 seq,uint128 cumulativeAmount,bytes32 receiptsRoot)
-Close(uint64 seq,uint128 toProvider)
-Rollover(uint64 seq,uint128 toProvider)
-Leaf(uint64 seq,bytes32 leaf)                                   // hanya anchored mode (P1)
+Checkpoint(uint32 epoch,uint64 seq,uint128 cumulativeAmount,bytes32 receiptsRoot)
+Close(uint32 epoch,uint64 seq,uint128 toProvider)
+Rollover(uint32 epoch,uint64 seq,uint128 toProvider)
+Leaf(uint32 epoch,uint64 seq,bytes32 leaf,uint128 cumulativeAmount)          // hanya anchored mode
 ```
-`channelId` tidak perlu ada di struct karena `verifyingContract` = alamat channel itu sendiri (satu channel = satu kontrak) — replay lintas channel mustahil by construction. `receiptsRoot` disimpan sebagai `bytes32` dengan nilai `< p_BN254`. `Close`/`Rollover` hanya memuat `toProvider`: sisa saldo **selalu** ke klien, sehingga transfer debu dari pihak ketiga setelah penandatanganan tidak bisa menggagalkan close (dan tidak ada yang bisa menandatangani "lebih dari saldo" untuk dirinya).
+`channelId` tidak perlu ada di struct karena `verifyingContract` = alamat channel itu sendiri (satu channel = satu kontrak) — replay lintas channel mustahil by construction. `receiptsRoot` disimpan sebagai `bytes32` dengan nilai `< p_BN254`. `Close`/`Rollover` hanya memuat `toProvider`: sisa saldo **selalu** ke klien, sehingga transfer debu dari pihak ketiga setelah penandatanganan tidak bisa menggagalkan close (dan tidak ada yang bisa menandatangani "lebih dari saldo" untuk dirinya). `Close` dan `Rollover` berbentuk sama tetapi typehash-nya berbeda: tanda tangan atas satu tidak sah untuk yang lain (`test_close_signature_rejected_by_rollover`).
 
-**Protokol ack (setiap unit):**
+**Kenapa `epoch` ada di setiap struct (v1.1).** Setelah `rollover`, `seq`/`R`/`A` di-reset tetapi domain EIP-712 (alamat channel) tidak berubah — tanpa `epoch`, setiap checkpoint/close co-signed epoch lama tetap tanda tangan sah dan bisa di-replay di epoch baru (mis. `Checkpoint(128, 2,56 USDG, R)` disubmit ulang → provider dibayar dua kali). `epoch` (`uint32`, dimulai 0, `++` di `rollover`) mematikan seluruh tanda tangan epoch lama (`BadSignature`; `test_old_epoch_checkpoint_and_close_rejected_after_rollover`, `test_old_epoch_leaf_signature_rejected_after_rollover`). `ChannelTerms` **tidak** memuat epoch: `Config`/salt/`predict()`/T19 tidak berubah. Bukti Groth16 juga tidak memuat epoch — ia mengikat `(channelIdField, T, R, seq, A, payToClient)`; bukti epoch lama hanya sah lagi bila state epoch baru **identik**, dan saat itu ia membuktikan pernyataan yang benar (fungsi penalti deterministik), jadi bukan celah.
+
+**Kenapa `Leaf` memuat `cumulativeAmount`.** Di anchored mode kontrak tidak pernah melihat `due_i`, tetapi bukti dan `settle` membutuhkan `A` on-chain (`claimPenalty` mengikat `(R, seq, A)`; default jendela membayar `min(A, B)`). Provider karena itu menandatangani `A` baru bersama hash daun; klien memverifikasi `leaf == Poseidon(seq, qty, m1, m2, due)` **dan** `A == A_sebelumnya + due` (persis `settle()` SDK atas receipt lokal) sebelum mengirim tx `ack` — tx itu adalah persetujuannya. Kontrak sendiri hanya memaksakan `A` tidak turun (`AmountDecreased`) dan tanda tangan provider (analisis "A digelembungkan" di §12 T26).
+
+**Protokol ack — mode co-signed (setiap unit):**
 ```
-1. provider → klien : resource + header Aegis-Receipt { seq, qty, m1, m2, due, sigProvider(Checkpoint_seq) }
-2. klien   → provider: sigClient(Checkpoint_seq)      // ack = tanda tangan checkpoint kumulatif baru
-3. keduanya menyimpan Checkpoint_seq lengkap (dua tanda tangan) + receipt
+1. provider → klien : resource + receipt { seq, qty, m1, m2, due } + Checkpoint_{seq+1} { epoch, seq+1, A', R' } + sigProvider
+2. klien   → provider: sigClient(Checkpoint_{seq+1})      // ack = tanda tangan checkpoint kumulatif baru (header Aegis-Ack pada request berikutnya, atau POST /ack)
+3. keduanya menyimpan Checkpoint_{seq+1} lengkap (dua tanda tangan) + receipt; provider menahan unit berikutnya sampai ack diterima
 ```
 Ack **adalah** checkpoint: setiap unit yang diterima langsung menghasilkan state co-signed terbaru. Tidak ada langkah checkpoint terpisah; provider selalu memegang bukti tagihan untuk semua unit yang di-ack; klien tidak pernah menandatangani metrik yang tidak ia setujui (b_i dihitung dari metrik yang **dua-duanya** tanda tangani).
+
+**Protokol ack — mode anchored (setiap unit, FR-25):**
+```
+1. provider → klien : resource + receipt + Leaf { epoch, seq, leaf = Poseidon(seq,qty,m1,m2,due), A' = A + due } + sigProvider(Leaf)
+2. klien             : verifikasi receipt/due/policy, leaf == leafHash(receipt), A' == settle(receipts ∪ receipt).A, tanda tangan provider
+3. klien → chain     : tx ack(seq, leaf, A', sigProvider) → kontrak: 7 hash insertPath, R' on-chain, seq+1, A'
+4. provider melayani unit n hanya setelah membaca seq() on-chain ≥ n (tidak ada header Aegis-Ack; tidak ada checkpoint co-signed)
+```
+Yang naik ke chain per unit: **hash daun dan `A'`** (calldata `ack` tidak memuat metrik — diuji `leak-check` dan skenario 12 "calldata ack tanpa metrik"). Tiket keluar seq-0 tidak diperlukan di mode ini: klien selalu bisa `startClose()` atas state on-chain (sebelum unit pertama, `settle()` mengembalikan seluruh deposit).
 
 ### 6.3 Fungsi penalti
 
@@ -302,7 +317,9 @@ Reproduksi: `tools/settlement_vectors.py` (fungsi `settle()` identik dengan §6.
 | `capBps` default SDK | 3.000 | Provider jujur di ≥ 70% unit tidak bisa dirugikan lebih dari 30% |
 | `nonce` | 253-bit dari CSPRNG | komitmen tidak bisa ditebak dari ruang harga yang kecil |
 | Field | BN254 scalar field `p = 21888…617` | circomlib, snarkjs, precompile EVM, `ark-bn254` |
-| Hash | circomlib Poseidon (v1) parameter standar, t ∈ {3, 6, 7} | satu varian di sirkuit, SDK (`circomlibjs`), Yul (`poseidon-solidity`), dan Rust (port, D3) |
+| Hash | circomlib Poseidon (v1) parameter standar, t ∈ {3, 6, 7} | satu varian di sirkuit, SDK (`circomlibjs`), Yul (`poseidon-solidity`), dan Rust (`AegisPoseidon`, port t=3 dari `circomlibjs/poseidon_opt.js`, D3 ✅) — keluaran identik diuji silang (§8.3) |
+| `epoch` | `uint32`, mulai 0, `++` per `rollover` | ada di setiap struct yang ditandatangani (§6.2); tidak ada di `ChannelTerms` maupun input publik bukti |
+| `HOOK_GAS` | 300.000 gas | stipend hook payout `_send` (§8.1); hanya terpakai bila payee kontrak; testnet v1 masih 150k (redeploy v2 menyusul) |
 | `protocolFeeBps` | 0 di MVP | fee bukan bagian tesis; slot ada di factory (§15) |
 
 ### 6.7 Apa yang tetap bocor — dan apa yang tidak
@@ -313,8 +330,10 @@ Reproduksi: `tools/settlement_vectors.py` (fungsi `settle()` identik dengan §6.
 | `B` (deposit), `A` (total yang di-ack), `seq` (jumlah unit) | `qty_i`, `m1_i`, `m2_i`, `due_i` per unit |
 | `payToClient` (jika ada klaim), waktu setiap transaksi | Berapa unit yang melanggar, pelanggaran jenis apa |
 | `termsCommitment`, `receiptsRoot` | Isi keduanya |
+| `epoch` (jumlah rollover), `RolledOver(newEpoch, closedSeq, toProvider, remaining)` | — (sama seperti baris di atas, per epoch) |
+| **Anchored mode saja (FR-25):** per `ack` — hash daun `ℓ_i` dan `A_i` (kumulatif), sehingga `due_i = A_i − A_{i−1}` per unit terlihat; dengan `qty` konstan itu **menyiratkan `p`** | `qty_i`, `m1_i`, `m2_i` (metrik) per unit, `L*`, `Q*`, `π`, `κ`, `ν`; pra-citra daun |
 
-Inferensi yang **masih mungkin**: `A / seq` = harga rata-rata per receipt (bukan `p` jika `qty` bervariasi); `payToClient / A` = porsi penalti (bukan jumlah pelanggaran, karena `π`, `κ` privat); pola waktu ack = ritme layanan. Mitigasi yang disediakan SDK: `qty` bervariasi dan agregasi beberapa unit per receipt; **bukan** klaim "anonim". Sebutkan tabel ini apa adanya di README dan pitch.
+Inferensi yang **masih mungkin**: `A / seq` = harga rata-rata per receipt (bukan `p` jika `qty` bervariasi); `payToClient / A` = porsi penalti (bukan jumlah pelanggaran, karena `π`, `κ` privat); pola waktu ack = ritme layanan. Mitigasi yang disediakan SDK: `qty` bervariasi dan agregasi beberapa unit per receipt; **bukan** klaim "anonim". **Anchored mode membocorkan lebih banyak by design** — granularitas harga per unit (bukan ambang, metrik, atau pelanggaran); karena itu `leak-check` untuk channel anchored mengeluarkan `unitPrice` dari himpunan nilai privat yang diperiksa dan web console menuliskannya ("hash daun + A per ack terlihat on-chain; metrik & ambang tetap privat"). Sebutkan tabel ini apa adanya di README dan pitch.
 
 ---
 
@@ -333,9 +352,9 @@ Inferensi yang **masih mungkin**: `A / seq` = harga rata-rata per receipt (bukan
            ▼                                     │        client, provider, T, R, seq, A │
  ┌──────────────────────┐   checkpoint / close   │        OPEN → CLOSING → SETTLED       │
  │ Provider agen        │ ─────────────────────► │        claimPenalty(proof) ───────────┼──► SLASettlementVerifier
- │ middleware x402      │                        │        settle() permissionless        │    (Groth16, Solidity)
- │ Aegis-Receipt header │                        │        ack() [anchored, P1] ──────────┼──► AegisPoseidon.rs (Stylus, D2)
- └──────────────────────┘                        │        payout → payoutClient/Provider ┼──► AegisTreasuryRouter [P1]
+ │ middleware x402      │   rollover (epoch++)   │        settle() permissionless        │    (Groth16, Solidity)
+ │ Aegis-Receipt header │                        │        ack()/startClose() [anchored] ─┼──► AegisPoseidon (Stylus) / PoseidonPathYul
+ └──────────────────────┘                        │        payout → _send(hook onPayout) ─┼──► AegisTreasuryRouter (kredit + claim)
                                                  └──────────────────────────────────────┘
  ┌──────────────────────┐   settle(), sweep()                        │
  │ Watcher / settler    │ ───────────────────────────────────────────┘
@@ -348,54 +367,70 @@ Inferensi yang **masih mungkin**: `A / seq` = harga rata-rata per receipt (bukan
 3. **Kontrak tidak pernah melihat receipt.** Ia melihat tanda tangan dan bukti. Itulah privasinya.
 4. **Deterministik, bukan optimistik.** Tidak ada asersi yang bisa "ditantang" dengan bond; hanya ada bukti yang valid atau tidak.
 5. **Gagal ke checkpoint co-signed terakhir.** Tanpa bukti dan tanpa checkpoint baru, hasilnya persis yang kedua pihak terakhir setujui (G5).
-6. **Immutable, tanpa admin di jalur dana.** Tidak ada proxy, `pause`, atau peran yang bisa menyentuh saldo channel. Factory hanya memegang parameter minimum dan alamat verifier **saat deploy**; channel menyalinnya ke immutable.
-7. **Stylus hanya jika diukur.** Setiap komponen Stylus punya padanan Yul yang di-benchmark di hari yang sama (D2).
+6. **Immutable, tanpa admin di jalur dana.** Tidak ada proxy, `pause`, atau peran yang bisa menyentuh saldo channel. Factory hanya memegang parameter minimum, alamat verifier, dan (P1) alamat Poseidon **saat deploy**; implementasi channel menyimpannya sebagai immutable — mode co-signed/anchored adalah sifat factory, bukan channel.
+7. **Stylus hanya jika diukur.** Setiap komponen Stylus punya padanan Yul dengan ABI dan keluaran identik (`AegisPoseidon` ↔ `PoseidonPathYul`), di-benchmark on-chain di jaringan yang sama (D2 ✅: 1,75× pada `insertPath`).
+8. **Hook payout tidak pernah menyandera dana (P1).** Payee kontrak boleh menerima `onPayout`, tetapi kegagalannya diabaikan (try/catch + stipend), dan pemanggil `settle`/`sweep` tidak bisa "mengelaparkan" hook tanpa transaksinya sendiri revert (`InsufficientGas`).
 
 ---
 
 ## 8. CONTRACT SPECIFICATIONS
 
-### 8.1 `AegisChannel` (implementasi untuk EIP-1167 clone)
+### 8.1 `AegisChannel` (implementasi untuk EIP-1167 clone) — sebagaimana dibangun (`contracts/src/AegisChannel.sol`)
 
 ```solidity
 enum State { UNINIT, OPEN, CLOSING, SETTLED }
 
-struct Config {                 // ditulis sekali oleh factory saat initialize
-    address client;
-    address provider;
-    address token;              // USDG
-    bytes32 termsCommitment;    // T
-    uint32  challengeWindow;
-    uint32  responseWindow;
-    address payoutClient;
-    address payoutProvider;
+struct Config {                 // ditulis sekali oleh factory saat initialize; di-hash utuh menjadi salt CREATE2 (§8.5)
+    address client; address provider; address token;   // token = USDG
+    bytes32 termsCommitment;                            // T
+    uint32  challengeWindow; uint32 responseWindow;     // responseWindow ≤ challengeWindow (BadConfig)
+    address payoutClient; address payoutProvider;       // bebas (D8); ≠ 0
+    bytes32 salt;
 }
-struct Latest {                 // state yang berubah
-    uint64  seq;
-    uint128 cumulativeAmount;   // A
-    bytes32 receiptsRoot;       // R
-    uint64  deadline;           // hanya di CLOSING
-    uint128 payToClient;        // hasil bukti yang tertunda; valid hanya jika proofSeq == seq
-    uint64  proofSeq;
-    State   state;
-}
+
+// Immutable di bytecode implementasi (sama untuk semua clone satu factory):
+address FACTORY; ISLASettlementVerifier VERIFIER; ISignatureTransfer PERMIT2;
+IPoseidonPath POSEIDON; bool ANCHORED = (poseidonPath != 0);            // mode per factory (FR-25)
+uint64 constant MAX_SEQ = 128;  uint256 constant HOOK_GAS = 300_000;
+
+// Storage per channel (variabel publik datar, bukan struct):
+Config cfg; bytes32 domainSeparator; State state;
+uint32  epoch;                  // FR-10: ++ per rollover; ada di setiap struct yang ditandatangani
+uint64  seq; uint128 cumulativeAmount /*A*/; bytes32 receiptsRoot /*R*/;
+uint64  deadline;               // hanya bermakna di CLOSING
+uint128 payToClient; uint64 proofSeq; bool hasProof;   // bukti tertunda; dipakai hanya jika hasProof && proofSeq == seq
+uint256[7] filledSubtrees;      // pohon inkremental kedalaman 7 (hanya anchored); di-nol-kan saat rollover
 
 function initialize(Config calldata c, address opener, bytes calldata sigClient, bytes calldata sigProvider) external;
     // factory-only; untuk tiap pihak: opener == pihak ATAU tanda tangan EIP-712 ChannelTerms sah (FR-2)
-function fundWithPermit2(ISignatureTransfer.PermitTransferFrom calldata p, bytes calldata sig) external;   // opsional; transfer biasa juga sah
-function budget() external view returns (uint256);                                  // token.balanceOf(this)
+function fundWithPermit2(ISignatureTransfer.PermitTransferFrom calldata p, bytes calldata sig) external nonReentrant;   // opsional; transfer biasa juga sah
+function budget() public view returns (uint256);                                    // token.balanceOf(this)
+function hashCheckpoint(uint32 epoch, uint64 seq, uint128 A, bytes32 R) / hashClose(epoch, seq, toProvider)
+       / hashRollover(epoch, seq, toProvider) / hashLeaf(epoch, seq, bytes32 leaf, uint128 A) → bytes32   // struct hash EIP-712, pure
 
+// ---- mode co-signed ----
 function submitCheckpoint(uint64 seq, uint128 A, bytes32 R, bytes calldata sigClient, bytes calldata sigProvider) external;
-    // OPEN  : mulai CLOSING, deadline = now + challengeWindow
-    // CLOSING: require seq > latest.seq; ganti state; deadline = max(deadline, now + responseWindow); hapus bukti tertunda
+    // revert WrongMode jika ANCHORED. OPEN: mulai CLOSING, deadline = now + challengeWindow
+    // CLOSING: require seq > latest.seq; ganti state; deadline = max(deadline, now + responseWindow); hasProof = false (FR-15)
+// ---- mode anchored (FR-25) ----
+function ack(uint64 seq, bytes32 leaf, uint128 A, bytes calldata sigProvider) external;
+    // revert WrongMode jika !ANCHORED; hanya cfg.client (NotClient); state OPEN; seq == latest.seq (StaleCheckpoint);
+    // seq < MAX_SEQ; A ≥ latest.A (AmountDecreased); sigProvider atas Leaf(epoch, seq, leaf, A);
+    // (root, nodes) = POSEIDON.insertPath(leaf, seq, filledSubtrees)  — SATU panggilan, 7 hash t=3 (STATICCALL);
+    // simpan nodes[i] untuk level dengan bit-i(seq) == 0; R = root; seq += 1; A = A_baru; hasProof = false; emit Acked
+function startClose() external;
+    // revert WrongMode jika !ANCHORED; hanya pihak; OPEN → CLOSING, deadline = now + challengeWindow; emit CloseStarted
+// ---- kedua mode ----
 function claimPenalty(uint256[8] calldata proof, uint128 payToClient) external;     // hanya client/provider; state CLOSING
     // publicInputs = [channelIdField, T, R, seq, A, payToClient]; require verifier.verifyProof; require payToClient <= A (FR-18)
-function settle() external;                                                         // CLOSING && now >= deadline; siapa pun
-function closeCooperative(uint64 seq, uint128 toProvider, bytes calldata sigClient, bytes calldata sigProvider) external;
-    // OPEN atau CLOSING; require seq >= latest.seq; require toProvider <= budget(); toClient = budget() − toProvider
-function rollover(uint64 seq, uint128 toProvider, bytes calldata sigClient, bytes calldata sigProvider) external;  // P1: bayar epoch, seq/R reset, OPEN
-function ack(uint64 seq, bytes32 leaf, bytes calldata sigProvider) external;        // P1 anchored mode; hanya client; require seq == latest.seq
-function sweep() external;                                                          // SETTLED: sisa saldo → payoutClient
+function settle() external nonReentrant;                                            // CLOSING && now >= deadline; siapa pun
+function closeCooperative(uint64 seq, uint128 toProvider, bytes calldata sigClient, bytes calldata sigProvider) external nonReentrant;
+    // OPEN atau CLOSING; seq >= latest.seq; dua tanda tangan Close(epoch, seq, toProvider); toProvider <= budget(); toClient = budget() − toProvider
+function rollover(uint64 seq, uint128 toProvider, bytes calldata sigClient, bytes calldata sigProvider) external nonReentrant;
+    // FR-10: OPEN atau CLOSING; seq >= latest.seq; dua tanda tangan Rollover(epoch, seq, toProvider); toProvider <= budget();
+    // epoch++; seq = A = R = deadline = 0; hasProof = false; state = OPEN; anchored: delete filledSubtrees;
+    // _send(payoutProvider, provider, toProvider); sisa TETAP di channel; emit RolledOver(newEpoch, seq, toProvider, budget()), PaymentReleased
+function sweep() external nonReentrant;                                             // SETTLED: sisa saldo → payoutClient (lewat _send)
 
 function channelIdField() public view returns (uint256) { return uint256(uint160(address(this))); }   // < p_BN254, tanpa reduksi
 ```
@@ -403,15 +438,17 @@ function channelIdField() public view returns (uint256) { return uint256(uint160
 **Alur `settle()`:**
 ```
 1. require state == CLOSING && block.timestamp >= deadline
-2. B = token.balanceOf(this)
-3. pen = (proofSeq == seq) ? payToClient : 0            // bukti hanya berlaku untuk state yang dibuktikannya (FR-15)
-4. toProvider = min(A − pen, B);  toClient = B − toProvider
-5. state = SETTLED (efek sebelum interaksi)
-6. token.safeTransfer(payoutProvider, toProvider); token.safeTransfer(payoutClient, toClient)
-7. emit Settled(seq, A, pen, toProvider, toClient); emit PaymentReleased(...); emit Refunded(...)   // bentuk ERC-8183 (FR-27)
+2. pen = (hasProof && proofSeq == seq) ? payToClient : 0     // bukti hanya berlaku untuk state yang dibuktikannya (FR-15)
+3. B = token.balanceOf(this); toProvider = min(A − pen, B);  toClient = B − toProvider
+4. state = SETTLED (efek sebelum interaksi)
+5. _send(payoutProvider, provider, toProvider); _send(payoutClient, client, toClient)      // transfer + hook (di bawah)
+6. emit Settled(seq, A, pen, toProvider, toClient, cooperative=false); emit PaymentReleased(jobId, provider, toProvider); emit Refunded(jobId, client, toClient)   // ERC-8183 (FR-27), jobId = channelIdField()
 ```
+`closeCooperative` memakai `_payout` yang sama dengan `pen = 0`, `cooperative = true`.
 
-**Tanda tangan.** `SignatureChecker.isValidSignatureNow(signer, digest, sig)` (OpenZeppelin) untuk `client` dan `provider` — EOA atau ERC-1271. Digest EIP-712 dengan `verifyingContract = address(this)`; karena clone, `DOMAIN_SEPARATOR` dihitung saat `initialize` dan disimpan (bukan immutable bytecode).
+**`_send(to, party, amount)` — transfer + hook payout best-effort (P1, FR-26).** `amount == 0` → return. `safeTransfer(to, amount)`; jika `to.code.length > 0`: `try IAegisPayoutHook(to).onPayout{gas: HOOK_GAS}(party, cfg.token, amount) {} catch {}` lalu **`if (gasleft() < HOOK_GAS / 63) revert InsufficientGas();`**. Baris terakhir adalah perbaikan temuan manual **M-1** audit Slither (`docs/audit/slither-2026-09.md` §3.5): `{gas: HOOK_GAS}` hanya batas *atas* — per EIP-150 callee menerima `min(HOOK_GAS, 63/64 · gasleft)`, dan karena `settle`/`sweep` permissionless, pihak ketiga bisa memilih gas limit sehingga hook kehabisan gas tetapi tx luar tetap selesai: token sudah pindah ke payee, atribusinya (untuk router: kredit) tidak pernah terjadi. Pemeriksaan pasca-panggilan bergaya OZ `ERC2771Forwarder._checkForwardedGas` menjamin hook **ditawari** stipend penuh (≥ 63·⌊300.000/63⌋ = 299.943 gas) atau tx revert; hook yang gagal karena ulahnya sendiri (revert, membakar stipend) tetap diabaikan (T20). Jendela sebelum perbaikan terukur hanya untuk hook ≈227k–300k gas; router yang dikirim ≈55k (MockUSDG) / ≈115–120k estimasi proxy USDG bergaya Paxos — karena itu `HOOK_GAS` dinaikkan dari 150k ke 300k (I2). Semua pemanggil `_send` `nonReentrant` dan state sudah final sebelum panggilan (CEI). Uji: `HookGas.t.sol` (5 test, 3 di antaranya gagal pada kode sebelum perbaikan).
+
+**Tanda tangan.** `SignatureChecker.isValidSignatureNow(signer, digest, sig)` (OpenZeppelin) untuk `client` dan `provider` — EOA atau ERC-1271 (`staticcall`, tidak bisa re-enter). Digest EIP-712 dengan `verifyingContract = address(this)`; karena clone, `domainSeparator` dihitung saat `initialize` dan disimpan (bukan immutable bytecode). Catatan clone: konstruktor `ReentrancyGuard` tidak pernah berjalan untuk clone, `_status` mulai 0 bukan 1 — OZ v5 hanya membandingkan dengan `ENTERED` (2), jadi guard bekerja; panggilan terjaga pertama per channel membayar SSTORE 0→2 (≈22k) sekali (audit §3.6).
 
 **Kenapa `channelIdField` = alamat.** Alamat 160-bit selalu < `p` BN254; tidak perlu reduksi, tidak ada tabrakan; dan nilainya identik dengan `verifyingContract` EIP-712 — satu identitas untuk tanda tangan dan bukti.
 
@@ -419,7 +456,7 @@ function channelIdField() public view returns (uint256) { return uint256(uint160
 
 **Kenapa `claimPenalty` tidak butuh jendela sendiri.** Bukti terikat ke `(R, seq, A)` saat ini. Jika lawan memegang checkpoint lebih baru, ia mengirimnya (FR-13) dan bukti gugur — dan checkpoint itu adalah state yang pembuat bukti **sendiri** tanda tangani. Tidak ada yang bisa dirugikan oleh state yang ia setujui.
 
-**Events:** `Opened(client, provider, T, challengeWindow)`, `Funded(from, amount)` (dipancarkan oleh `fundWithPermit2`; transfer langsung terlihat lewat `Transfer` USDG), `CheckpointSubmitted(seq, A, R, deadline)`, `PenaltyClaimed(by, seq, payToClient)`, `Settled(...)`, `Swept(amount)`, plus `JobFunded/PaymentReleased/Refunded` (FR-27).
+**Events:** `Opened(client, provider, T, challengeWindow)`, `Funded(from, amount)` (dipancarkan oleh `fundWithPermit2`; transfer langsung terlihat lewat `Transfer` USDG), `CheckpointSubmitted(seq, A, R, deadline)`, `PenaltyClaimed(by, seq, payToClient)`, `Settled(seq, A, penalty, toProvider, toClient, cooperative)`, `Swept(amount)`, **P1:** `RolledOver(newEpoch, closedSeq, toProvider, remaining)`, `Acked(seq, leaf, A, root)`, `CloseStarted(by, seq, A, R, deadline)`; plus `JobFunded/PaymentReleased/Refunded` (FR-27). **Errors:** `NotFactory, AlreadyInitialized, BadConfig, BadSignature, WrongState, StaleCheckpoint, SeqTooLarge, NotParty, ExceedsCumulative, InvalidProof, TooEarly, ExceedsBudget, WrongToken, WrongMode, NotClient, AmountDecreased, InsufficientGas`. Ukuran runtime implementasi: 12.411 byte pada Task 5 P1 (ledger; sebelum penambahan `InsufficientGas`/`HOOK_GAS` 300k — ukuran saat ini belum dicatat).
 
 ---
 
@@ -433,46 +470,92 @@ Verifier hasil `snarkjs zkey export solidityverifier`, dipasang sebagai alamat i
 
 **Kenapa Solidity, bukan Stylus (D2).** Empat pairing + 6 `ecMul` adalah 100% precompile. zk-sunade — implementasi Stylus yang memanggil precompile yang sama lewat `RawCall` — mencatat 256.334 gas; overhead-nya adalah init program (8.832 gas non-cache / 352 cache) + host I/O per call. Tidak ada yang bisa dimenangkan; ada yang bisa dikalahkan (toolchain, ukuran WASM, expiry program 365 hari).
 
+**P1:** verifier, sirkuit, dan zkey **tidak berubah** (release `v0.1.0-zkey`); anchored mode memakai bukti yang sama atas `R`/`seq`/`A` on-chain. File verifier dibekukan byte-per-byte terhadap ekspor snarkjs — tiga temuan High Slither (`incorrect-return` pada `return(0, 0x20)` Yul) adalah *false positive* idiom snarkjs dan sengaja tidak disentuh (audit ID-0..2).
+
 ---
 
-### 8.3 `AegisPoseidon.rs` (Stylus, **P1, digerbangi D2**) & anchored mode
+### 8.3 `AegisPoseidon` (Stylus, **P1 — dikirim, D2 ✅**) & anchored mode — sebagaimana dibangun
 
-```rust
-#[public] impl AegisPoseidon {
-    pub fn hash2(&self, a: U256, b: U256) -> U256;                 // node
-    pub fn hash5(&self, x: [U256; 5]) -> U256;                     // leaf
-    pub fn hash6(&self, x: [U256; 6]) -> U256;                     // terms
-    pub fn root128(&self, leaves: Vec<U256>) -> U256;              // rekomputasi penuh (≤ 255 hash)
+**Antarmuka on-chain (`contracts/src/interfaces/IPoseidonPath.sol`) — dua implementasi, satu ABI, keluaran identik:**
+```solidity
+interface IPoseidonPath {
+    function hash2(uint256 a, uint256 b) external view returns (uint256);                     // 1 hash t=3; tidak dipakai on-chain (known-answer check deploy saja)
+    /// cur = leaf; untuk level i = 0..6: bit i dari `index` 0 → (cur, zeros[i]), nodes[i] = cur; bit 1 → (filled[i], cur), nodes[i] = filled[i];
+    /// cur = H(kiri, kanan). Kembalikan (root, nodes). Revert bila input ≥ p_BN254 ("NotField") atau index ≥ 128 ("BadIndex").
+    function insertPath(uint256 leaf, uint256 index, uint256[7] calldata filled) external view returns (uint256 root, uint256[7] memory nodes);
 }
 ```
-`no_std`, `ark-bn254` + `ark-ff` (fitur `no_std`), konstanta round circomlib Poseidon v1 (D3), stateless & `view`. Padanan Yul: `poseidon-solidity` (PoseidonT3 21.124 gas, circomlib-compatible) — **di-benchmark bersamaan pada Hari 4**.
+1. **`stylus/aegis-poseidon/` — `AegisPoseidon`** (Rust, `no_std`, `stylus-sdk` 0.10.9): circomlib **Poseidon v1** t=3 (8 full + 57 partial round, S-box x⁵), port 1:1 dari `circomlibjs/src/poseidon_opt.js` — algoritma teroptimasi (konstanta round dilipat, matriks jarang `S` untuk 57 partial round, matriks pra-jarang `P`) di atas `ark-bn254`/`ark-ff` 0.5 (`MontFp!`, `Fr::sum_of_products`; aritmetika `#[inline(never)]` agar hanya satu salinan `Fr::mul`). Konstanta dibangkitkan dari `circomlibjs` oleh `scripts/gen_constants.mjs`; `zeros[0..6]` dari fixture `anchored_ex1.json`. **21,7 KB terkompresi** (batas Stylus 24 KB; ≈12,3 KB di antaranya adalah 384 konstanta field). **Aktif di testnet 46630: `0x1027cf7DC26152012ed9Ef949Aa1432Bf1C7ef34`**, dipakai `factoryAnchored`. Dua build referensi sebelumnya (riwayat): `opt-level=z` `0xd2b67074…37a7` (18,4 KB) dan `opt-level=3` `0x65b059d9…f038` (20,1 KB). Tidak ada CacheManager di chain ini (`cargo stylus cache bid` → "no cache managers found") — setiap panggilan membayar init program uncached (≈8,8k gas).
+2. **`contracts/src/PoseidonPathYul.sol`** — implementasi identik di atas `PoseidonT3` (`poseidon-solidity`, Yul, library eksternal via `DELEGATECALL`): dipakai Foundry (tidak ada VM WASM), Anvil lokal, dan **Rencana B** bila `POSEIDON_STYLUS` kosong saat deploy. Di testnet juga di-deploy sebagai pembanding apple-to-apple (`0x804318aE…3766`, `PoseidonT3` `0xd52e2919…3d1`), bukan bagian deployment produksi.
 
-**Anchored mode (FR-25).** Untuk job bernilai tinggi & frekuensi rendah di mana kedua pihak ingin setiap ack **on-chain** (tanpa asumsi liveness channel): klien memanggil `ack(seq, leaf, sigProvider)` — `leaf = Poseidon(seq, qty, m1, m2, due)` dihitung **off-chain** oleh keduanya dan ditandatangani provider (`Leaf(uint64 seq,bytes32 leaf)` EIP-712), sehingga metrik tetap privat — dan kontrak memasukkan `leaf` ke pohon inkremental kedalaman 7 (pola Semaphore/Tornado): **7 hash t=3 per ack**. Estimasi: Stylus ≈ 7 × 11,9k ≈ **83k gas**, Yul ≈ 7 × 20k ≈ **140k**, Solidity polos ≈ 1,5M. Sirkuit yang sama membaca `R` on-chain (`seq` = jumlah ack). Ini satu-satunya tempat AegisClear menghitung Poseidon di chain — karena itu satu-satunya tempat Stylus punya pekerjaan. `hash5`/`hash6` tetap disediakan untuk Rencana B3 (commit-reveal). Jika D2 negatif, anchored mode tetap dikirim dengan Yul; jika waktu habis, anchored mode dipangkas (§16) dan `AegisPoseidon.rs` menjadi benchmark terpublikasi saja.
+**Kesetaraan keluaran (D3 ✅), diuji silang:** `hash2(1,2) = 7853200120776062878684798364095072458815029376092732009249414926327459813530` (vektor circomlib) dan `insertPath(leaf0, 0, zeros) = 8867972900015110853220544640232097790621643464826894219536805239310374416705` **identik** di Yul dan ketiga build Stylus (on-chain, `cast call`); `cargo test` 9/9 (rantai zeros, 100 root `insertPath` vs SDK, 19 pasangan daun vs `circomlibjs`, penolakan input ≥ p, 20.000 triple `sum_of_products`); `PoseidonPathYul.t.sol` 5 test (128 daun bertahap == root SDK); `Anchored.t.sol` 3 ack == root fixture. `DeployTestnet.s.sol` menjalankan known-answer check `hash2(1,2)` (via `vm.rpc eth_call`, karena Foundry tidak bisa mengeksekusi WASM) terhadap `POSEIDON_STYLUS` **sebelum** men-deploy `factoryAnchored` — wiring yang salah gagal jelas, bukan diam-diam menghasilkan root yang salah.
 
-**Batas praktis Stylus yang relevan (nilai on-chain 19 Sep 2026, §19 V2):** `inkPrice` 10.000 ink/gas, `freePages` 2, `pageGas` 1.000, `pageLimit` 128 (8 MB), `minInitGas` 8.832 / cached 352, `expiryDays` 365, `keepaliveDays` 31. Program yang tidak dipanggil ≥ 365 hari harus di-`keepalive` — dicatat sebagai T15.
+**Angka D2 final (`docs/benchmarks/poseidon.md` §5; `cast estimate`, gas total termasuk intrinsik, testnet 46630, 20 Sep 2026):**
+
+| Implementasi | `insertPath` (7 hash, jalur `ack`) | `hash2` (1 hash) |
+|---|---|---|
+| Yul `PoseidonPathYul` | **252.271** | **62.138** |
+| Stylus referensi `opt-level=z` | 231.217 | 91.259 |
+| Stylus referensi `opt-level=3` | 175.905 (1,43×; ≈1,50× eksekusi) | 83.172 |
+| **Stylus teroptimasi (aktif)** | **144.076 → 1,75× total, ≈1,9× eksekusi-saja** | 82.593 |
+
+Foundry (Yul, eksekusi saja, referensi): `insertPath` 222.766. Kesimpulan: pada hash tunggal Yul lebih murah di **ketiga** build Stylus (init program mendominasi satu hash) — karena itu `AegisChannel` tidak pernah memanggil `hash2` on-chain, dan `ack` memakai **satu** panggilan `insertPath` (7 hash), bukan 7× `hash2`. **Angka 2,33× dari benchmark 19–20 Sep berasal dari Poseidon2 (`openzeppelin-crypto`), yang tidak kompatibel circomlib/sirkuit — ditarik dan hanya disimpan sebagai riwayat metodologi** (`docs/benchmarks/poseidon.md` §§0–4). Ambang D2 (≥ 1,5×) terpenuhi dengan hash yang benar-benar dipakai sirkuit.
+
+**`hash5`/`hash6`/`root128` tidak dibangun (berbeda dari v1.0).** Tidak ada pemakainya on-chain: daun (`Poseidon` t=6) dan komitmen syarat (t=7) dihitung di SDK dan sirkuit, tidak pernah di kontrak; `root128` hanya berguna untuk Rencana B3 (commit-reveal), yang tidak pernah diaktifkan (§18). Program Stylus dibatasi pada dua fungsi yang punya jalur on-chain nyata; ukuran WASM dan permukaan audit ikut kecil.
+
+**Anchored mode (FR-25) sebagaimana dibangun.** Untuk job bernilai tinggi & frekuensi rendah di mana kedua pihak ingin setiap ack **on-chain** (tanpa asumsi liveness channel dan tanpa responder tantangan): mode ditentukan **per factory** (`POSEIDON` immutable ≠ 0 ⇒ `ANCHORED`; `Config`/`ChannelTerms`/salt/`predict` tidak berubah). Klien memanggil `ack(seq, leaf, cumulativeAmount, sigProvider)` — `leaf = Poseidon(seq, qty, m1, m2, due)` dihitung **off-chain** oleh keduanya dan ditandatangani provider bersama `A` baru (`Leaf(uint32 epoch,uint64 seq,bytes32 leaf,uint128 cumulativeAmount)`), sehingga metrik tetap privat — dan kontrak memasukkan `leaf` ke pohon inkremental kedalaman 7 (pola Semaphore/Tornado; `zeros[0]=0`, `zeros[i+1]=H(zeros[i],zeros[i])`, `zeros[7]` = root pohon kosong = `merkleRoot([])` SDK) dengan **7 hash t=3 per ack dalam satu panggilan `insertPath`**. `startClose()` (pihak mana pun) membuka jendela tantangan atas state on-chain; selama `CLOSING` pihak boleh `claimPenalty` dengan bukti atas `R/seq/A` on-chain (sirkuit dan verifier tidak berubah, `seq` = jumlah ack), lalu `settle()` permissionless. `submitCheckpoint` → `WrongMode`; `closeCooperative`/`rollover`/`sweep`/`fundWithPermit2` berlaku di kedua mode; `rollover` me-nol-kan `filledSubtrees`. Tiket keluar seq-0 tidak diperlukan. Ini satu-satunya tempat AegisClear menghitung Poseidon di chain — karena itu satu-satunya tempat Stylus punya pekerjaan.
+
+**Gas anchored terukur (testnet 46630 deploy v1, Stylus; README "Alamat kontrak"):** `fund` 59.872 · `ack` pertama **357.028** (storage dingin), lalu **211.021–217.237** stabil (9 `ack` berikutnya) · `startClose` **65.484** · `claimPenalty` 312.706 · `settle` 102.427. Pembanding Yul di Anvil (bukan testnet): `ack` pertama 449.142, stabil ≈303.400–309.400. Estimasi v1.0 (≈83k Stylus / ≈140k Yul per `ack`) terlalu optimistis: ia mengabaikan init program uncached, 7 SSTORE `filledSubtrees`, dan verifikasi tanda tangan.
+
+**Batas praktis Stylus yang relevan (nilai on-chain 19 Sep 2026, §19 V2):** `inkPrice` 10.000 ink/gas, `freePages` 2, `pageGas` 1.000, `pageLimit` 128 (8 MB), `minInitGas` 8.832 / cached 352 (cache tidak tersedia di chain ini), `expiryDays` 365, `keepaliveDays` 31. Program yang tidak dipanggil ≥ 365 hari harus di-`keepalive` — T15. **Catatan operasional P1 (README M9):** watcher `keepalive` otomatis **belum diimplementasikan** (P2); sampai saat itu `keepalive` manual. Bila `AegisPoseidon` kedaluwarsa, `ack()` berhenti (panggilan `insertPath` gagal) tetapi **dana selalu bisa diselamatkan** lewat jalur EVM murni yang tidak pernah memanggil `POSEIDON`: `startClose()` → `claimPenalty()` (opsional) → `settle()`, atau `closeCooperative()`.
 
 ---
 
-### 8.4 `AegisTreasuryRouter` (P1)
+### 8.4 `AegisTreasuryRouter` (P1 — dikirim) — hook + buku kredit + `claim`
+
+ERC-20 tidak punya hook penerimaan, jadi "receive → forward" dari v1.0 diwujudkan sebagai **hook yang dipanggil channel** setelah transfer (`_send`, §8.1):
 
 ```solidity
-function setTreasury(address agent, address treasury) external;    // hanya agent (atau pemilik 4337-nya) untuk dirinya sendiri
-function treasuryOf(address agent) external view returns (address);
+interface IAegisPayoutHook { function onPayout(address party, address token, uint256 amount) external; }
+
+contract AegisTreasuryRouter is IAegisPayoutHook, ReentrancyGuard {          // tanpa owner, tanpa upgrade
+    mapping(address agent => address treasury) public treasuryOf;
+    mapping(address agent => mapping(address token => uint256)) public credit;
+    mapping(address token => uint256) public totalCredit;
+    function setTreasury(address treasury) external;                          // msg.sender mengatur MILIKNYA SENDIRI (EOA/Safe/4337); address(0) = hapus
+    function destinationOf(address agent) public view returns (address);      // treasuryOf[agent] atau agent
+    function onPayout(address party, address token, uint256 amount) external nonReentrant;
+        // require balanceOf(this) >= totalCredit[token] + amount  (Unbacked) — invarian Σcredit[token] ≤ saldo, juga SELAMA panggilan
+        // credit[party][token] += amount; totalCredit += amount; ok = _tryTransfer(token, destinationOf(party), amount);
+        // ok → kurangi credit/totalCredit;  gagal (mis. tujuan dibekukan USDG) → kredit tetap; emit PayoutRouted(party, token, dest, amount, ok)
+    function claim(address token, address to) external nonReentrant;          // msg.sender menarik credit[msg.sender][token] → to (NothingToClaim)
+}
 ```
-Channel dibuka dengan `payoutClient = router` / `payoutProvider = router`; router meneruskan `onPayout` ke `treasuryOf(agent)` atau, jika tidak ada, ke agen. Tidak ada custody: `receive` → forward dalam transaksi yang sama. Ini implementasi "Fleet Treasury Router" dari draft — sengaja **kecil**; nilainya adalah menjaga hot wallet robot tetap kosong, bukan logika treasury.
+Channel dibuka dengan `payoutProvider = router` (SDK: `ProviderOptions.payoutProvider`) dan/atau `payoutClient = router` (klien: `payoutTo`); channel mentransfer ke router lalu memanggil `onPayout` dalam tx yang sama, router meneruskan ke `treasuryOf(agent)` atau ke agen bila belum diset. **Tidak ada custody yang disengaja**: kredit hanya muncul bila penerusan gagal, dan hanya agen itu yang bisa menariknya. `_tryTransfer` adalah `call` tingkat rendah yang **tidak revert** (kembalian kosong = ok, 32 byte = bool, selain itu = gagal) — token yang menolak tujuan menjadi kredit, bukan revert yang men-dampar token di router tanpa jejak. `onPayout` dan `claim` sama-sama `nonReentrant` (satu guard OZ) sehingga jalur re-entrancy lintas-fungsi yang dilaporkan Slither (ID-4, *false positive*) revert; uji `test_onPayout_cross_function_reentrancy_into_claim_is_blocked`. Gas ekstra hanya bagi yang memakai router (SSTORE kredit + transfer); channel dengan payee EOA hanya membayar `extcodesize`.
+
+**Peringatan (I2, NatSpec `onPayout`):** `onPayout` permissionless dan **tidak bisa** membedakan token yang baru masuk dari hook channel dengan token yang sudah ada di saldo. Token yang mendarat di router **di luar** jalur hook (transfer ERC-20 langsung, token non-standar) tidak diatribusikan ke siapa pun dan menjadi *slack* yang bisa diklaim **pemanggil mana pun** lewat `onPayout(party, token, amount)` dengan `party` pilihannya. **Jangan pernah mengirim token langsung ke alamat router** — channel (lewat `_send`) adalah satu-satunya pengirim yang dimaksud. Dengan M-1 diperbaiki (§8.1), jalur hook sendiri tidak lagi bisa menghasilkan slack.
+
+**Status deploy:** router testnet v1 `0xe4A87335A54d50bf5E2afd830dc917b33b697689` (skenario "13 (FR-26)" suite SDK: treasury dibayar dalam tx `close` yang sama, channel `0x5a57e6ed…fde1`). Testnet v1 di-deploy dari source dengan `HOOK_GAS` = 150k dan **tanpa** penjaga `InsufficientGas`; source saat ini 300k + penjaga — redeploy v2 menyusul. Uji: `TreasuryRouter.t.sol` (11 test: forward ke treasury / ke agen, `setTreasury` per pengirim, payee revert/membakar gas tidak memblokir settle & close, treasury dibekukan → kredit → `claim`, `onPayout` tanpa token masuk → `Unbacked`, kembalian sampah, `sweep`/`rollover` juga lewat hook) + `HookGas.t.sol`. Ini implementasi "Fleet Treasury Router" dari draft — sengaja **kecil**; nilainya adalah menjaga hot wallet robot tetap kosong, bukan logika treasury.
 
 ---
 
 ### 8.5 `AegisChannelFactory` & `MockUSDG`
 
 ```solidity
+constructor(address verifier, address permit2, uint32 minChallengeWindow, address poseidonPath);
+    // verifier == 0 || permit2 == 0 → ZeroAddress (audit ID-5/ID-7: salah deploy = claimPenalty/fundWithPermit2 mati permanen untuk semua clone)
+    // poseidonPath boleh 0 = mode co-signed; ≠ 0 = mode anchored (FR-25) — implementasi AegisChannel di-deploy di sini dengan ketiganya sebagai immutable
+address public immutable IMPLEMENTATION; address public immutable VERIFIER; address public immutable PERMIT2;
+uint32  public immutable MIN_CHALLENGE_WINDOW;   // 21.600 s (6 jam) produksi / 60 s demo & anchored (D5)
+address public immutable POSEIDON;               // 0 = co-signed; kontrak IPoseidonPath = anchored
+function salt(Config calldata c) public pure returns (bytes32);        // keccak256(abi.encode(c)) — SELURUH Config, termasuk payout & salt
+function predict(Config calldata c) public view returns (address);     // Clones.predictDeterministicAddress(IMPLEMENTATION, salt(c), this)
 function open(Config calldata c, bytes calldata sigClient, bytes calldata sigProvider) external returns (address channel);
+    // c.challengeWindow >= MIN_CHALLENGE_WINDOW (WindowTooShort); predict(c).code.length != 0 → AlreadyOpen (pra-cek, hemat gas tabrakan CREATE2);
+    // cloneDeterministic + initialize(c, msg.sender, sigClient, sigProvider); emit ChannelOpened(channel, client, provider, T)
     // tanda tangan boleh kosong untuk pihak yang == msg.sender
-function predict(Config calldata c) external view returns (address);   // CREATE2: salt = keccak(client, provider, T, c.salt)
-uint32 public immutable MIN_CHALLENGE_WINDOW;   // 6 jam produksi / 60 s demo (D5)
-address public immutable VERIFIER; address public immutable IMPLEMENTATION;
 ```
-`predict()` membuat alamat channel diketahui **sebelum** ada — provider bisa memasukkannya ke 402 `payTo` dan klien mendanainya lewat facilitator apa pun; `open()` bisa terjadi sesudah dana masuk, oleh siapa pun yang memegang tanda tangan kedua pihak (atau salah satu pihak dengan tanda tangan pihak lain). Karena `Config` di-hash ke salt, alamat itu hanya bisa menjadi channel dengan syarat persis yang ditandatangani. `MockUSDG`: ERC-20 6 desimal, `mint` bebas, hanya testnet.
+`predict()` membuat alamat channel diketahui **sebelum** ada — provider bisa memasukkannya ke 402 `payTo` dan klien mendanainya lewat facilitator apa pun; `open()` bisa terjadi sesudah dana masuk, oleh siapa pun yang memegang tanda tangan kedua pihak (atau salah satu pihak dengan tanda tangan pihak lain). Karena **seluruh** `Config` di-hash ke salt, alamat itu hanya bisa menjadi channel dengan syarat persis yang ditandatangani. Tiga factory di testnet v1 (README "Alamat kontrak"): `factory` demo co-signed 60 s `0x596E9f21…dAfF`, `factoryProd` co-signed 21.600 s `0xf8e93aE5…FE5a`, `factoryAnchored` 60 s + `POSEIDON` = Stylus `0x1fB7d8E1…6147` — kode implementasi identik, hanya immutable-nya berbeda. Uji: `Factory.t.sol` (9 test, termasuk `test_open_twice_same_config_reverts`, `test_constructor_zero_verifier_or_permit2_reverts`). `MockUSDG`: ERC-20 6 desimal, `mint` bebas, hanya testnet (`0x7455E600…94EF`).
 
 ---
 
@@ -480,36 +563,42 @@ address public immutable VERIFIER; address public immutable IMPLEMENTATION;
 
 | Peran | Bisa apa | Tidak bisa apa | Catatan |
 |---|---|---|---|
-| `client` | mendanai, ack (tanda tangan), `submitCheckpoint`, `claimPenalty`, `closeCooperative` (dengan provider) | menarik dana sepihak sebelum settle, mengubah `T` | — |
-| `provider` | `submitCheckpoint`, `claimPenalty`, `closeCooperative`, `rollover` | membuat receipt tanpa tanda tangan klien, mengubah `T` | — |
-| Siapa pun | `fund` (transfer), `open` dengan tanda tangan sah, `settle` setelah deadline, `sweep` | — | watcher bot |
-| Factory deployer | men-deploy factory dengan `VERIFIER`, `IMPLEMENTATION`, `MIN_CHALLENGE_WINDOW` | mengubah apa pun setelah deploy | tidak ada owner |
+| `client` | mendanai, ack (tanda tangan checkpoint — co-signed; **tx `ack()` sendiri — anchored**), `submitCheckpoint` (co-signed), `startClose` (anchored), `claimPenalty`, `closeCooperative` / `rollover` (dengan provider) | menarik dana sepihak sebelum settle, mengubah `T`, `ack` atas `A` yang turun | satu-satunya pemanggil `ack` (`NotClient`) |
+| `provider` | `submitCheckpoint` (co-signed), `startClose` (anchored), `claimPenalty`, `closeCooperative` / `rollover` (dengan klien), menandatangani `Leaf` (anchored) | membuat receipt/daun tanpa persetujuan klien, mengubah `T`, memanggil `ack` | ack anchored tetap butuh tx klien |
+| Siapa pun | `fund` (transfer), `open` dengan tanda tangan sah, `settle` setelah deadline, `sweep`, `onPayout` router (dijaga `Unbacked`) | memicu `rollover`/`close` tanpa dua tanda tangan; "mengelaparkan" hook payout (`InsufficientGas`) | watcher bot; pemanggil `settle`/`sweep` dengan payee kontrak harus memberi gas ≥ stipend |
+| Agen di router | `setTreasury(treasury)` untuk **dirinya sendiri**, `claim(token, to)` atas kreditnya sendiri | mengatur treasury atau menarik kredit pihak lain | tanpa owner; slack dari transfer langsung bisa diklaim siapa pun (I2) |
+| Payee kontrak (hook) | menerima `onPayout(party, token, amount)` dengan stipend 300k | memblokir/menggagalkan `settle`/`close`/`sweep`/`rollover` (try/catch), re-enter fungsi terjaga | T20 |
+| Factory deployer | men-deploy factory dengan `VERIFIER`, `PERMIT2`, `MIN_CHALLENGE_WINDOW`, `POSEIDON` (mode) | mengubah apa pun setelah deploy | tidak ada owner; mode adalah sifat factory |
 | Koordinator trusted setup | (satu kali) menghasilkan zkey | — | **risiko T4**; ceremony ≥ 3 kontributor sebelum dana mainnet non-demo |
 
-Tidak ada `owner`, `pause`, proxy, atau `upgradeTo` di jalur dana. Tulis matriks ini di README — kriteria "smart contract quality" akan mencarinya.
+Tidak ada `owner`, `pause`, proxy, atau `upgradeTo` di jalur dana. Matriks ini disalin di README ("Peran & kendali") — kriteria "smart contract quality" akan mencarinya.
 
 ---
 
-### 8.7 Anggaran gas (estimasi → **diisi dari pengukuran Hari 7 & 12**)
+### 8.7 Anggaran gas (estimasi v1.0 → **terukur 20 Sep 2026**, Foundry + testnet 46630)
 
-| Operasi | Estimasi | Terukur (Foundry / testnet) |
+| Operasi | Estimasi (v1.0) | Terukur (Foundry / testnet) |
 |---|---|---|
-| `open` (clone + initialize + 2 verifikasi tanda tangan) | ≈ 180k | _Hari 7_ |
-| Transfer USDG ke channel (proxy Paxos) | ≈ 60k | MockUSDG: **51.577** (Anvil) · **58.413** (testnet 46630); proxy Paxos di mainnet belum diukur |
+| `open` (clone + initialize; klien = `msg.sender`, 1 verifikasi tanda tangan provider) | ≈ 180k | **295.634** (Foundry `--gas-report`, `Cooperative.t.sol`, 8 panggilan identik, 20 Sep 2026); dengan dua tanda tangan / di testnet: belum diukur terpisah |
+| Transfer USDG ke channel (proxy Paxos) | ≈ 60k | MockUSDG: **51.577** (Anvil) · **58.413** (testnet 46630); v1: 57.905 (co-signed) · 59.872 (anchored); proxy Paxos di mainnet belum diukur |
 | `submitCheckpoint` (2 tanda tangan EOA) | ≈ 80k | **102.825** (Anvil) · **118.929** (testnet v0) · **118.113** (testnet v1) |
-| `closeCooperative` (2 tanda tangan + 2 transfer) | ≈ 190k | _Hari 7_ |
-| `claimPenalty` (verifier 6 input + storage) | ≈ 260k | verifier saja: **229.241**; total **293.880** (Anvil) · **309.373** (testnet v0, tx `0x54355aef…`) · **308.256** (testnet v1) |
-| `settle` (2 transfer) | ≈ 130k | **93.900** (Anvil) · **98.291** (testnet v0) · **102.427** (testnet v1) |
+| `closeCooperative` (2 tanda tangan + 2 transfer ke EOA) | ≈ 190k | median **100.191**, maks **109.003** (Foundry `--gas-report`, `Cooperative.t.sol`, 20 Sep 2026); testnet: belum diukur terpisah |
+| `claimPenalty` (verifier 6 input + storage) | ≈ 260k | verifier saja: **229.241**; total **293.880** (Anvil) · **309.373** (testnet v0, tx `0x54355aef…`) · **308.256** (testnet v1) · 312.706 (testnet v1, anchored) |
+| `settle` (2 transfer) | ≈ 130k | **93.900** (Anvil) · **98.291** (testnet v0) · **102.427** (testnet v1, co-signed dan anchored) |
+| `settle` dengan payee kontrak yang membakar stipend hook (T20, Foundry) | — | **212.572** (ledger P1 Task 3; `HOOK_GAS` saat itu 150k) — dengan router nyata: belum diukur terpisah |
+| `rollover` (2 tanda tangan + 1 transfer + reset) | — | belum diukur terpisah (ada di dalam skenario 11 testnet, channel `0x188febd7…37c7`) |
 | `ack` anchored (7 hash t=3 + storage) — Stylus / Yul | ≈ 83k / 140k | Stylus (testnet 46630): 357.028 pertama, ≈211k–217k stabil; Yul (Anvil): 449.142 pertama, ≈303k–309k stabil |
 | `startClose` (anchored, membuka jendela tantangan) | — | **65.484** (testnet v1) |
-| `insertPath` 7 hash Poseidon t=3 (`cast estimate` − intrinsik, kontrak Poseidon berdiri sendiri) — Stylus teroptimasi / Yul | ≈ 83k / 140k | Stylus **144.076** vs Yul **252.271** |
-| Aktivasi `AegisPoseidon.rs` (sekali) | 1.659.168 + data fee | AegisPoseidon aktif di `0x1027cf7D…ef34`, 21,7 KB, data fee 0,000095 ETH |
+| `insertPath` 7 hash Poseidon t=3 (`cast estimate`, kontrak Poseidon berdiri sendiri) — Stylus teroptimasi / Yul | ≈ 83k / 140k | Stylus **144.076** vs Yul **252.271** (1,75×); `hash2` tunggal Yul 62.138 vs Stylus 82.593 |
+| Aktivasi `AegisPoseidon` (sekali) | 1.659.168 + data fee | AegisPoseidon aktif di `0x1027cf7D…ef34`, 21,7 KB; *data fee* estimasi `cargo stylus check` 0,000095 ETH (build referensi) / 0,000091 ETH (build teroptimasi, `stylus/aegis-poseidon/README.md`); gas aktivasi aktual belum dicatat |
 
-Pada gas price mainnet saat diukur (0,0676 gwei), seluruh siklus sengketa (open → checkpoint → claim → settle) ≈ 650k gas ≈ **44 µETH** + fee data L1. Sebutkan dalam ETH, bukan USD, kecuali harga ETH ikut dicatat pada tanggal yang sama.
+Pada gas price mainnet saat diukur (0,0676 gwei), seluruh siklus sengketa (open → checkpoint → claim → settle) ≈ 650k gas ≈ **44 µETH** + fee data L1. Sebutkan dalam ETH, bukan USD, kecuali harga ETH ikut dicatat pada tanggal yang sama. Angka Foundry adalah gas eksekusi EVM (tanpa intrinsik tx); angka testnet adalah `gasUsed` receipt.
 
 ---
 
 ## 9. SPESIFIKASI SIRKUIT — `sla_settlement.circom`
+
+**Tidak berubah di P1.** Sirkuit, zkey (release `v0.1.0-zkey`), dan verifier identik dengan v1.0; `epoch` sengaja tidak masuk input publik (§6.2), dan anchored mode memakai bukti yang sama atas `R`/`seq`/`A` yang dibangun kontrak dari `ack` (`Anchored.t.sol::test_100_acks_then_dispute_with_real_proof`).
 
 ### 9.1 Antarmuka
 ```
@@ -581,7 +670,7 @@ provider → factory.open(cfg, sigClient, "")                                   
 ```
 **Catatan persetujuan klien.** Klien menandatangani Permit2 (dana), bukan `ChannelTerms`. Dua opsi: (a) klien mengembalikan `sigClient(ChannelTerms)` di header tambahan saat membayar (butuh SDK AegisClear sebelum pembayaran pertama) atau (b) **provider** yang membuka channel dengan tanda tangan klien yang dikirim bersama **ack pertama**. Opsi (b) menjaga FR-23: klien x402 polos cukup membayar; persetujuan syarat datang saat ack pertama, yang memang butuh SDK AegisClear di sisi klien. Dana yang sudah masuk ke alamat `predict()` sebelum `open` tetap aman: alamat itu hanya bisa menjadi channel dengan `cfg` persis yang di-hash ke salt — dan sebelum `open`, tidak ada yang bisa memindahkannya (`sweep` butuh `SETTLED`). Rekomendasi: (b) — D7. Sisi lain koin ini adalah T19.
 
-**Tiket keluar (exit ticket) — ditambahkan saat implementasi (Task 14).** Karena `submitCheckpoint`/`closeCooperative` butuh dua tanda tangan, klien tidak punya jalan keluar sepihak sebelum unit 0 jika provider menghilang setelah dana masuk. Provider karena itu menandatangani `Checkpoint(0, 0, root_kosong)` per sesi dan mengirimnya di 402 sebagai `extra.aegis.exitSig`; SDK klien memverifikasinya (domain = alamat `predict()`) **sebelum** mendanai, dan `exitUnilateral()` memakainya hanya jika klien belum memegang checkpoint co-signed apa pun. Tiket ini tidak membuka kelas serangan baru — klien memang selalu bisa mengirim checkpoint co-signed yang basi — tetapi ia mempertegas kewajiban §11.4: provider **wajib** menjalankan challenge responder yang mengirim `latestCoSigned` saat `seq` on-chain lebih rendah.
+**Tiket keluar (exit ticket) — ditambahkan saat implementasi (Task 14), diperluas ke epoch di P1.** Karena `submitCheckpoint`/`closeCooperative` butuh dua tanda tangan, klien tidak punya jalan keluar sepihak sebelum unit 0 jika provider menghilang setelah dana masuk. Provider karena itu menandatangani `Checkpoint(epoch, 0, 0, emptyRoot)` per sesi dan mengirimnya di 402 sebagai `extra.aegis.exitSig`; SDK klien memverifikasinya (domain = alamat `predict()`) **sebelum** mendanai, dan `exitUnilateral()` memakainya hanya jika klien belum memegang checkpoint co-signed apa pun. Tiket ini tidak membuka kelas serangan baru — klien memang selalu bisa mengirim checkpoint co-signed yang basi — tetapi ia mempertegas kewajiban §11.4: provider **wajib** menjalankan challenge responder yang mengirim `latestCoSigned` saat `seq` on-chain lebih rendah. **Setelah `rollover`** tiket epoch lama mati bersama semua tanda tangan epoch itu; provider karena itu mengembalikan tiket epoch berikutnya (`exitSigNext` = `Checkpoint(epoch+1, 0, 0, emptyRoot)`) **di dalam balasan `POST /rollover`**, sebelum klien mem-broadcast tx apa pun (T25, I1). Mode anchored tidak memakai tiket sama sekali — `startClose()` adalah jalan keluar sepihaknya. 402 juga memuat `extra.aegis.anchored`, tetapi klien **tidak mempercayainya**: mode diturunkan dari `POSEIDON()` factory miliknya sendiri (T23).
 
 **Facilitator.** Tidak ada perubahan: ia memverifikasi `witness.to == payTo` dan menyelesaikan. Uji terhadap facilitator Mesh (`facilitator.meshgateway.co`) apakah menerima `payTo` arbitrer (V8); jika tidak, jalankan facilitator sendiri dari `meshgateway/x402` fork — x402 facilitator adalah server stateless.
 
@@ -593,8 +682,8 @@ provider → factory.open(cfg, sigClient, "")                                   
 | `evaluator.complete/reject` | bukti (`claimPenalty`) atau default jendela; **tidak ada alamat evaluator** |
 | `Completed` / `Rejected` biner | `Settled(toProvider, toClient)` proporsional |
 | `claimRefund` setelah `expiredAt` | `settle` setelah `deadline`; sisa budget selalu ke klien |
-| `IACPHook` | tidak ada (jalur dana tanpa hook, sesuai peringatan 8183 sendiri tentang `claimRefund`) |
-| Event `JobFunded`, `PaymentReleased`, `Refunded` | dipancarkan dengan nama & parameter sama |
+| `IACPHook` | tidak ada hook yang bisa menggagalkan jalur dana (sesuai peringatan 8183 sendiri tentang `claimRefund`); hook payout P1 (`IAegisPayoutHook`, §8.4) bersifat best-effort — try/catch + stipend, kegagalan diabaikan (T20) |
+| Event `JobFunded`, `PaymentReleased`, `Refunded` | dipancarkan dengan nama & parameter sama (`jobId = channelIdField()`); `rollover` memancarkan `PaymentReleased` per epoch |
 
 Konformansi interface penuh (`IACP`) **tidak** diklaim; 8183 masih draft dan semantiknya per-job biner. Yang diklaim: *"AegisClear adalah evaluator yang 8183 bayangkan, dengan escrow yang 8183 belum bisa ekspresikan"*.
 
@@ -605,26 +694,36 @@ Setelah `Settled`, watcher memanggil `ReputationRegistry.giveFeedback(agentId_pr
 
 ## 11. OFF-CHAIN SERVICES — `aegis-sdk` (TypeScript)
 
-### 11.1 `@aegisclear/core`
-- `Terms` → `commit()` (Poseidon t=7 via `circomlibjs`), serialisasi & penyimpanan terenkripsi lokal (kehilangan `nonce` = kehilangan hak klaim, T9)
-- `ReceiptTree`: 128 slot, `append()`, `root()`, vektor uji identik dengan sirkuit
-- `Checkpoint`: EIP-712 sign/verify (viem), `latest()`, `merge(remote)` (ambil `seq` tertinggi yang punya dua tanda tangan sah)
-- `Prover`: `prove(terms, receipts, seq) → {proof, publicSignals}` (snarkjs; opsional `rapidsnark` binary), `settlement(terms, receipts)` (Python-equivalent, dipakai untuk pra-cek sebelum proving)
+Satu paket `@aegisclear/sdk` (`sdk/`) dengan empat lapisan; nama di bawah adalah nama modulnya. Ini implementasi **referensi** untuk demo/test, bukan server produksi — keterbatasannya yang diketahui dicatat di README ("Keterbatasan SDK referensi").
 
-### 11.2 `@aegisclear/provider` (middleware Express/Hono)
-- Menjawab 402 dengan `payTo = predict(cfg)` (§10.2)
-- Per request berbayar: hitung `due`, lampirkan `Aegis-Receipt` + `sigProvider(Checkpoint_seq)`, **tahan respons berikutnya sampai ack `seq` sebelumnya diterima** (FR-24, T2)
-- Menolak jika `budget − A − due < 0` (baca `balanceOf` dengan cache per blok)
-- Menutup channel sepihak setelah `idleTimeout` (checkpoint terakhir)
+### 11.1 `core` (`sdk/src/core/`)
+- `Terms` → `commitTerms()` (Poseidon t=7 via `circomlibjs`); `nonce` per sesi (kehilangan `nonce` = kehilangan hak klaim, T9)
+- `ReceiptTree`: 128 slot, `append()`, `root()`, `reset()` (rollover); `leafHash(receipt)`, `merkleRoot(leaves)` — vektor uji identik dengan sirkuit dan `insertPath` on-chain (INV-11)
+- `typedData.ts`: domain `AegisClear`/`1`/`verifyingContract = channel`; `sign*/verify*` untuk `ChannelTerms`, `Checkpoint{epoch,…}`, `CloseMsg`, `RolloverMsg` (tipe terpisah, typehash berbeda), `LeafMsg` (anchored); `TypedDataVerifier` sadar ERC-1271/6492 (`publicClient.verifyTypedData`) untuk klien smart account, `verify*Sig` murni (ecrecover) untuk EOA/offline
+- `settle(receipts, terms)` (padanan Python §6.3, dipakai untuk `cumulativeAmount` dan pra-cek sebelum proving); `buildCircuitInput`; `Prover` (snarkjs `groth16 fullprove`, ≈4 s)
 
-### 11.3 `@aegisclear/client` (untuk MeshWallet/MCP atau agen apa pun)
-- Meng-ack hanya jika metrik di header sesuai pengamatan sendiri dalam toleransi yang dikonfigurasi (mis. latensi server ≤ RTT klien) — kalau tidak, tidak ack dan unit tidak dibayar
-- Menyimpan setiap `Checkpoint` co-signed; `claimPenalty()` = prove + kirim; `settle()` setelah deadline
+### 11.2 `provider` — `createProviderApp(ProviderOptions)` (Hono)
+- Opsi P1: `anchored?: boolean` (satu server = satu mode; saat start membaca `POSEIDON()` dari `ctx.factory` dan **melempar error bila tidak cocok** dengan opsi — konfigurasi salah gagal jujur, bukan salah melayani), `payoutProvider?: Address` (default alamat provider; isi alamat router untuk FR-26)
+- `GET /job` (header `Aegis-Client`) → 402 dengan `payTo = predict(cfg)` dan `extra.aegis = { config, sigProvider(ChannelTerms), terms, unitQty, exitSig, anchored }` (§10.2)
+- `POST /job` — badan handler **diserialkan per klien** (`serializeJob`, rantai promise FIFO per alamat — M6): dua request konkuren untuk sesi yang sama tidak lagi bisa double-append ke pohon. Urutan: (1) buka channel pada `Aegis-Terms-Signature` pertama (D7; provider = `msg.sender`); (2) co-signed: tahan sampai ack checkpoint sebelumnya (`Aegis-Ack` atau `POST /ack`) — anchored: baca on-chain `state == OPEN`, `epoch` sama, `seq() ≥ n` (tidak ada header ack); (3) `409 epoch-full` bila `n ≥ MAX_SEQ`, `409 session-closing` bila `Close`/`Rollover` sudah ditandatangani provider; (4) tolak bila `balanceOf(channel) < A + due` (FR-24, T2); (5) layani unit `n`: co-signed → `{ receipt, checkpoint{epoch, n+1, A', R'}, sigProvider }`, anchored → `{ receipt, leaf{epoch, n, leaf, A'}, sigProvider(Leaf) }`
+- `POST /close` dan `POST /rollover` (`countersign`, T-close-hi + F-close-continue): hanya `seq` co-signed **tertinggi** (anchored: `seq()` on-chain), `toProvider` harus persis kumulatif checkpoint itu, dan permintaan **wajib** membawa tanda tangan klien atas pesan yang sama (`Close`/`Rollover`) — bukti identitas & niat, karena header `Aegis-Client` sendiri tidak diautentikasi; setelah ikut menandatangani, sesi ditandai `closing`. `/rollover` (co-signed) juga mengembalikan **`exitSigNext`** = tiket `Checkpoint(epoch+1, 0, 0, emptyRoot)` pra-tanda-tangan (I1, T25); anchored tidak (M5)
+- `POST /rollover/confirm` — sinkronisasi **idempoten** berdasarkan state on-chain: `state != OPEN` → `409 rollover-not-onchain`; epoch on-chain == epoch sesi dan tidak `closing` → balas ulang tiket yang ada; epoch on-chain == epoch sesi + 1 dan `seq() == 0` → reset pohon/kumulatif/checkpoint, `epoch++`, `closing = false`, tiket seq-0 baru (co-signed)
+- `POST /ack`, `GET /state`; kode 409 lain: `ack-required`, `epoch-mismatch`, `channel-not-open`, `checkpoint-not-acked`, `amount-mismatch`
+- `startProviderWatcher` **wajib** dijalankan di proses yang sama (responder T1 memakai memori checkpoint co-signed sesi)
 
-### 11.4 Watcher / settler bot
-- Mengindeks event factory; memanggil `settle()` setelah `deadline`, `sweep()` setelah `SETTLED` dengan saldo > 0
-- **Challenge responder (wajib untuk provider):** untuk setiap channel yang dilayani, jika `state == CLOSING` dan `seq` on-chain < `seq` checkpoint co-signed tertinggi yang dipegang (`latestCoSigned`), kirim `submitCheckpoint` dengan checkpoint itu sebelum `deadline` — inilah yang menetralkan checkpoint basi maupun tiket keluar seq-0 (T1)
+### 11.3 `client` — `AegisClient` (untuk MeshWallet/MCP atau agen apa pun)
+- `start()`: verifikasi `payTo == predict(cfg)` (T19), `sigProvider(ChannelTerms)`, `payoutClient == payoutTo`; **mode diturunkan dari `POSEIDON()` factory milik klien sendiri** — flag `anchored` di 402 hanya dicocokkan, ketidakcocokan → tolak sebelum transfer apa pun (T23); `ClientPolicy` (`maxDeposit`, `maxChallengeWindow`, `maxQtyPerUnit` — tanpa batas qty klien menolak mendanai); co-signed: verifikasi `exitSig` seq-0 sebelum mendanai
+- `requestUnit()`: verifikasi `due == qty × p`, batas qty, `accept(receipt)` (tempat klien membandingkan metrik dengan pengamatannya sendiri — default menerima semua); co-signed: rekomputasi root/A tentatif harus sama dengan checkpoint provider, verifikasi tanda tangan, **baru** pohon disentuh, tanda tangan klien disimpan sebagai `pendingAck`; anchored: `leaf == leafHash(receipt)`, `A' == settle(receipts ∪ receipt).A`, tanda tangan `Leaf` provider, lalu **tx `ack()`**, lalu `tree.append` (invarian `tree.size == seq()` on-chain)
+- `closeCooperative()`: `finalAck()` dulu (M1), klien menandatangani `Close(epoch, seq, A)` **lebih dulu** → `/close` → tx `closeCooperative`
+- `rollover()`: `/rollover` → verifikasi `sigProvider` **dan `exitSigNext`** (co-signed) **sebelum** tx `rollover()` dikirim → tx → `/rollover/confirm` (retry ×3) → verifikasi `epoch` on-chain naik 1 → baru commit lokal (reset pohon, `epoch++`, simpan tiket baru). Aman diulang: tx yang sudah tercatat tidak dikirim ulang; bila epoch sudah naik lebih dulu (percobaan sebelumnya terputus), langsung ke confirm
+- `dispute()`: co-signed → `submitCheckpoint` dengan checkpoint co-signed tertinggi; anchored → `startClose()` bila `OPEN`, **toleran `CLOSING`** (provider lebih dulu `startClose`) — lalu bukti + `claimPenalty` bila `payToClient > 0`
+- `exitUnilateral()`: co-signed → tiket seq-0 hanya bila tidak ada checkpoint co-signed; anchored → `startClose()` (toleran `CLOSING`)
+
+### 11.4 Watcher / settler bot (`sdk/src/watcher/`)
+- Mengindeks `ChannelOpened` dari `fromBlock` (wajib diisi di RPC publik); memanggil `settle()` setelah `deadline`, `sweep()` setelah `SETTLED` dengan saldo > 0; CLI permissionless `watcher/cli.ts` (validasi env, SIGINT)
+- **Challenge responder (wajib untuk provider, in-process):** untuk setiap channel yang dilayani, jika `state == CLOSING` dan `seq` on-chain < `seq` checkpoint co-signed tertinggi yang dipegang **dengan `epoch` yang sama** (`mine.cp.epoch === view.epoch` — checkpoint epoch lama pasti ditolak kontrak dan seq-nya tidak boleh disalahartikan lebih baru), kirim `submitCheckpoint` sebelum `deadline` — inilah yang menetralkan checkpoint basi maupun tiket keluar seq-0 (T1). Responder selalu merespons dulu tanpa memandang `deadline` (kontrak tidak menggerbangi `submitCheckpoint` dengan deadline), membaca ulang, baru men-settle. Tidak relevan untuk anchored (tidak ada checkpoint co-signed)
 - Peringatan untuk klien: channel `CLOSING` dengan `seq` lebih rendah dari yang klien pegang → kirim checkpoint terbaru; dengan `seq` sama & ada pelanggaran → prove & claim sebelum deadline
+- **Belum:** `keepalive` otomatis program Stylus (T15, P2)
 
 ---
 
@@ -645,14 +744,23 @@ Setelah `Settled`, watcher memanggil `ReputationRegistry.giveFeedback(agentId_pr
 | T11 | Overflow / nilai di luar rentang | `due` besar, `seq` > 128 | C10 di sirkuit; `uint128` di kontrak; `MAX_SEQ` | Nihil |
 | T12 | Signer ERC-1271 mengubah logika | tanda tangan sah lalu "dicabut" | validitas diperiksa saat submit (`isValidSignatureNow`); state yang sudah masuk tidak bergantung pada validitas ulang | Diterima |
 | T13 | Front-running `settle` / `claimPenalty` | mempercepat/menghambat | hasil deterministik; `settle` permissionless; FCFS | Nihil |
-| T14 | Reentrancy pada payout | token dengan hook | USDG tanpa hook; tetap CEI + `nonReentrant` | Nihil |
-| T15 | Program Stylus kedaluwarsa | 365 hari tanpa panggilan | `keepalive` (31 hari) oleh watcher; anchored mode Yul sebagai fallback | Rendah |
+| T14 | Reentrancy pada payout | token dengan hook; **P1:** hook payout `_send` adalah satu-satunya panggilan ke kode tak tepercaya | USDG tanpa hook; CEI (state final sebelum `_send`) + `nonReentrant` di `settle`/`closeCooperative`/`rollover`/`sweep`/`fundWithPermit2`; fungsi tak terjaga (`submitCheckpoint`, `ack`, `startClose`, `claimPenalty`) butuh tanda tangan lawan atau hanya boleh oleh pihak dan tidak memindahkan dana; `insertPath`/`verifyProof`/ERC-1271 adalah `STATICCALL`. Router: `onPayout` + `claim` satu guard (Slither ID-4 *false positive*, uji re-entrancy lintas fungsi) | Nihil |
+| T15 | Program Stylus kedaluwarsa | 365 hari tanpa panggilan | `keepalive` (31 hari) — **watcher otomatis belum dibangun (P2), manual di P1**; `PoseidonPathYul` sebagai fallback deploy; dana selalu bisa diselamatkan lewat jalur EVM murni (`startClose` → `claimPenalty` → `settle`, atau `closeCooperative`) karena tidak satu pun memanggil `POSEIDON` (§8.3) | Rendah — hanya `ack` baru yang berhenti |
 | T16 | Kebocoran metadata | `A/seq`, `payToClient/A`, waktu | §6.7; `qty` bervariasi; **tidak diklaim anonim** | **Diterima & didokumentasikan** |
 | T17 | Provider melayani melebihi deposit | mengabaikan FR-24 | `toProvider ≤ B`; kerugian di provider | Diterima |
 | T18 | Facilitator jahat | menahan/menolak settle | tidak bisa mengubah jumlah/tujuan (witness); klien bisa mendanai langsung tanpa facilitator | Nihil untuk dana |
-| T19 | Dana masuk ke alamat `predict()` untuk `cfg` yang tidak pernah `open` | provider mengirim `payTo` lalu menghilang | siapa pun bisa `open` asalkan memegang tanda tangan **kedua** pihak; jika provider tidak pernah menandatangani `ChannelTerms`, alamat tidak bisa menjadi channel → dana **terkunci** | **Rendah dengan SDK klien** — D7: 402 `extra.aegis` wajib memuat `sigProvider(ChannelTerms)`; SDK klien memverifikasinya sebelum menandatangani Permit2, lalu klien sendiri bisa `open(cfg, "", sigProvider)` kapan saja. Klien x402 **polos** tidak boleh diarahkan ke `payTo` channel |
+| T19 | Dana masuk ke alamat `predict()` untuk `cfg` yang tidak pernah `open` | provider mengirim `payTo` lalu menghilang | siapa pun bisa `open` asalkan memegang tanda tangan **kedua** pihak; jika provider tidak pernah menandatangani `ChannelTerms`, alamat tidak bisa menjadi channel → dana **terkunci** | **Rendah dengan SDK klien** — D7: 402 `extra.aegis` wajib memuat `sigProvider(ChannelTerms)`; SDK klien memverifikasinya sebelum menandatangani Permit2, lalu klien sendiri bisa `open(cfg, "", sigProvider)` kapan saja. Klien x402 **polos** tidak boleh diarahkan ke `payTo` channel. Uji: "T19: payTo palsu (≠ predictChannel(cfg)) ditolak oleh start()" |
+| **T20** (P1, T-hook) | Payee kontrak menyandera payout | `payoutClient`/`payoutProvider` adalah kontrak yang revert atau membakar gas di `onPayout` → `settle`/`close`/`sweep`/`rollover` pihak lain gagal | hook dipanggil dalam `try/catch` dengan stipend tetap `HOOK_GAS` (300k) **setelah** transfer; kegagalan hook diabaikan; uji `test_reverting_payee_does_not_block_settle_or_close`, `test_gas_burning_payee_is_capped_and_settle_succeeds` | Nihil untuk dana; payee jahat hanya merugikan dirinya (kehilangan atribusi) |
+| **T21** (P1, T-hook-gas, audit M-1) | Pemanggil "mengelaparkan" hook | `settle`/`sweep` permissionless → pemanggil memilih gas limit sehingga hook kehabisan gas (EIP-150: callee dapat `min(HOOK_GAS, 63/64·gasleft)`) tetapi tx luar selesai → token sudah di router tanpa kredit (slack) → siapa pun `onPayout(penyerang, …)` mengambilnya (`Unbacked` lolos karena token memang ada) | pemeriksaan pasca-panggilan `gasleft() < HOOK_GAS/63 → InsufficientGas` (pola OZ `ERC2771Forwarder`): hook dijamin **ditawari** stipend penuh atau tx revert; `eth_estimateGas` monoton, tidak ada yang hardcode gas. Jendela sebelum perbaikan terukur hanya untuk hook ≈227k–300k (PoC Foundry: hook 234k → `sweep{gas: 434.200}` men-dampar 250.000 token; 164k → tidak ada jendela); `settle`/`rollover` punya lebih banyak kerja pasca-hook (ambang > 300k) sehingga tidak bisa dieksploitasi bahkan sebelum perbaikan. Uji `HookGas.t.sol` (5; 3 gagal pada kode lama) | **Diperbaiki di source (commit `5fe05c0`)**; testnet v1 mendahului perbaikan — router yang dikirim ≈55k (MockUSDG) jauh di bawah jendela, jadi tidak tereksploitasi di v1; redeploy v2 menyusul |
+| **T22** (P1) | Slack router | transfer ERC-20 **langsung** ke alamat router (bukan lewat hook) atau token non-standar → saldo tak teratribusi, dapat diklaim siapa pun lewat `onPayout` | tidak bisa dibedakan on-chain dari token yang baru masuk lewat hook; peringatan keras di NatSpec + README: **jangan pernah** mengirim token langsung ke router; USDG lewat channel adalah satu-satunya jalur yang dimaksud | Diterima — kesalahan pengguna, didokumentasikan |
+| **T23** (P1, T-mode) | 402 berbohong soal mode | provider co-signed mengklaim `anchored: true` → klien anchored melewatkan verifikasi tiket keluar seq-0 → tanpa tiket, klien tidak punya jalan keluar sepihak → deposit terkunci (temuan **Critical** review Task 7, diperbaiki) | klien menurunkan mode dari `POSEIDON()` **factory miliknya sendiri** on-chain; flag 402 hanya dicocokkan, mismatch → `start()` menolak sebelum transfer apa pun; provider juga memverifikasi konfigurasinya sendiri saat start. Uji "T-mode: 402 mengklaim anchored=true padahal factory klien (POSEIDON=0) co-signed → start() menolak" | Nihil |
+| **T24** (P1, T-close-continue) | Layanan berlanjut setelah `Close`/`Rollover` ditandatangani | setelah provider ikut menandatangani `Close(epoch, n, A_n)`, sesi terus melayani unit n+1… → pihak mana pun memegang pesan close yang tidak lagi mencerminkan state; atau pihak ketiga memalsukan `/close` lewat header `Aegis-Client` yang tidak diautentikasi | `/close` & `/rollover` **wajib** membawa tanda tangan klien atas pesan yang sama (bukti niat), hanya `seq` co-signed tertinggi dengan jumlah persis (`checkpoint-not-acked`, `amount-mismatch`), lalu `session.closing = true` → `/job` `409 session-closing` sampai rollover terkonfirmasi on-chain; klien `finalAck()` dulu agar unit terakhir tidak hilang (M1) | Rendah |
+| **T25** (P1, T-rollover-ticket, I1) | Provider menyandera epoch baru | setelah tx `rollover()` klien ter-mined, epoch+1 tidak punya checkpoint co-signed; bila provider menahan balasan `/rollover/confirm` (tiket seq-0 epoch+1), sisa budget epoch baru terkunci tanpa batas waktu — mode co-signed tidak punya jalan keluar khusus klien | tiket epoch berikutnya (`exitSigNext` = `Checkpoint(epoch+1, 0, 0, emptyRoot)`) ditandatangani **di muka** di balasan `POST /rollover`, dan klien memverifikasinya **sebelum** mem-broadcast tx `rollover()`; tiket itu inert sampai epoch benar-benar naik — dan epoch hanya naik lewat tx yang membawa tanda tangan `Rollover` provider yang sama. `/rollover/confirm` idempoten berdasarkan state on-chain (retry aman). Uji "I1 negatif: countersign /rollover TANPA exitSigNext ditolak SEBELUM tx apa pun dikirim"; skenario 11 di testnet | Rendah — catatan desain **D11**: `startClose()` di mode co-signed akan membuat tiket keluar berlebihan (terbuka) |
+| **T26** (P1, anchored) | `A` digelembungkan di mode anchored | provider menandatangani `Leaf(epoch, seq, leaf, A')` dengan `A' > A + due`; kontrak hanya memeriksa `A' ≥ A` (`AmountDecreased`) dan tanda tangan provider | tx `ack` adalah **persetujuan klien** (padanan menandatangani checkpoint): SDK klien memverifikasi `leaf == leafHash(receipt)` dan `A' == settle(receipts ∪ receipt).A` sebelum mengirim tx (`agent.ts` melempar `leaf hash mismatch` / `leaf cumulativeAmount mismatch`; **belum ada test negatif khusus** untuk jalur ini — backlog). Bila klien tetap meng-ack `A'` yang salah, itu kesalahannya sendiri seperti co-sign checkpoint yang salah: default jendela membayar `min(A', B)`, dan **tidak ada bukti** yang bisa dibuat untuk `A'` (C6 `Σ due_i == A`) sehingga klien juga kehilangan hak penalti; provider tidak pernah bisa menaikkan `A` sendirian karena hanya `client` yang boleh `ack` | Diterima — pemeriksaan sisi klien, dinyatakan |
+| **T27** (P1, M6) | `POST /job` konkuren untuk satu klien | dua request paralel (atau spoof header) membaca `n = tree.size` yang sama sebelum salah satu `append` → double-append, tabrakan `checkpoints.set(n+1)` | badan handler `/job` diserialkan per alamat klien (rantai promise FIFO); klien berbeda tidak saling menunggu. Uji "M6: dua POST /job konkuren untuk klien yang sama tidak boleh meng-korupsi pohon provider" | Rendah — `/ack` belum diserialkan (liveness saja; backlog) |
+| **T28** (P1, anchored) | Lawan lebih dulu `startClose()` | provider memanggil `startClose()` → channel `CLOSING` → `dispute()`/`exitUnilateral()` klien yang memanggil `startClose()` lagi revert `WrongState` → jalur penalti tidak tercapai (temuan Important review Task 7, diperbaiki) | klien toleran `CLOSING`: lewati `startClose`, langsung bukti + `claimPenalty` (bukti atas `R/seq/A` on-chain tetap sah); provider berhenti melayani channel non-`OPEN` (`channel-not-open`). Uji "anchored: provider memanggil startClose() lebih dulu (CLOSING) → dispute() tetap lanjut ke bukti" (lulus di testnet, channel `0x0c7dbeba…27dc`) | Nihil |
 
-T19 layak disorot di README: ia adalah alasan `extra.aegis` di 402 wajib berisi tanda tangan provider, dan alasan klien x402 **polos** (tanpa SDK AegisClear) tidak boleh diarahkan ke `payTo` channel.
+T19 layak disorot di README: ia adalah alasan `extra.aegis` di 402 wajib berisi tanda tangan provider, dan alasan klien x402 **polos** (tanpa SDK AegisClear) tidak boleh diarahkan ke `payTo` channel. T20–T22 adalah dua desain yang masing-masing diterima (hook best-effort × `onPayout` permissionless) yang interaksinya baru terlihat saat audit — alasan `InsufficientGas` ada. **Self-audit Slither 0.11.5 (20 Sep 2026, `docs/audit/slither-2026-09.md`):** 77 → 75 hasil atas 7 kontrak + 3 interface (574 SLOC); nol *true positive* High/Medium (3 High = idiom `return` snarkjs, 2 Medium = `amount == 0` dan re-entrancy lintas fungsi yang terjaga); 2 Low diperbaiki (`ZeroAddress` factory) + M-1 manual; `forge test` 118 lulus. Ini audit tim sendiri sebelum tenggat, bukan pengganti audit independen sebelum dana nyata (T4 tetap terbuka).
 
 ---
 
@@ -662,7 +770,7 @@ T19 layak disorot di README: ia adalah alasan `extra.aegis` di 402 wajib berisi 
 | ID | Invariant |
 |---|---|
 | INV-1 | Pada `SETTLED`: `toProvider + toClient == balanceOf(channel)` sesaat sebelum transfer; saldo 0 sesudahnya |
-| INV-2 | `latest.seq` monoton naik; setiap perubahan `(seq, A, R)` disertai dua tanda tangan sah atas nilai persis itu |
+| INV-2 | `latest.seq` monoton naik **dalam satu epoch**; setiap perubahan `(seq, A, R)` disertai dua tanda tangan sah atas nilai persis itu (co-signed) atau tanda tangan provider + tx klien (anchored); reset hanya lewat `rollover` dengan dua tanda tangan `Rollover(epoch, …)` dan `epoch++` |
 | INV-3 | `proofSeq == seq` ⇒ `verifyProof(…, [addr, T, R, seq, A, payToClient]) == true` pada saat klaim |
 | INV-4 | `payToClient ≤ A` (kontrak) dan `payToClient == min(penRaw, cap)` (sirkuit) |
 | INV-5 | `toProvider ≤ min(A, B)`; `toProvider ≥ min(A − ⌊A×κ/10000⌋, B)` untuk setiap jalur settle |
@@ -671,8 +779,12 @@ T19 layak disorot di README: ia adalah alasan `extra.aegis` di 402 wajib berisi 
 | INV-8 | `deadline` tidak pernah berkurang; total perpanjangan ≤ `responseWindow × (jumlah checkpoint co-signed)` |
 | INV-9 | Tidak ada fungsi yang memindahkan USDG keluar sebelum `SETTLED`; setelah `SETTLED` hanya `sweep` → `payoutClient` |
 | INV-10 | (sirkuit) `Σ due_i == A`; `due_i == qty_i × p`; `leaf_i == 0 ∀ i ≥ seq`; root == `R` |
-| INV-11 | (anchored) root on-chain setelah `k` ack == `ReceiptTree.root()` SDK atas leaf yang sama, untuk Stylus dan Yul |
+| INV-11 | (anchored) root on-chain setelah `k` ack == `ReceiptTree.root()` SDK atas leaf yang sama, untuk Stylus dan Yul — ✅ `Anchored.t.sol::test_ack_three_leaves_matches_fixture_roots`, `PoseidonPathYul.t.sol::test_insertPath_128_leaves_incrementally_matches_sdk_roots`, `cargo test` (100 root), on-chain `cast call` identik (§8.3) |
 | INV-12 | Tidak ada urutan panggilan oleh **satu** pihak yang mengubah hak pihak lain di bawah `(A − cap)` untuk provider atau di bawah `B − A` untuk klien |
+| INV-13 (P1) | Tanda tangan `Checkpoint`/`Close`/`Rollover`/`Leaf` epoch `e` tidak pernah diterima setelah `rollover` ke `e+1` (`BadSignature`) — `test_old_epoch_checkpoint_and_close_rejected_after_rollover`, `test_rollover_signature_not_replayable`, `test_old_epoch_leaf_signature_rejected_after_rollover` |
+| INV-14 (P1) | Setelah `rollover`: `seq = A = R = deadline = 0`, `hasProof = false`, `state = OPEN`, `budget()` = saldo sebelumnya − `toProvider`; anchored: `filledSubtrees` nol (ack seq 0 lagi menghasilkan root 1-daun) — `test_rollover_pays_provider_keeps_remainder_and_resets`, `test_rollover_resets_tree` |
+| INV-15 (P1, router) | `Σ_agent credit[agent][token] == totalCredit[token] ≤ balanceOf(router, token)` di setiap titik, termasuk selama `onPayout` (`Unbacked`; `test_onPayout_without_backing_reverts`) |
+| INV-16 (P1, hook) | Kegagalan `onPayout` payee tidak pernah mengubah hasil `settle`/`closeCooperative`/`sweep`/`rollover`; bila tx sukses dengan payee kontrak, hook telah ditawari ≥ 63·⌊`HOOK_GAS`/63⌋ gas (`HookGas.t.sol`) |
 
 ### Skenario test wajib
 1. **Jalur bahagia:** 100 request, 0 pelanggaran, cooperative close → provider 2,00; klien 3,00 (sisa). Chain hanya berisi `T`, `R`, jumlah (uji `leak-check`).
@@ -685,12 +797,15 @@ T19 layak disorot di README: ia adalah alasan `extra.aegis` di 402 wajib berisi 
 8. **Bukti palsu ditolak:** ubah satu byte → `verifyProof == false`. FR-18 diuji terpisah dengan verifier mock yang selalu `true`: `payToClient > A` → revert.
 9. **ERC-1271:** klien adalah smart account (mock 1271 + SimpleAccount 4337) → semua tanda tangan diterima.
 10. **Pendanaan x402:** simulasi `x402ExactPermit2Proxy.settle` (fork mainnet 4663 di Anvil) ke `predict(cfg)` sebelum `open`; lalu `open`; `budget()` benar (V8 untuk facilitator nyata).
-11. **Rollover (P1):** epoch 128 penuh → `rollover` → epoch baru dengan `T` sama, `seq = 0`, budget sisa.
-12. **Anchored (P1):** 8 `ack` on-chain → root == SDK; gas Stylus vs Yul dicatat.
-13. **USDG dibekukan (mock):** `transfer` revert saat settle → state tetap `CLOSING`, tidak ada dana yang hilang, `settle` bisa diulang.
-14. **Fuzz parameter:** `π, κ ∈ [0, 10000]`, `seq ∈ [0, 128]`, `qty, m1, m2 < 2³²` → INV-4, INV-5, INV-10 (sirkuit lewat vektor acak: 200 vektor, Python vs snarkjs).
+11. **Rollover (P1) ✅:** epoch 128 penuh → `rollover` → epoch baru dengan `T` sama, `seq = 0`, budget sisa. Foundry `Rollover.t.sol` (12 test: bayar provider + sisa jadi budget + `epoch 1`/`seq 0`; replay checkpoint/close epoch 0 → `BadSignature`; rollover dari `CLOSING` menghapus bukti tertunda; `ExceedsBudget`; `StaleCheckpoint`; dua rollover berurutan lalu close; `toProvider = 0`; tanda tangan `Close` ditolak `rollover`). SDK integrasi: **"skenario 11 (FR-10): epoch penuh → 409 epoch-full → rollover() → unit lanjut di epoch 1 → close; provider = A0 + A1"** + **"I1 negatif: countersign /rollover TANPA exitSigNext ditolak SEBELUM tx apa pun dikirim"** — lulus di Anvil dan testnet 46630 (channel `0x188febd7…37c7`, tx `open` `0xe2d6e114…bd3a`).
+12. **Anchored (P1) ✅:** ack on-chain → root == SDK; gas Stylus vs Yul dicatat (§8.7). Foundry `Anchored.t.sol` (18 test dengan `PoseidonPathYul`: 3 ack == root fixture, seq salah/bukan klien/tanda tangan salah/`A` turun/`WrongMode` kedua arah/`startClose` hanya pihak & hanya `OPEN`/settle tanpa bukti membayar `A`/rollover me-reset pohon/seq 128/daun epoch lama/close kooperatif/**100 ack + bukti asli via FFI**) + `PoseidonPathYul.t.sol` (5). SDK integrasi `describe("skenario 12 (FR-25 anchored): ack on-chain, startClose, bukti atas R on-chain")`: **"sengketa: 10 ack on-chain (1 pelanggaran) → startClose → bukti → settle 190.000 / 810.000; calldata ack tanpa metrik"**, **"anchored: provider memanggil startClose() lebih dulu (CLOSING) → dispute() tetap lanjut ke bukti tanpa startClose lagi"**, **"kooperatif anchored: 5 ack → close (klien menandatangani dulu) → provider +100.000"**, **"keluar unilateral anchored: provider tidak menjawab → startClose → settle → deposit kembali penuh"** — lulus di Anvil (Yul) **dan** testnet 46630 (Stylus; channel `0xa9c8bea6…7ee7`, `0x0c7dbeba…27dc`, `0x2858e618…d6f9`, `0xf63e7199…7bec`).
+13. **USDG dibekukan (mock):** `transfer` revert saat settle → state tetap `CLOSING`, tidak ada dana yang hilang, `settle` bisa diulang. **Status:** di tingkat channel perilaku ini mengikuti CEI (`state = SETTLED` ditulis lalu `safeTransfer` revert → seluruh tx batal, state tetap `CLOSING`) tetapi **belum ada test khusus**; di tingkat router ✅ `TreasuryRouter.t.sol::test_frozen_treasury_keeps_credit_then_claim` (`FreezableToken` mock: transfer ke treasury beku → kredit → `claim`).
+14. **Fuzz parameter:** `π, κ ∈ [0, 10000]`, `seq ∈ [0, 128]`, `qty, m1, m2 < 2³²` → INV-4, INV-5, INV-10 (sirkuit lewat vektor acak: 200 vektor, Python vs snarkjs). `Invariant.t.sol` (Foundry) + `settlement.test.ts`/`circuits` test.
+15. **Treasury router (P1) ✅:** provider `payoutProvider = router`, `setTreasury(treasury)` → treasury dibayar dalam tx `close` yang sama. Foundry `TreasuryRouter.t.sol` (11 test, §8.4). SDK integrasi **"skenario 13 (FR-26): payoutProvider = AegisTreasuryRouter → treasury menerima pembayaran dalam tx close yang sama"** (dinamai "13" di suite SDK) — lulus di testnet (channel `0x5a57e6ed…fde1`, tx `0x848f7823…9c11`).
+16. **Hook payout & stipend (P1, audit M-1) ✅:** `HookGas.t.sol` — `test_sweep_caller_cannot_starve_router_hook` (semua gas limit 380k…640k: sweep revert atau router sudah meneruskan), `test_settle_caller_cannot_starve_router_hook`, `test_starved_hook_reverts_InsufficientGas`, `test_hook_needing_full_stipend_is_never_starved`, `test_eoa_payee_has_no_stipend_requirement`; `test_reverting_payee_does_not_block_settle_or_close`, `test_gas_burning_payee_is_capped_and_settle_succeeds`, `test_sweep_and_rollover_go_through_hook`.
+17. **Adversarial SDK (P0/P1) ✅:** "T19: payTo palsu … ditolak oleh start()", "T-mode: 402 mengklaim anchored=true …", "M6: dua POST /job konkuren …", "F2: balasan provider dengan tanda tangan checkpoint SALAH ditolak SEBELUM pohon disentuh" (Anvil saja), "F3: ClientPolicy — maxDeposit menolak 402 sebelum transfer; maxQtyPerUnit menolak receipt qty 5 …, lalu klien keluar lewat tiket seq-0" (testnet channel `0x8e6fcb4d…f0b5`), "F5: nonce/termsCommitment berbeda per sesi", "/close menolak seq basi (0 atau tengah)" (Anvil saja), "tiket keluar unilateral: provider mati sebelum unit 0 → deposit klien kembali penuh" (Anvil saja), "Task 15 fix round 1: startProviderWatcher in-process mengganti checkpoint basi" (Anvil saja).
 
-Target: ≥ 90% line coverage kontrak inti; invariant run ≥ 50k; 200 vektor acak sirkuit lulus.
+**Status suite (20 Sep 2026):** `forge test` **118 lulus, 0 gagal** (audit §4); pada tip P1 sebelum sub-proyek ship: sdk 50, web 31, circuits 14, demo 3, stylus `cargo test` 5 (ledger P1, "Final re-review") — sub-proyek ship menambah test demo/web untuk baris anchored & rollover. Suite integrasi SDK di **testnet 46630: 13 lulus, 4 dilewati** (test yang memakai kunci Anvil #4/#5, hanya chain id 31337), 973 s. Target v1.0 (≥ 90% line coverage; invariant run ≥ 50k; 200 vektor acak): coverage % **belum diukur**.
 
 ---
 
@@ -712,9 +827,16 @@ Skrip menjalankan skenario 1 dan 2 (§13) di kedua pasar dan mencetak:
 | Waktu proving (**terukur**) | — | 4.245 ms (N=128, snarkjs) |
 | `leak-check` calldata+log tx channel B | — | **bocor: 0**, ambigu: 0 |
 
-Lingkungan: Anvil **fork mainnet 4663** (USDG asli, Permit2 & proxy x402 asli, `vm.warp` untuk jendela) untuk uji; **testnet 46630** dengan `MockUSDG` untuk bukti liveness; **mainnet 4663** dengan USDG sen-level untuk demo video (D1). Kontrak produksi dipakai apa adanya — tidak ada `AegisClock`; jendela pendek datang dari factory demo (`MIN_CHALLENGE_WINDOW = 60 s`, D5), bukan dari kode kontrak yang berbeda.
+**Dua skenario P1 (web console & `demo/`, 20 Sep 2026; `demo/test/rows.test.ts`, `web/test/server.test.ts`):**
 
-**Web console (20 Sep 2026).** `web/` menjalankan skenario tabel ini dari browser (`pnpm web` → `http://localhost:4040`, mode `local`/`testnet`): dashboard channel dari event `ChannelOpened`, log langkah live per skenario dengan tautan explorer, tabel perbandingan di atas, kartu privat-vs-chain, dan `leak-check` per run. Kunci demo tetap di server (tidak ada wallet browser); provider yang sama di-mount di `/provider`.
+| Baris (`toRows`) | Hasil klien / provider | Siapa yang memutuskan | Field yang terbaca di explorer | Catatan |
+|---|---|---|---|---|
+| `B: AegisClear anchored (ack on-chain, sengketa)` — skenario `B-anchored-dispute`, `factoryAnchored`, klien A | **0,02 / 0,38** | bukti Groth16 atas `R` on-chain | hash daun, `A` per ack, `payToClient` | 20 unit × 0,02 USDG (`A` = 0,40), pelanggaran di seq 3 & 17 → penalti 2 × 0,01; `leak-check` anchored mengecualikan `unitPrice` (§6.7), metrik/ambang tetap tidak muncul; gas siklus: belum dicatat di dokumen ini |
+| `B: AegisClear rollover (128 + 5 unit, 1 deposit)` — skenario `B-rollover`, klien B | **0,00 / 2,66** | dua tanda tangan ×2 (rollover + close) | `T`, `R`, `epoch`, jumlah | 133 unit dengan satu deposit 5 USDG, `epoch` on-chain berakhir 1; gas siklus: belum dicatat di dokumen ini |
+
+Lingkungan: Anvil **fork mainnet 4663** (USDG asli, Permit2 & proxy x402 asli, `vm.warp` untuk jendela) untuk uji; **testnet 46630** dengan `MockUSDG` untuk bukti liveness; **mainnet 4663** dengan USDG sen-level untuk demo video (D1 — belum, deployer 0 ETH). Kontrak produksi dipakai apa adanya — tidak ada `AegisClock`; jendela pendek datang dari factory demo (`MIN_CHALLENGE_WINDOW = 60 s`, D5), bukan dari kode kontrak yang berbeda.
+
+**Web console (20 Sep 2026, `web/`).** Menjalankan skenario tabel ini dari browser (`pnpm web` → `http://localhost:4040`, `WEB_PORT`; mode `AEGIS_NETWORK=local` (Anvil 31337) / `testnet` (46630, alamat dari `contracts/deployments/testnet-46630.json`)): dashboard channel dari event `ChannelOpened` **ketiga factory** (co-signed demo/prod, anchored — dengan kolom `epoch` dan pill mode `anchored`), drawer detail dengan timeline event (`CheckpointSubmitted`, `PenaltyClaimed`, `Settled`, `Swept`, `Funded`, `Acked`, `CloseStarted`, `RolledOver`) + `gasUsed`, log langkah live per skenario (SSE) dengan tautan explorer, tabel perbandingan di atas (tombol skenario `B-cooperative`, `B-dispute`, `B-anchored-dispute`, `B-rollover`, `A-complete`, `A-reject`, plus `all` yang menjalankan keempat kaki tabel §14), kartu privat-vs-chain (untuk channel anchored: "hash daun + A per ack terlihat on-chain; metrik & ambang tetap privat"), `leak-check` per run, dan JSON 402 mentah yang dilihat klien x402. Kunci demo tetap di server (tidak ada wallet browser; server hanya mendengarkan `127.0.0.1`, semua endpoint tanpa autentikasi); provider co-signed di-mount di `/provider`, provider anchored (instance kedua, `factoryAnchored`) di `/provider-anchored`, masing-masing dengan challenge responder in-process. API: `GET /api/config`, `/api/channels`, `/api/channels/:addr`, `POST /api/demo/run {scenario}`, `GET /api/demo/runs`, `/api/demo/runs/:id`, `/api/demo/runs/:id/events` (SSE), `/api/demo/leak-check/:runId`, `/api/offer?client=A|B`. Bukan wallet dApp dan bukan multi-user; proving Groth16 tetap di Node.
 
 > `block.number` di Robinhood Chain adalah estimasi blok L1 yang update periodik. Semua logika waktu memakai `block.timestamp`; jangan pakai `block.number` untuk deadline.
 
@@ -740,19 +862,19 @@ Lingkungan: Anvil **fork mainnet 4663** (USDG asli, Permit2 & proxy x402 asli, `
 | Hari | Deliverable | Go/No-Go |
 |---|---|---|
 | **1** (19 Sep) | ✅ §19 V1–V7 selesai hari ini. Sisa: V8–V17. Registrasi hackathon. Scaffold: Foundry + circom/snarkjs + `tools/settlement_vectors.py` (ada) | Semua toolchain jalan |
-| **2–3** | Sirkuit `sla_settlement.circom` + vektor EX1–EX3 + 200 vektor acak; ptau 2¹⁷; zkey; verifier Solidity; ukur constraint & proving | **Go/No-Go sirkuit:** semua vektor lulus, proving < 30 s (D4 jika tidak) |
-| **4** | Benchmark Poseidon: `poseidon-solidity` (Yul) vs `AegisPoseidon.rs` (`cargo stylus` ke testnet 46630) — hash t=3/t=6 dan 8 hash berantai | **D2:** Stylus lanjut hanya jika ≥ 1,5× |
-| **5–7** | `AegisChannel` + factory + `MockUSDG`; EIP-712; ERC-1271; Foundry: skenario 1–9, INV-1–9; ukur gas §8.7 | Skenario 2 & 4 lulus end-to-end dengan bukti asli via FFI |
-| **8** | `aegis-sdk` core + provider middleware + klien; protokol ack; deploy testnet 46630 | Dua agen menyelesaikan 100 request + cooperative close di testnet |
-| **9** | x402 `payTo` (§10.2) di fork mainnet; uji facilitator Mesh (V8) atau facilitator sendiri; skenario 10 | Dana lewat proxy kanonik masuk channel |
-| **10** | Watcher/settler; skenario 5–8, 13; fuzz 14; `leak-check` | INV semua hijau; coverage ≥ 90% |
-| **11** | Demo harness A vs B + tabel; `SimpleJobEscrow.sol` kontrol | Tabel §14 tercetak dari run nyata |
-| **12** | **Jika D2 positif:** anchored mode + `AegisPoseidon.rs` + skenario 12. **Jika tidak:** anchored Yul atau pangkas. `AegisTreasuryRouter`. Deploy mainnet 4663 (D1) | Angka Stylus/Yul terukur masuk §8.7 |
-| **13** | Audit sendiri: Slither/Aderyn, checklist SWC, review ulang T4/T19; ceremony transkrip; README (matriks §8.6, tabel §6.7) | Nol temuan high |
-| **14** | Video ≤ 3 menit (skrip §14), doc arsitektur final, submission draft di HackQuest | |
+| **2–3** | ✅ Sirkuit `sla_settlement.circom` + vektor EX1–EX3 + 200 vektor acak; ptau 2¹⁷ (lokal, V14); zkey (release `v0.1.0-zkey`); verifier Solidity; constraint 115.066 (`--O2`), proving 4.245 ms (§9.3, §14) | **Go/No-Go sirkuit:** ✅ semua vektor lulus, proving < 30 s |
+| **4** | ✅ Benchmark Poseidon: Poseidon2 dulu (2,33×, ditarik), lalu `AegisPoseidon` Poseidon v1 vs `PoseidonPathYul` on-chain — `insertPath` 1,75× (§8.3) | **D2:** ✅ ≥ 1,5× terpenuhi dengan hash yang kompatibel sirkuit |
+| **5–7** | ✅ `AegisChannel` + factory + `MockUSDG`; EIP-712; ERC-1271 (`Wallet1271.t.sol`); Foundry: skenario 1–9, INV-1–9; gas §8.7 | ✅ Skenario 2 & 4 lulus end-to-end dengan bukti asli via FFI (`Penalty.t.sol`) |
+| **8** | ✅ `aegis-sdk` core + provider middleware + klien; protokol ack; deploy testnet 46630 (v0 20 Sep, v1 20 Sep) | ✅ Dua agen menyelesaikan 100 request + cooperative close di testnet |
+| **9** | Sebagian: `Permit2.t.sol` + T19 di SDK; x402 `payTo` di fork mainnet & facilitator Mesh nyata (V8) **menunggu pemilik** | Dana lewat proxy kanonik masuk channel — belum dibuktikan terhadap facilitator nyata |
+| **10** | ✅ Watcher/settler + challenge responder (Task 15); skenario 5–8; `Invariant.t.sol`; `leak-check` (bocor 0); skenario 13 sebagian (§13) | INV hijau; coverage % belum diukur |
+| **11** | ✅ Demo harness A vs B + tabel (Task 16); `SimpleJobEscrow.sol` kontrol; **P1:** web console `web/` | ✅ Tabel §14 tercetak dari run nyata |
+| **12** | ✅ **D2 positif:** anchored mode + `AegisPoseidon` (Stylus, aktif di 46630) + skenario 12 ×4; `AegisTreasuryRouter` + hook; epoch/`rollover` + skenario 11; redeploy testnet v1 (V18b). **Deploy mainnet 4663 (D1): belum — deployer 0 ETH, menunggu pemilik** | ✅ Angka Stylus/Yul terukur masuk §8.7 |
+| **13** | ✅ Audit sendiri: Slither 0.11.5 (`docs/audit/slither-2026-09.md`) — nol High/Medium yang benar, 2 Low + M-1 diperbaiki (Aderyn tidak terpasang); README memuat matriks §8.6 & tabel §6.7. Ceremony ≥ 3 kontributor **tidak** dilakukan (T4 dinyatakan, §9.4) | ✅ Nol temuan high yang benar |
+| **14** | Spec v1.1 ✅ (dokumen ini); paket submission (`docs/SUBMISSION.md`, Task 5 sub-proyek ship) dan video ≤ 3 menit (skrip: web console testnet → run dispute → tabel → leak-check → explorer) **menunggu pemilik** | |
 | **15** | Buffer + submit. **Deadline 4 Okt 2026 15:59 UTC** (22:59 WIB) | |
 
-**Aturan pemangkasan bila tertinggal.** Buang dengan urutan ini: `AegisTreasuryRouter` → anchored mode + `AegisPoseidon.rs` → `rollover` → integrasi facilitator Mesh nyata (cukup fork) → deploy mainnet (cukup testnet). Yang **tidak boleh** dibuang: sirkuit + verifier + `AegisChannel` + SDK ack + demo A vs B. Empat hal itu adalah produk yang utuh dan jujur; tanpa Stylus sekalipun ia tetap "escrow yang evaluatornya sirkuit".
+**Aturan pemangkasan bila tertinggal (v1.0).** Buang dengan urutan ini: `AegisTreasuryRouter` → anchored mode + `AegisPoseidon.rs` → `rollover` → integrasi facilitator Mesh nyata (cukup fork) → deploy mainnet (cukup testnet). Yang **tidak boleh** dibuang: sirkuit + verifier + `AegisChannel` + SDK ack + demo A vs B. Empat hal itu adalah produk yang utuh dan jujur; tanpa Stylus sekalipun ia tetap "escrow yang evaluatornya sirkuit". **Hasil (20 Sep 2026):** tiga item pertama tidak perlu dipangkas — semuanya dikirim; yang tersisa persis dua item terakhir daftar (facilitator Mesh nyata, mainnet), keduanya menunggu pemilik.
 
 ---
 
@@ -764,12 +886,15 @@ Lingkungan: Anvil **fork mainnet 4663** (USDG asli, Permit2 & proxy x402 asli, `
 | "Kenapa bukan ERC-8183 dengan evaluator kontrak?" | Itu **persis** yang kami bangun — 8183 menyebut evaluator boleh memverifikasi bukti ZK, tapi semantiknya per-job dan biner. Kami menambah channel banyak unit dan payout proporsional; event-nya tetap berbentuk 8183 agar indexer paham. |
 | "Kenapa ZK, bukan TEE atau LLM-as-judge?" | Ketiganya mengganti kepercayaan pada manusia dengan kepercayaan pada sesuatu. TEE: vendor + attestasi; LLM: model + prompt, non-deterministik, dan harus melihat datanya. Sirkuit: hanya matematika, deterministik, dan tidak melihat apa pun. Untuk SLA yang bisa dinyatakan sebagai aritmetika atas metrik co-signed, ZK adalah opsi termurah dalam asumsi. |
 | "Kenapa Robinhood Chain?" | Empat hal sekaligus: USDG asli (703 juta supply, 6 desimal) dengan rel Permit2/x402 yang hidup (Mesh), FCFS tanpa priority fee (jendela waktu adalah satu-satunya tuas — desain kami memang berbasis waktu), gas 0,07 gwei yang membuat verifikasi 225k gas ekonomis untuk sengketa sen, dan Stylus untuk hashing on-chain. Base punya USDC, bukan USDG dan ekosistem ini. |
-| "Kenapa verifier di Solidity kalau kalian pakai Stylus?" | Karena kami mengukur. Pairing BN254 adalah precompile; Groth16 di Stylus 256k gas vs Solidity 194k. Stylus dipakai di tempat ia menang: Poseidon 11,9k vs 19,3k gas (Yul). Kami tidak akan mengklaim angka yang tidak kami ukur sendiri. |
+| "Kenapa verifier di Solidity kalau kalian pakai Stylus?" | Karena kami mengukur. Pairing BN254 adalah precompile; Groth16 di Stylus 256k gas vs Solidity 194k (zk-sunade vs frame-verify-gas; verifier kami terukur 229.241 untuk 6 input). Stylus dipakai di tempat ia menang — dan kami mengukurnya sendiri, bukan mengutip. |
+| "Stylus di mana, dan kenapa hanya di sana?" | Di **satu** tempat: `AegisPoseidon`, dipanggil `ack()` anchored mode untuk menyisipkan hash daun ke pohon Merkle on-chain — 7 hash Poseidon dalam satu panggilan `insertPath`. Terukur di testnet 46630 dengan hash yang **sama** dengan sirkuit (circomlib Poseidon v1): **144.076 gas vs 252.271 di Yul — 1,75× lebih murah** (≈1,9× eksekusi-saja). Kenapa hanya di sana: itu satu-satunya tempat AegisClear menghitung Poseidon di chain (daun & komitmen dihitung off-chain, verifier Groth16 adalah precompile), dan Stylus hanya menang bila satu panggilan cukup besar — hash tunggal justru lebih mahal (82.593 vs 62.138) karena tiap panggilan membayar init program 8,8k gas (chain ini belum punya CacheManager). Angka 2,33× yang sempat kami catat berasal dari Poseidon2 yang tidak kompatibel sirkuit — kami tarik. Padanan Yul-nya (`PoseidonPathYul`) tetap ada dengan ABI dan keluaran identik. |
 | "Trusted setup?" | Satu kontributor untuk hackathon — dinyatakan di README. Pemegang toxic waste bisa memalsukan bukti, karena itu kontrak membatasi `payToClient ≤ A` dan hanya pihak channel yang boleh klaim. Sebelum dana nyata: ceremony ≥ 3 kontributor, atau PLONK universal dengan +50–100% gas. |
 | "Bagaimana kalau provider bohong soal metrik?" | Ia tidak bisa membuat receipt sendirian: setiap metrik yang dihitung sirkuit adalah metrik yang klien tanda tangani. Kalau klien tidak setuju, ia tidak ack dan unit itu tidak dibayar. |
 | "Bagaimana kalau klien tidak pernah ack?" | Provider berhenti melayani; kerugian maksimum satu unit — sama seperti API prabayar mana pun. Kami tidak berpura-pura menghapus risiko itu; kami membatasinya ke satu unit. |
-| "Apa yang bocor?" | Pihak, deposit, total yang di-ack, jumlah unit, dan porsi penalti jika ada klaim. Bukan harga, ambang, metrik, atau jumlah pelanggaran. Tabelnya ada di README; kami tidak mengklaim anonim. |
-| "128 receipt per epoch — terlalu kecil?" | Untuk micro-escrow, itu satu hari kerja robot. Rollover kooperatif me-reset epoch tanpa deposit ulang. Agregasi bukti adalah roadmap, bukan MVP. |
+| "Apa yang bocor?" | Pihak, deposit, total yang di-ack, jumlah unit, jumlah epoch, dan porsi penalti jika ada klaim. Bukan harga, ambang, metrik, atau jumlah pelanggaran. Anchored mode sengaja membocorkan lebih: `A` per ack, jadi harga per unit tersirat — tetap tanpa metrik dan ambang, dan `leak-check` memeriksanya begitu. Tabelnya ada di README; kami tidak mengklaim anonim. |
+| "128 receipt per epoch — terlalu kecil?" | Untuk micro-escrow, itu satu hari kerja robot. Rollover kooperatif me-reset epoch tanpa deposit ulang — sudah dikirim dan dibuktikan di testnet (skenario 11: 128 unit → `rollover` → 5 unit lagi → close, satu deposit; web console: 0,00 / 2,66 USDG). Setiap pesan yang ditandatangani memuat `epoch`, jadi checkpoint epoch lama tidak bisa di-replay. Agregasi bukti adalah roadmap, bukan MVP. |
+| "Kenapa ada dua mode?" | Co-signed: murah (ack = tanda tangan off-chain), butuh responder tantangan dan tiket keluar. Anchored: setiap ack adalah tx on-chain (≈211k–217k gas dengan Stylus), tidak ada asumsi liveness dan tidak ada tiket — untuk job bernilai tinggi frekuensi rendah. Mode adalah sifat factory (`POSEIDON` immutable), kontrak channel identik; klien menentukan mode dari factory-nya sendiri, bukan dari klaim 402 provider. |
+| "Hook payout — bukankah itu yang 8183 peringatkan?" | Ya, karena itu best-effort: dipanggil setelah transfer, dalam try/catch dengan stipend 300k, kegagalan diabaikan — payee yang revert tidak bisa menyandera settle pihak lain. Audit kami menemukan sendiri (M-1) bahwa stipend hanya batas atas: pemanggil `settle` permissionless bisa mengelaparkan hook dan membuat token nyasar di router. Diperbaiki dengan pemeriksaan gas pasca-panggilan gaya OZ; tesnya gagal di kode lama. |
 | "Kenapa tidak optimistik saja (UMA) — lebih murah?" | Optimistik butuh bond, jendela sengketa yang bisa diperebutkan, dan data yang **publik** agar orang bisa menantang. Kami tidak punya penantang — kami punya bukti. |
 | "Apa yang on-chain?" | Channel, komitmen syarat, root receipt, checkpoint co-signed, verifikasi bukti, pembayaran. Off-chain: receipt, ack, proving. Tidak ada keeper yang dibutuhkan untuk keselamatan — `settle` permissionless dan defaultnya adalah state yang kedua pihak terakhir setujui. |
 | "Sudah ada yang bangun ini?" | ERC-8183 (escrow evaluator biner), Kleros/UMA (adjudikasi manusia/optimistik), Mesh (rel tanpa escrow). Tidak ditemukan escrow agen dengan adjudikasi bukti ZK yang terdeploy — kami akan menyebut jika menemukannya. |
@@ -784,15 +909,17 @@ Lingkungan: Anvil **fork mainnet 4663** (USDG asli, Permit2 & proxy x402 asli, `
 
 **B2 — Groth16 toolchain gagal (zkey/verifier).** PLONK di snarkjs dengan sirkuit yang sama; verifier ≈ 300–400k gas; tanpa phase-2 khusus sirkuit (menghapus T4 sebagian). Tambah ≈ 1 hari.
 
-**B3 — ZK gagal total sebelum Hari 7.** *Commit-reveal*: `claimPenalty` membuka `terms` + receipt on-chain, kontrak menghitung ulang `T` dan `R` (Poseidon Yul/Stylus, ≤ 255 hash ≈ 3–5M gas) dan mengevaluasi §6.3 di Solidity. Privasi bertahan **sampai sengketa** — dinyatakan begitu, dan ini satu-satunya jalur di mana Stylus menjadi komponen utama. Semantik §6 dan vektor uji tetap dipakai.
+**B3 — ZK gagal total sebelum Hari 7.** *Commit-reveal*: `claimPenalty` membuka `terms` + receipt on-chain, kontrak menghitung ulang `T` dan `R` (Poseidon Yul/Stylus, ≤ 255 hash ≈ 3–5M gas) dan mengevaluasi §6.3 di Solidity. Privasi bertahan **sampai sengketa** — dinyatakan begitu, dan ini satu-satunya jalur di mana Stylus menjadi komponen utama. Semantik §6 dan vektor uji tetap dipakai. **Tidak diaktifkan** (ZK jalan) — karena itu `hash5`/`hash6`/`root128` tidak dibangun di `AegisPoseidon` (§8.3).
 
 **B4 — Jangan lakukan:** membangun "escrow agen generik" tanpa bukti maupun reveal. Itu ERC-8183 tanpa alasan untuk ada.
+
+**B5 — Stylus tidak tersedia, gagal di-deploy, atau kedaluwarsa (P1, ada dan teruji).** `PoseidonPathYul` (`contracts/src/PoseidonPathYul.sol`) adalah kembaran `IPoseidonPath` dengan ABI dan keluaran identik di atas `poseidon-solidity`: `DeployTestnet.s.sol` memakainya otomatis bila `POSEIDON_STYLUS` kosong; Foundry/Anvil selalu memakainya (tidak ada VM WASM). Biaya: `ack` ≈303k–309k gas (Anvil) alih-alih ≈211k–217k (Stylus, testnet) — anchored mode tetap berfungsi, hanya 1,75× lebih mahal di jalur hash. Program yang kedaluwarsa (T15) tidak mengunci dana: semua jalur keluar adalah EVM murni (§8.3).
 
 ---
 
 ## 19. VERIFICATION CHECKLIST — HARI 1
 
-Item ✅ diverifikasi 19 Sep 2026 dengan perintah yang tercantum (RPC publik). Sisanya wajib sebelum Hari 2.
+Item ✅ diverifikasi 19 Sep 2026 dengan perintah yang tercantum (RPC publik), atau 20 Sep 2026 bila disebut (V9–V12, V18, V18b, V19). Masih terbuka: V4b, V8, V13, V15, V16, V17 — semuanya di luar jalur dana atau menunggu pemilik.
 
 | # | Item | Cara | Hasil / Konsekuensi |
 |---|---|---|---|
@@ -806,17 +933,18 @@ Item ✅ diverifikasi 19 Sep 2026 dengan perintah yang tercantum (RPC publik). S
 | V6 | Kriteria juri, deadline, syarat deploy | hackquest.io (halaman buildathon) | ✅ 4 kriteria; USDG prioritas; ≥ 1 podium Robinhood Chain; deploy di chain Arbitrum mana pun; **4 Okt 2026 15:59 UTC** |
 | V7 | Benchmark referensi ZK | zk-sunade README; frame-verify-gas README; OpenZeppelin blog | ✅ 256.334 / 194.396 / 11.887–19.313–220.244 gas |
 | V8 | Facilitator Mesh menerima `payTo` arbitrer? | kirim 402 tiruan dengan `payTo = predict(cfg)` ke `facilitator.meshgateway.co /verify` | Jika tidak → facilitator sendiri (fork `meshgateway/x402`) |
-| V9 | Toolchain: `circom` 2.x, `snarkjs`, `rapidsnark`, `cargo-stylus`, `stylus-sdk` versi, Foundry | ✅ sebagian (19 Sep 2026): Foundry 1.5.1, Node 22.23, pnpm 9.15, cargo 1.92 + cargo-stylus 0.10.9 + target wasm32 ada; **circom belum terinstal** (binari v2.2.3, plan Task 1); `cargo stylus check --endpoint <testnet>` belum | Ukuran WASM: batas kode 96 KB di Robinhood Chain berlaku untuk Stylus? cek `cargo stylus check` |
-| V10 | Gas verifier Solidity 6 input publik | Foundry: `verifyProof` dengan bukti asli EX1 | Mengisi §8.7; target ≈ 225k |
-| V11 | Constraint & proving time sirkuit | `snarkjs r1cs info`; `time snarkjs groth16 prove` | D4 jika > 30 s |
-| V12 | Poseidon Yul vs Stylus | Foundry gas `poseidon-solidity` T3/T6; `cargo stylus` deploy + `cast estimate` | **D2** |
+| V9 | Toolchain: `circom` 2.x, `snarkjs`, `rapidsnark`, `cargo-stylus`, `stylus-sdk` versi, Foundry | ✅ (20 Sep 2026): Foundry 1.5.1, Node 22, pnpm 9.15, circom 2.2.3, cargo 1.92.0 + cargo-stylus 0.10.9 + stylus-sdk 0.10.9 + target wasm32; `cargo stylus check --endpoint <testnet>` lolos (`docs/benchmarks/poseidon.md` §2, `stylus/aegis-poseidon/README.md`); `rapidsnark` tidak dipakai (snarkjs cukup: ≈4 s) | Ukuran WASM: batas yang mengikat adalah **24 KB terkompresi** Stylus (bukan 96 KB kode EVM) — `AegisPoseidon` 21,7 KB, sisa ≈2,9 KB (§8.3) |
+| V10 | Gas verifier Solidity 6 input publik | Foundry: `verifyProof` dengan bukti asli EX1 | ✅ **229.241** (`Verifier.t.sol`, §8.2) |
+| V11 | Constraint & proving time sirkuit | `snarkjs r1cs info`; `time snarkjs groth16 prove` | ✅ 115.066 constraint (`--O2`, ptau 2¹⁷), proving 4.245 ms (§9.3, §14) — D4 tidak diperlukan |
+| V12 | Poseidon Yul vs Stylus | Foundry gas `poseidon-solidity` T3/T6; `cargo stylus` deploy + `cast estimate` | ✅ **D2 final (20 Sep 2026, on-chain 46630, Poseidon v1 kompatibel sirkuit):** `insertPath` Yul 252.271 vs Stylus 144.076 → **1,75× total / ≈1,9× eksekusi**; `hash2` Yul 62.138 vs Stylus 82.593 (Yul lebih murah); Foundry Yul referensi T3 32.503, T6 172.418, 7×T3 212.715, `insertPath` 222.766. Angka Poseidon2 (0,70× / 2,33×) = riwayat, ditarik. `docs/benchmarks/poseidon.md` §5 |
 | V13 | Jendela force-inclusion delayed inbox Robinhood Chain | docs Arbitrum / kontrak `SequencerInbox` (`maxTimeVariation`) | `challengeWindow` produksi (§6.6) |
 | V14 | Powers of Tau 2¹⁷ | ✅ diperiksa 19 Sep 2026: mirror `storage.googleapis.com/zkevm/ptau` **dan** `hermez.s3-eu-west-1.amazonaws.com` mengembalikan HTTP 403 → `circuits/scripts/setup.sh` membangkitkan ptau lokal (`powersoftau new/contribute/beacon/prepare phase2`); jika mirror kembali tersedia, `PTAU_URL=… setup.sh` + cocokkan hash blake2b `6247a343…49345` dari README snarkjs | Setup lokal = kontributor tunggal juga untuk phase 1 (T4 tidak berubah) |
 | V15 | Registry ERC-8004 di Robinhood Chain (MeshIdentity) | docs/repo Mesh, explorer | FR-28 roadmap |
 | V16 | ZeroStyl — apa yang sudah ia sediakan | github.com/kazai777/zerostyl | Kreditkan jika dipakai/berimpit |
 | V17 | Syarat submission: durasi video, repo publik, form | portal HackQuest | DQ jika terlewat |
 | V18 | **Deploy testnet 46630** | ✅ 20 Sep 2026: `DeployTestnet.s.sol --broadcast --verify` — 7/7 kontrak terverifikasi Blockscout (factory demo `0x0922ee7D…4ED3`, factory prod `0x201BaC41…7fDD`, verifier `0x5EC99814…7462`, MockUSDG `0xCadd4526…5a83`, escrow `0x5017C9e5…964a`); test integrasi kooperatif + sengketa (bukti Groth16 asli, jendela 120 s nyata) **lulus on-chain** — `claimPenalty` tx `0x54355aef…93a6`, `Settled` `0xd903f389…37bc` | Bukti liveness untuk submission (README) — **deploy v0, digantikan V18b** |
-| V18b | **Deploy testnet v1 (epoch/rollover, router, anchored) + Stylus `AegisPoseidon`** | ✅ 20 Sep 2026: `DeployTestnet.s.sol --broadcast --verify` dengan `POSEIDON_STYLUS=0x1027cf7D…ef34` (Stylus di-deploy lebih dulu via `cargo stylus deploy`) — 7/7 kontrak terverifikasi Blockscout blok `121.982.356` (`factory` `0x596E9f21…dAfF`, `factoryProd` `0xf8e93aE5…FE5a`, `factoryAnchored` `0x1fB7d8E1…6147`, `router` `0xe4A87335…7689`, `verifier` `0x7B8ad2d9…6273`, `usdg` `0x7455E600…94EF`, `escrow` `0xC4b08e8F…Ab9C`, `poseidon` `0x1027cf7D…ef34`); suite integrasi SDK **13 lulus, 4 dilewati** (Anvil-key-only, di luar chain id 31337), 973 s | Bukti liveness v1 untuk submission (README); deploy v0 (V18) tetap terdokumentasi sebagai riwayat |
+| V18b | **Deploy testnet v1 (epoch/rollover, router, anchored) + Stylus `AegisPoseidon`** | ✅ 20 Sep 2026: `DeployTestnet.s.sol --broadcast --verify` dengan `POSEIDON_STYLUS=0x1027cf7D…ef34` (Stylus di-deploy lebih dulu via `cargo stylus deploy`) — 7/7 kontrak terverifikasi Blockscout blok `121.982.356` (`factory` `0x596E9f21…dAfF`, `factoryProd` `0xf8e93aE5…FE5a`, `factoryAnchored` `0x1fB7d8E1…6147`, `router` `0xe4A87335…7689`, `verifier` `0x7B8ad2d9…6273`, `usdg` `0x7455E600…94EF`, `escrow` `0xC4b08e8F…Ab9C`, `poseidon` `0x1027cf7D…ef34`); suite integrasi SDK **13 lulus, 4 dilewati** (Anvil-key-only, di luar chain id 31337), 973 s; kembaran Yul di testnet untuk D2: `PoseidonT3` `0xd52e2919…3d1`, `PoseidonPathYul` `0x804318aE…3766` | Bukti liveness v1 untuk submission (README); deploy v0 (V18) tetap terdokumentasi sebagai riwayat. **Catatan v1.1:** v1 di-deploy dari source dengan `HOOK_GAS` 150k, **tanpa** penjaga `InsufficientGas` (M-1) dan **tanpa** `ZeroAddress` di konstruktor factory — ketiganya ada di source sekarang; **redeploy v2 menyusul** (alamat di README akan berubah) |
+| V19 | **Self-audit Slither** | `slither . --filter-paths "lib/\|test/\|script/" --exclude-dependencies --checklist` di `contracts/` (0.11.5, solc 0.8.28) | ✅ 20 Sep 2026: 77 → 75 hasil; 3 High + 2 Medium semuanya *false positive* (idiom snarkjs, `amount == 0`, re-entrancy terjaga); 2 Low diperbaiki (`ZeroAddress`), 1 Low by design (`poseidonPath == 0` = mode), 2 Low diterima (`block.timestamp`); M-1 manual diperbaiki; `forge test` 118 lulus (`docs/audit/slither-2026-09.md`, commit `5fe05c0`) |
 
 ---
 
@@ -824,16 +952,17 @@ Item ✅ diverifikasi 19 Sep 2026 dengan perintah yang tercantum (RPC publik). S
 
 | # | Keputusan | Opsi | Rekomendasi |
 |---|---|---|---|
-| D1 | Deployment final | testnet 46630 (MockUSDG) saja / + mainnet 4663 (USDG asli, sen-level) | **Keduanya.** Seluruh ekosistem Mesh hanya hidup di mainnet; biaya deploy < $2 pada 0,07 gwei; juri memberi prioritas USDG asli. Dana demo ≤ 5 USDG |
-| D2 | Stylus | Poseidon di Stylus jika benchmark Hari 4 ≥ 1,5× vs Yul / Yul saja | **Terukur on-chain 20 Sep 2026 (testnet 46630, `cast estimate` − intrinsik, apple-to-apple):** hash tunggal Yul 39.472 vs Stylus 56.513 (rasio 0,70× — Stylus lebih mahal karena init program 8.832 gas; chain ini **tidak punya CacheManager**, semua panggilan uncached); rantai 7 hash (jalur anchored ack) Yul 223.901 vs Stylus 95.934 (**rasio 2,33×**, marjinal ≈ 6,6k vs ≈ 30,7k gas/hash). Yul (Foundry, referensi): T3 32.503, T6 172.418, 7×T3 212.715. WASM 14,4 KB terkompresi. Perbandingan kelas biaya (Poseidon2 vs v1). **Keputusan (20 Sep 2026, kriteria §16 Hari 4 "≥ 1,5×" terpenuhi pada jalur yang relevan): Stylus untuk anchored mode** — satu-satunya tempat Poseidon dihitung on-chain adalah rantai 7 hash per `ack` (FR-25), dan di situ Stylus 2,33× lebih murah; hash tunggal (0,70×) tidak dipakai on-chain di mana pun. `AegisPoseidon.rs` mengimplementasikan circomlib Poseidon v1 (D3), bukan Poseidon2 seperti program benchmark; lihat `docs/benchmarks/poseidon.md`. **Update 20 Sep 2026 (deploy v1):** angka 2,33× di atas datang dari Poseidon2, yang **bukan** kompatibel sirkuit; dengan port Poseidon **v1** kompatibel sirkuit yang benar-benar aktif (`0x1027cf7D…ef34`, 21,7 KB), rasio terukur turun menjadi **1,75× total (≈1,9× eksekusi-saja)** pada jalur 7-hash `insertPath`/`ack` — tetap di atas ambang 1,5×, jadi keputusan tidak berubah: **Stylus dipertahankan hanya untuk anchored mode**; hash tunggal tetap lebih murah di Yul dan tidak dipakai on-chain. Detail: `docs/benchmarks/poseidon.md` §5 |
-| D3 | Varian hash | circomlib Poseidon v1 di semua tempat (port Rust) / Poseidon2 (OZ Rust + template circom baru) | **v1.** circomlib & `poseidon-solidity` sudah teruji dan kompatibel; port Rust ≈ 150 baris + konstanta publik, diuji terhadap `circomlibjs` |
-| D4 | `MAX_SEQ` | 64 / 128 / 256 | **128**, turun ke 64 jika proving > 30 s |
-| D5 | Jendela demo | factory demo terpisah (`MIN_CHALLENGE_WINDOW = 60 s`) / `vm.warp` saja | **Factory demo terpisah** — deploy testnet & mainnet demo perlu jendela pendek nyata; kode kontrak channel identik |
+| D1 | Deployment final | testnet 46630 (MockUSDG) saja / + mainnet 4663 (USDG asli, sen-level) | **Keduanya.** Seluruh ekosistem Mesh hanya hidup di mainnet; biaya deploy < $2 pada 0,07 gwei; juri memberi prioritas USDG asli. Dana demo ≤ 5 USDG. **Status 20 Sep 2026:** testnet v1 ✅ (v2 menyusul); **mainnet belum** — deployer 0 ETH di 4663, menunggu pemilik |
+| D2 | Stylus | Poseidon di Stylus jika benchmark Hari 4 ≥ 1,5× vs Yul / Yul saja | ✅ **FINAL — Stylus hanya untuk anchored mode (`insertPath`), 1,75× vs Yul dengan Poseidon v1 kompatibel sirkuit.** Riwayat keputusan: **Terukur on-chain 20 Sep 2026 (testnet 46630, `cast estimate` − intrinsik, apple-to-apple):** hash tunggal Yul 39.472 vs Stylus 56.513 (rasio 0,70× — Stylus lebih mahal karena init program 8.832 gas; chain ini **tidak punya CacheManager**, semua panggilan uncached); rantai 7 hash (jalur anchored ack) Yul 223.901 vs Stylus 95.934 (**rasio 2,33×**, marjinal ≈ 6,6k vs ≈ 30,7k gas/hash). Yul (Foundry, referensi): T3 32.503, T6 172.418, 7×T3 212.715. WASM 14,4 KB terkompresi. Perbandingan kelas biaya (Poseidon2 vs v1). **Keputusan (20 Sep 2026, kriteria §16 Hari 4 "≥ 1,5×" terpenuhi pada jalur yang relevan): Stylus untuk anchored mode** — satu-satunya tempat Poseidon dihitung on-chain adalah rantai 7 hash per `ack` (FR-25), dan di situ Stylus 2,33× lebih murah; hash tunggal (0,70×) tidak dipakai on-chain di mana pun. `AegisPoseidon.rs` mengimplementasikan circomlib Poseidon v1 (D3), bukan Poseidon2 seperti program benchmark; lihat `docs/benchmarks/poseidon.md`. **Update 20 Sep 2026 (deploy v1):** angka 2,33× di atas datang dari Poseidon2, yang **bukan** kompatibel sirkuit; dengan port Poseidon **v1** kompatibel sirkuit yang benar-benar aktif (`0x1027cf7D…ef34`, 21,7 KB), rasio terukur turun menjadi **1,75× total (≈1,9× eksekusi-saja)** pada jalur 7-hash `insertPath`/`ack` — tetap di atas ambang 1,5×, jadi keputusan tidak berubah: **Stylus dipertahankan hanya untuk anchored mode**; hash tunggal tetap lebih murah di Yul dan tidak dipakai on-chain. Detail: `docs/benchmarks/poseidon.md` §5 |
+| D3 | Varian hash | circomlib Poseidon v1 di semua tempat (port Rust) / Poseidon2 (OZ Rust + template circom baru) | ✅ **v1, dibangun.** `AegisPoseidon` = port `circomlibjs/poseidon_opt.js` (t=3) di atas `ark-ff` 0.5, konstanta dibangkitkan dari `circomlibjs`; keluaran identik dengan sirkuit, SDK, `PoseidonT3` (§8.3). Port generik `ark-ff` pertama hanya 1,43× — algoritma teroptimasi (matriks jarang + `sum_of_products`) yang mencapai 1,75× |
+| D4 | `MAX_SEQ` | 64 / 128 / 256 | ✅ **128** — proving 4,2 s, tidak perlu turun |
+| D5 | Jendela demo | factory demo terpisah (`MIN_CHALLENGE_WINDOW = 60 s`) / `vm.warp` saja | ✅ **Factory demo terpisah** — testnet v1: `factory` 60 s, `factoryProd` 21.600 s, `factoryAnchored` 60 s; kode kontrak channel identik, hanya immutable |
 | D6 | Proof system | Groth16 (194k, phase-2 per sirkuit) / PLONK (≈ +50–100% gas, universal) | **Groth16** untuk MVP dengan T4 dinyatakan; PLONK sebagai B2 & opsi produksi |
-| D7 | Persetujuan klien atas `ChannelTerms` di jalur x402 | header tambahan saat bayar / provider membuka + tanda tangan klien saat ack pertama | **Provider membuka.** Menjaga klien x402 polos tetap bisa membayar; SDK klien memverifikasi `sigProvider` sebelum menandatangani Permit2 (T19) |
-| D8 | `payoutClient`/`payoutProvider` | wajib = pihak / bebas | **Bebas** — itulah "treasury routing"; router adalah gula |
+| D7 | Persetujuan klien atas `ChannelTerms` di jalur x402 | header tambahan saat bayar / provider membuka + tanda tangan klien saat ack pertama | ✅ **Provider membuka** (`POST /job` pertama dengan `Aegis-Terms-Signature`). Menjaga klien x402 polos tetap bisa membayar; SDK klien memverifikasi `sigProvider` sebelum menandatangani Permit2 (T19) |
+| D8 | `payoutClient`/`payoutProvider` | wajib = pihak / bebas | ✅ **Bebas** — itulah "treasury routing"; router adalah gula, dibangun sebagai hook + kredit (§8.4) |
 | D9 | Fee protokol | 0 / bps di factory | **0 di MVP**, slot ada |
-| D10 | Nama repo publik | — | Hindari "escrow" sebagai nama (generik); pertahankan "AegisClear" |
+| D10 | Nama repo publik | — | Hindari "escrow" sebagai nama (generik); pertahankan "AegisClear" — `github.com/mdlog/AegisClear` |
+| **D11** (baru, terbuka) | `startClose()` di mode co-signed | hanya anchored (sekarang) / juga co-signed: pihak mana pun boleh membuka jendela tantangan atas state on-chain (`seq` co-signed terakhir yang sudah disubmit, atau 0) | **Terbuka — kandidat untuk redeploy v2.** Ditemukan saat review Task 2 P1 (ledger): setelah `rollover`, klien co-signed bergantung pada tiket keluar epoch baru dari provider (T25); `startClose()` co-signed memberi jalan keluar sepihak seq-0 tanpa tiket, **aman di bawah asumsi responder** yang sudah wajib (provider menjawab dengan `latestCoSigned` — persis seperti tiket seq-0 hari ini), dan membuat seluruh mekanisme tiket keluar (`exitSig`, `exitSigNext`) berlebihan. Biaya: satu fungsi + test; tidak mengubah semantik §6.4. Belum diputuskan karena butuh redeploy dan perubahan SDK klien |
 
 ---
 
@@ -848,15 +977,21 @@ Item ✅ diverifikasi 19 Sep 2026 dengan perintah yang tercantum (RPC publik). S
 | **`x402ExactPermit2Proxy`** | Kontrak kanonik `0x402085c2…20001` sebagai `spender` Permit2 yang memaksa `to == witness.to` |
 | **ERC-8183** | Agentic Commerce: escrow job + evaluator tunggal, `complete`/`reject` biner |
 | **ERC-8004** | Trustless Agents: Identity, Reputation, Validation registry |
-| **Channel / epoch** | Satu kontrak clone per pasangan agen; epoch = ≤ 128 receipt di bawah satu `receiptsRoot` |
-| **Receipt / ack** | Unit layanan `(seq, qty, m1, m2, due)`; ack = tanda tangan klien atas checkpoint kumulatif baru |
-| **Checkpoint** | `(seq, cumulativeAmount, receiptsRoot)` dengan tanda tangan kedua pihak |
+| **Channel / epoch** | Satu kontrak clone per pasangan agen; epoch = ≤ 128 receipt di bawah satu `receiptsRoot`. `epoch` (`uint32`) adalah penghitung on-chain yang naik satu per `rollover` dan ada di setiap struct yang ditandatangani — tanda tangan epoch lama mati setelah rollover |
+| **Rollover** | Penutupan epoch kooperatif (FR-10): dua tanda tangan `Rollover(epoch, seq, toProvider)`, provider dibayar, sisa saldo menjadi budget epoch berikutnya di channel yang sama, `seq/A/R` di-reset, `epoch++` |
+| **Receipt / ack** | Unit layanan `(seq, qty, m1, m2, due)`; ack = tanda tangan klien atas checkpoint kumulatif baru (co-signed) atau tx `ack()` klien atas daun yang ditandatangani provider (anchored) |
+| **Checkpoint** | `(epoch, seq, cumulativeAmount, receiptsRoot)` dengan tanda tangan kedua pihak |
+| **Tiket keluar (exit ticket)** | `Checkpoint(epoch, 0, 0, emptyRoot)` yang ditandatangani provider di muka (di 402 sebagai `exitSig`; untuk epoch berikutnya sebagai `exitSigNext` di balasan `/rollover`) agar klien co-signed punya jalan keluar sepihak sebelum unit pertama; dinetralkan responder bila ada checkpoint lebih tinggi; tidak dipakai di anchored |
+| **Hook payout / `IAegisPayoutHook`** | `onPayout(party, token, amount)` yang dipanggil channel pada payee **kontrak** setelah transfer, best-effort (try/catch, stipend `HOOK_GAS` 300k, penjaga `InsufficientGas`); `AegisTreasuryRouter` adalah implementasinya |
+| **Slack (router)** | Saldo router yang melebihi `totalCredit` — muncul hanya dari transfer langsung ke router (dilarang) dan bisa diklaim siapa pun lewat `onPayout` |
+| **Mode per factory / `POSEIDON`** | Immutable factory (dan implementasi channel): `0` = co-signed, alamat `IPoseidonPath` = anchored; klien menurunkan mode dari factory-nya sendiri (T23) |
+| **`insertPath`** | Fungsi `IPoseidonPath`: 7 hash Poseidon t=3 dalam satu panggilan untuk menyisipkan satu daun ke pohon inkremental kedalaman 7; diimplementasikan Stylus (`AegisPoseidon`) dan Yul (`PoseidonPathYul`) dengan keluaran identik |
 | **`termsCommitment` (T)** | `Poseidon(p, L*, Q*, π, κ, ν)` — komitmen syarat komersial |
 | **`receiptsRoot` (R)** | Root pohon Poseidon 128 slot atas leaf receipt |
 | **Cooperative / unilateral close** | Kedua pihak menandatangani pembagian akhir / satu pihak mengirim checkpoint dan membuka jendela |
 | **`challengeWindow` / `responseWindow`** | Jendela sebelum `settle` / perpanjangan per checkpoint baru |
 | **Klaim penalti** | Bukti Groth16 bahwa `payToClient = min(Σ pen_i, cap)` atas `(T, R, seq, A)` |
-| **Anchored mode** | Ack on-chain dengan pohon Poseidon inkremental (Stylus/Yul) — untuk job bernilai tinggi frekuensi rendah |
+| **Anchored mode** | Ack on-chain: klien mengirim tx `ack(seq, leaf, cumulativeAmount, sigProvider)` dan kontrak memelihara pohon Poseidon inkremental (`insertPath`, Stylus di Robinhood Chain / Yul di Anvil); `startClose()` membuka jendela; tanpa checkpoint co-signed, responder, atau tiket keluar — untuk job bernilai tinggi frekuensi rendah; membocorkan `A` per ack (§6.7) |
 | **Poseidon** | Hash aritmetika ramah-SNARK atas field BN254; circomlib v1 di dokumen ini |
 | **Groth16 / ptau / zkey** | Proof system; Powers of Tau universal; kunci phase-2 khusus sirkuit |
 | **FCFS** | First-come-first-served sequencing — tidak ada priority fee di Robinhood Chain |
@@ -884,12 +1019,48 @@ Item ✅ diverifikasi 19 Sep 2026 dengan perintah yang tercantum (RPC publik). S
 - Permit2 (`ISignatureTransfer`): `https://github.com/Uniswap/permit2`
 - OpenZeppelin `SignatureChecker` (ERC-1271), Clones (EIP-1167): `https://docs.openzeppelin.com/contracts/5.x/`
 - Servo Protocol (koreksi draft — RWA revenue share, bukan M2M): `https://www.servoprotocol.xyz/app/`
+- **Ditambahkan v1.1 (P1):** circomlibjs `poseidon_opt.js` / `poseidon_constants_opt.json` (algoritma & konstanta yang di-port `AegisPoseidon`): `https://github.com/iden3/circomlibjs`; arkworks `ark-bn254`/`ark-ff` 0.5 (aritmetika field di Stylus): `https://github.com/arkworks-rs/algebra`; `stylus-sdk-rs` 0.10.9 & `cargo-stylus`: `https://github.com/OffchainLabs/stylus-sdk-rs`; OpenZeppelin `ERC2771Forwarder._checkForwardedGas` (pola pemeriksaan gas pasca-panggilan EIP-150 yang dipakai `InsufficientGas`): `https://docs.openzeppelin.com/contracts/5.x/`; Slither 0.11.5: `https://github.com/crytic/slither`; pengukuran & audit internal: `docs/benchmarks/poseidon.md`, `docs/audit/slither-2026-09.md`, `docs/superpowers/ledger-2026-09-20-aegisclear-protocol-p1.md`, `docs/superpowers/ledger-2026-09-20-aegisclear-web-console.md`
 
 **Belum bersumber primer (wajib dilengkapi sebelum pitch):** klaim OKX APP "escrow & dispute coming soon" (§2.3); alamat registry ERC-8004 di Robinhood Chain (V15); jendela force-inclusion Robinhood Chain (V13); ZeroStyl (V16).
 
 ---
 
 ## 23. RIWAYAT PERUBAHAN
+
+### v1.1 — 20 September 2026 (sistem sebagaimana dibangun setelah P1)
+
+Sumber angka: `README.md`, `docs/benchmarks/poseidon.md`, `docs/audit/slither-2026-09.md`, ledger P1 & web console (`docs/superpowers/`), kode di `contracts/src`, `sdk/src`, `stylus/aegis-poseidon`; dua angka Foundry `--gas-report` (`open`, `closeCooperative`) diukur saat menulis v1.1. Tidak ada angka yang diperkirakan; yang tidak terukur ditulis "belum diukur".
+
+| # | Perubahan | Bagian | Alasan / sumber |
+|---|---|---|---|
+| 1 | Header & status: v1.1, P0 + P1 dikirim, testnet v1, yang masih menunggu pemilik (mainnet, facilitator Mesh, video), redeploy v2 tertunda | Header, §0, §1, §16 | README "Status implementasi"; design spec §C "Di luar cakupan" |
+| 2 | Scope table diberi ✅ per item; P1 tidak lagi "digerbangi" — D2 terpenuhi 1,75×; web console masuk scope | §1 | README; `docs/benchmarks/poseidon.md` §5 |
+| 3 | Angka Stylus yang dikutip (OZ 11.887/19.313, "1,6×/18×") diganti angka terukur sendiri: `insertPath` 144.076 vs 252.271 (1,75× total, ≈1,9× eksekusi), `hash2` 82.593 vs 62.138; 2,33× (Poseidon2) **ditarik** | §0, §1, §2.1 P6, §2.4, §8.3, §17, §19 V12, §20 D2 | `docs/benchmarks/poseidon.md` §5; ledger P1 Task 9/6b |
+| 4 | FR-8/FR-11 memuat `epoch`; FR-10, FR-25, FR-26, FR-27 → ✅ dengan semantik yang dikirim dan nama test | §5 | `AegisChannel.sol`, `AegisTreasuryRouter.sol`, `Rollover.t.sol`, `Anchored.t.sol`, `TreasuryRouter.t.sol`, `Events.t.sol` |
+| 5 | Struct EIP-712 ditulis ulang persis seperti typehash on-chain: `epoch` di `Checkpoint`/`Close`/`Rollover`, `Leaf(uint32 epoch,uint64 seq,bytes32 leaf,uint128 cumulativeAmount)`; rasional replay-setelah-rollover dan `A` di `Leaf`; protokol ack anchored; tipe SDK (`RolloverMsg`, `LeafMsg`) | §6.2 | `AegisChannel.sol` baris typehash; `sdk/src/core/typedData.ts`; design spec §B.1/B.3 |
+| 6 | Parameter baru `epoch`, `HOOK_GAS`; baris hash diperbarui (port Rust dibangun) | §6.6 | kode |
+| 7 | Tabel kebocoran: baris `epoch`/`RolledOver` dan baris **anchored** (hash daun + `A` per ack ⇒ `due_i` per unit, harga tersirat); `leak-check` anchored mengecualikan `unitPrice` | §6.7, §17 | design spec §B.3; plan ship "Global Constraints"; `demo/test/rows.test.ts` |
+| 8 | Diagram & prinsip desain: `rollover`, `ack/startClose`, `_send` hook, `PoseidonPathYul`; prinsip 6–8 (mode = sifat factory; Stylus terukur; hook tidak menyandera) | §7 | kode |
+| 9 | §8.1 ditulis ulang sebagaimana dibangun: immutable `POSEIDON`/`ANCHORED`, storage datar + `epoch`/`hasProof`/`filledSubtrees`, `hash*`, `ack`, `startClose`, `rollover`, `sweep` lewat `_send`, alur `settle` dengan `hasProof && proofSeq == seq`, `_send` + `HOOK_GAS` 300k + `InsufficientGas` (M-1), event/error lengkap, catatan `ReentrancyGuard` di clone | §8.1 | `AegisChannel.sol`; audit §3.5–3.6 |
+| 10 | §8.2: verifier/zkey tidak berubah; 3 High Slither = idiom snarkjs (false positive) | §8.2 | audit ID-0..2 |
+| 11 | §8.3 ditulis ulang: `IPoseidonPath` (`hash2`, `insertPath`), `AegisPoseidon` v1 teroptimasi (poseidon_opt, ark-ff 0.5, 21,7 KB, `0x1027cf7D…ef34`), kembaran Yul, kesetaraan keluaran, tabel D2 final, **`hash5`/`hash6`/`root128` tidak dibangun** (tidak ada pemakai on-chain, B3 tidak aktif), anchored mode sebagaimana dibangun, gas anchored terukur, T15 = catatan ops P2 | §8.3 | `docs/benchmarks/poseidon.md` §5; `stylus/aegis-poseidon/README.md`; README "Alamat kontrak"; README M9 |
+| 12 | §8.4 router sebagaimana dibangun: hook `IAegisPayoutHook`, `setTreasury` diri sendiri, `onPayout` + `Unbacked`, `_tryTransfer` non-revert, `claim`, `nonReentrant`, peringatan transfer langsung (I2), status deploy (v1 150k → source 300k) | §8.4 | `AegisTreasuryRouter.sol`; README; audit ID-4/ID-16 |
+| 13 | §8.5 factory: konstruktor `(verifier, permit2, minChallengeWindow, poseidonPath)` + `ZeroAddress`, `salt = keccak256(abi.encode(c))` (seluruh Config), `AlreadyOpen`, tiga factory testnet | §8.5 | `AegisChannelFactory.sol`; audit ID-5/7 |
+| 14 | Matriks akses: baris `ack`/`startClose`/`rollover`, agen di router, payee kontrak (hook), deployer dengan `POSEIDON` | §8.6 | kode |
+| 15 | §8.7: `open` 295.634 dan `closeCooperative` 100.191/109.003 (Foundry `--gas-report`, diukur 20 Sep 2026), `settle` dengan payee pembakar gas 212.572 (ledger), angka v1 anchored/co-signed, `hash2`, data fee per build; `rollover` & settle-dengan-router "belum diukur terpisah" | §8.7 | pengukuran sendiri; README; ledger P1 Task 3 |
+| 16 | §9 tidak berubah (dicatat); §10.2 tiket keluar ber-epoch + `exitSigNext` + anchored tanpa tiket + flag `anchored` 402 tidak dipercaya; §10.3 baris `IACPHook` disesuaikan dengan hook best-effort | §9, §10.2, §10.3 | `server.ts`, `agent.ts` |
+| 17 | §11 ditulis ulang sebagaimana dibangun: rute provider (`/job` diserialkan per klien, `/close`, `/rollover` + `exitSigNext`, `/rollover/confirm` idempoten, kode 409), opsi `anchored`/`payoutProvider` + asersi mode saat start, klien (`start()` mode dari factory sendiri, `ClientPolicy`, `requestUnit` anchored, `rollover()` verifikasi-sebelum-broadcast, `dispute()`/`exitUnilateral()` toleran `CLOSING`), watcher dengan guard epoch, keepalive belum | §11 | `sdk/src/provider/server.ts`, `sdk/src/client/agent.ts`, `sdk/src/watcher/watcher.ts`; README "Keterbatasan SDK referensi" |
+| 18 | Threat model: T14/T15 diperbarui; **T20** T-hook, **T21** T-hook-gas (M-1), **T22** slack router, **T23** T-mode, **T24** T-close-continue, **T25** T-rollover-ticket (I1) → D11, **T26** `A` digelembungkan (anchored), **T27** `/job` konkuren (M6), **T28** lawan `startClose` dulu; ringkasan audit Slither | §12 | audit; ledger P1 (review Task 2, Task 7, final review I1/I2/M1–M9) |
+| 19 | Invarian INV-2 ber-epoch, INV-11 ✅, INV-13–16 baru; skenario 11 ✅, 12 ✅ (nama test SDK & Foundry, channel testnet), 13 status jujur (router ✅, channel belum ada test khusus), 15 router ✅, 16 hook-gas ✅, 17 adversarial SDK; status suite (forge 118; testnet 13/4) | §13 | `sdk/test/integration.test.ts`; `contracts/test/*`; audit §4; README |
+| 20 | §14: dua baris skenario P1 — anchored **0,02 / 0,38** dan rollover **0,00 / 2,66** — dan paragraf web console lengkap (tiga factory, `/provider-anchored`, kolom `epoch`, pill mode, API) | §14 | `demo/test/rows.test.ts`, `web/test/server.test.ts`, plan ship; README "Lihat di browser" |
+| 21 | Rencana 15 hari: baris 2–8, 10–13 ✅ dengan bukti; 9 & 14 sebagian (menunggu pemilik); hasil aturan pemangkasan | §16 | README; §19 |
+| 22 | Q&A: jawaban Stylus diperbarui (229.241 verifier) + Q baru "Stylus di mana & kenapa hanya di sana" (1,75×), "Kenapa dua mode", "Hook payout"; jawaban kebocoran & rollover diperbarui | §17 | `docs/benchmarks/poseidon.md` §5 |
+| 23 | Rencana B: B3 tidak aktif (alasan tanpa `hash5/6/root128`); **B5** baru: `PoseidonPathYul` fallback (`POSEIDON_STYLUS` kosong) | §18 | `DeployTestnet.s.sol` via README "Deploy ke testnet" |
+| 24 | Checklist: V9–V12 ✅ final (V12 = angka D2), V18b + catatan v1 mendahului M-1/`ZeroAddress`/300k, **V19** self-audit Slither | §19 | audit; README |
+| 25 | Keputusan: D1 status (mainnet belum), D2 ✅ FINAL, D3/D4/D5/D7/D8 ✅, D10 URL repo, **D11** baru: `startClose()` co-signed (terbuka, kandidat v2) | §20 | ledger P1 Task 2 "design note" |
+| 26 | Glosarium: epoch, rollover, tiket keluar, hook payout, slack, mode per factory, `insertPath`, anchored mode diperbarui | §21 | — |
+| 27 | Sumber: circomlibjs, arkworks, stylus-sdk, OZ `ERC2771Forwarder`, Slither, dokumen internal | §22 | — |
+| 28 | String basi v1.0 dihapus: `Rollover(uint64 seq,uint128 toProvider)`, `Leaf(uint64 seq,bytes32 leaf)`, `Checkpoint(uint64 seq,…)`, pseudo-code `hash5/hash6/root128`, "Hari 7/12" sebagai tenggat pengukuran; semua hanya tersisa di baris changelog ini | §6.2, §8.3, §8.7, §3 | — |
 
 ### v1.0 — 19 September 2026 (menggantikan draft §3.1–3.2)
 
