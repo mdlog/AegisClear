@@ -5,7 +5,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { foundry } from "viem/chains";
 import {
   signCheckpoint, verifyCheckpointSig, signChannelTerms, verifyChannelTermsSig, signClose, verifyCloseSig, signRollover, verifyRolloverSig,
-  makeTypedDataVerifier, domain, CHECKPOINT_TYPES, CLOSE_TYPES, ROLLOVER_TYPES, rootHex, type ChannelConfig,
+  makeTypedDataVerifier, domain, CHECKPOINT_TYPES, CLOSE_TYPES, ROLLOVER_TYPES, LEAF_TYPES, rootHex, signLeaf, verifyLeafSig, type ChannelConfig,
 } from "../src/core/typedData.js";
 
 const acct = privateKeyToAccount("0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d");
@@ -59,6 +59,19 @@ describe("EIP-712", () => {
       encodeAbiParameters([{ type: "bytes32" }, { type: "uint32" }, { type: "uint64" }, { type: "uint128" }], [th("Close(uint32 epoch,uint64 seq,uint128 toProvider)"), 1, 7n, 5n]));
     expectDigest(ROLLOVER_TYPES, "Rollover", { epoch: 1, seq: 7n, toProvider: 5n },
       encodeAbiParameters([{ type: "bytes32" }, { type: "uint32" }, { type: "uint64" }, { type: "uint128" }], [th("Rollover(uint32 epoch,uint64 seq,uint128 toProvider)"), 1, 7n, 5n]));
+  });
+  it("leaf sign/verify (anchored) dan struct hash cocok dengan typehash kontrak", async () => {
+    const m = { epoch: 0, seq: 3, leaf: rootHex(16723296179585495516306154995438540387388995699464725696412698533727287537557n), cumulativeAmount: 80_000n };
+    const sig = await signLeaf(acct, channel, 31337, m);
+    expect(await verifyLeafSig(acct.address, channel, 31337, m, sig)).toBe(true);
+    expect(await verifyLeafSig(acct.address, channel, 31337, { ...m, cumulativeAmount: 80_001n }, sig)).toBe(false);
+    const dom = domain(channel, 31337);
+    // Generik eksplisit — lihat catatan di "struct hash cocok dengan typehash kontrak" di atas.
+    const domSep = hashDomain<Record<string, unknown>>({ domain: dom, types: { EIP712Domain: getTypesForEIP712Domain({ domain: dom }) } });
+    const encoded = encodeAbiParameters([{ type: "bytes32" }, { type: "uint32" }, { type: "uint64" }, { type: "bytes32" }, { type: "uint128" }],
+      [keccak256(toBytes("Leaf(uint32 epoch,uint64 seq,bytes32 leaf,uint128 cumulativeAmount)")), 0, 3n, m.leaf, 80_000n]);
+    expect(hashTypedData({ domain: dom, types: LEAF_TYPES, primaryType: "Leaf", message: { epoch: 0, seq: 3n, leaf: m.leaf, cumulativeAmount: 80_000n } }))
+      .toBe(keccak256(concatHex(["0x1901", domSep, keccak256(encoded)])));
   });
 });
 

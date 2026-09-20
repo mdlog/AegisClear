@@ -19,6 +19,7 @@ export const CHECKPOINT_TYPES = {
 } as const;
 export const CLOSE_TYPES = { Close: [{ name: "epoch", type: "uint32" }, { name: "seq", type: "uint64" }, { name: "toProvider", type: "uint128" }] } as const;
 export const ROLLOVER_TYPES = { Rollover: [{ name: "epoch", type: "uint32" }, { name: "seq", type: "uint64" }, { name: "toProvider", type: "uint128" }] } as const;
+export const LEAF_TYPES = { Leaf: [{ name: "epoch", type: "uint32" }, { name: "seq", type: "uint64" }, { name: "leaf", type: "bytes32" }, { name: "cumulativeAmount", type: "uint128" }] } as const;
 
 export interface ChannelConfig {
   client: Address; provider: Address; token: Address; termsCommitment: Hex;
@@ -28,10 +29,13 @@ export interface ChannelConfig {
 export interface Checkpoint { epoch: number; seq: number; cumulativeAmount: bigint; receiptsRoot: bigint }
 export interface CloseMsg { epoch: number; seq: number; toProvider: bigint }
 export type RolloverMsg = CloseMsg;
+/** Anchored (FR-25): provider menandatangani daun Poseidon + kumulatif; klien mengirimnya ke `ack()`. */
+export interface LeafMsg { epoch: number; seq: number; leaf: Hex; cumulativeAmount: bigint }
 
 export const rootHex = (r: bigint): Hex => toHex(r, { size: 32 });
 const cpMsg = (cp: Checkpoint) => ({ epoch: cp.epoch, seq: BigInt(cp.seq), cumulativeAmount: cp.cumulativeAmount, receiptsRoot: rootHex(cp.receiptsRoot) });
 const closeMsg = (m: CloseMsg) => ({ epoch: m.epoch, seq: BigInt(m.seq), toProvider: m.toProvider });
+const leafMsg = (m: LeafMsg) => ({ epoch: m.epoch, seq: BigInt(m.seq), leaf: m.leaf, cumulativeAmount: m.cumulativeAmount });
 
 export function signChannelTerms(a: PrivateKeyAccount, channel: Address, chainId: number, c: ChannelConfig): Promise<Hex> {
   return a.signTypedData({ domain: domain(channel, chainId), types: CHANNEL_TERMS_TYPES, primaryType: "ChannelTerms", message: c });
@@ -57,6 +61,12 @@ export function signRollover(a: PrivateKeyAccount, channel: Address, chainId: nu
 export function verifyRolloverSig(signer: Address, channel: Address, chainId: number, m: RolloverMsg, signature: Hex): Promise<boolean> {
   return verifyTypedData({ address: signer, domain: domain(channel, chainId), types: ROLLOVER_TYPES, primaryType: "Rollover", message: closeMsg(m), signature });
 }
+export function signLeaf(a: PrivateKeyAccount, channel: Address, chainId: number, m: LeafMsg): Promise<Hex> {
+  return a.signTypedData({ domain: domain(channel, chainId), types: LEAF_TYPES, primaryType: "Leaf", message: leafMsg(m) });
+}
+export function verifyLeafSig(signer: Address, channel: Address, chainId: number, m: LeafMsg, signature: Hex): Promise<boolean> {
+  return verifyTypedData({ address: signer, domain: domain(channel, chainId), types: LEAF_TYPES, primaryType: "Leaf", message: leafMsg(m), signature });
+}
 
 /**
  * Verifier tanda tangan EIP-712 yang SADAR KONTRAK. `verifyChannelTermsSig`/`verifyCheckpointSig`/
@@ -72,6 +82,7 @@ export interface TypedDataVerifier {
   verifyCheckpointSig(signer: Address, channel: Address, chainId: number, cp: Checkpoint, signature: Hex): Promise<boolean>;
   verifyCloseSig(signer: Address, channel: Address, chainId: number, m: CloseMsg, signature: Hex): Promise<boolean>;
   verifyRolloverSig(signer: Address, channel: Address, chainId: number, m: RolloverMsg, signature: Hex): Promise<boolean>;
+  verifyLeafSig(signer: Address, channel: Address, chainId: number, m: LeafMsg, signature: Hex): Promise<boolean>;
 }
 export function makeTypedDataVerifier(publicClient: PublicClient): TypedDataVerifier {
   return {
@@ -83,5 +94,7 @@ export function makeTypedDataVerifier(publicClient: PublicClient): TypedDataVeri
       publicClient.verifyTypedData({ address: signer, domain: domain(channel, chainId), types: CLOSE_TYPES, primaryType: "Close", message: closeMsg(m), signature }),
     verifyRolloverSig: (signer, channel, chainId, m, signature) =>
       publicClient.verifyTypedData({ address: signer, domain: domain(channel, chainId), types: ROLLOVER_TYPES, primaryType: "Rollover", message: closeMsg(m), signature }),
+    verifyLeafSig: (signer, channel, chainId, m, signature) =>
+      publicClient.verifyTypedData({ address: signer, domain: domain(channel, chainId), types: LEAF_TYPES, primaryType: "Leaf", message: leafMsg(m), signature }),
   };
 }

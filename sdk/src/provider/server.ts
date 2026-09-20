@@ -6,9 +6,9 @@
 import { Hono } from "hono";
 import { randomBytes } from "node:crypto";
 import type { Address, Hex, PrivateKeyAccount } from "viem";
-import { type Terms, type Receipt, ReceiptTree, commitTerms, makeReceipt, MAX_SEQ, merkleRoot, randomNonce } from "../core/index.js";
+import { type Terms, type Receipt, ReceiptTree, commitTerms, makeReceipt, MAX_SEQ, merkleRoot, randomNonce, settle } from "../core/index.js";
 import {
-  type ChannelConfig, type Checkpoint, signCheckpoint, signChannelTerms, signClose, signRollover, rootHex, makeTypedDataVerifier,
+  type ChannelConfig, type Checkpoint, type LeafMsg, signCheckpoint, signChannelTerms, signClose, signRollover, signLeaf, rootHex, makeTypedDataVerifier,
 } from "../core/typedData.js";
 import { type ChainCtx, predictChannel, openChannel, erc20Balance, readChannel } from "../chain/channel.js";
 import { Watcher } from "../watcher/watcher.js";
@@ -27,6 +27,8 @@ export interface ProviderOptions {
   unitQty: bigint; deposit: bigint; challengeWindow: number; responseWindow: number;
   /** metrik per unit (demo: injeksi pelanggaran) */
   metrics: (seq: number) => { m1: bigint; m2: bigint };
+  /** mode anchored (FR-25): factory di `ctx.factory` harus factory anchored; ack klien = tx on-chain, tidak ada checkpoint co-signed. */
+  anchored?: boolean;
 }
 export interface CoSigned { cp: Checkpoint; sigProvider: Hex; sigClient?: Hex }
 export interface Session {
@@ -78,7 +80,7 @@ export function createProviderApp(o: ProviderOptions) {
     x402Version: 1,
     accepts: [{
       scheme: "exact", network: `eip155:${chainId}`, asset: o.usdg, payTo: s.predicted, maxAmountRequired: o.deposit.toString(),
-      extra: { aegis: { config: j(s.cfg), sigProvider: s.termsSigProvider, terms: j(s.terms), unitQty: o.unitQty.toString(), exitSig: s.exitSigProvider } },
+      extra: { aegis: { config: j(s.cfg), sigProvider: s.termsSigProvider, terms: j(s.terms), unitQty: o.unitQty.toString(), exitSig: s.exitSigProvider, anchored: !!o.anchored } },
     }],
   });
   const clientOf = (c: any) => c.req.header("Aegis-Client") as Address | undefined;
@@ -105,16 +107,22 @@ export function createProviderApp(o: ProviderOptions) {
       const { channel } = await openChannel(o.ctx, s.cfg, sigClient, "0x"); // provider = msg.sender
       s.channel = channel;
     }
-    // (2) ack checkpoint sebelumnya (§6.2, FR-24)
+    // (2) ack unit sebelumnya (§6.2, FR-24)
     const n = s.tree.size;
     if (n > 0) {
-      const pending = s.checkpoints.get(n)!;
-      if (!pending.sigClient) {
-        const hdr = c.req.header("Aegis-Ack");
-        const ack = hdr ? (JSON.parse(hdr) as { seq: number; signature: Hex }) : undefined;
-        if (!ack || ack.seq !== n || !(await verify.verifyCheckpointSig(client, s.channel, chainId, pending.cp, ack.signature)))
-          return c.json({ error: "ack-required", seq: n }, 409);
-        pending.sigClient = ack.signature;
+      if (o.anchored) {
+        // (2') anchored: unit n-1 harus sudah di-ack ON-CHAIN oleh klien (tidak ada header Aegis-Ack); epoch harus sama.
+        const v = await readChannel(o.ctx, s.channel);
+        if (v.epoch !== s.epoch || v.seq < n) return c.json({ error: "ack-required", seq: n - 1 }, 409);
+      } else {
+        const pending = s.checkpoints.get(n)!;
+        if (!pending.sigClient) {
+          const hdr = c.req.header("Aegis-Ack");
+          const ack = hdr ? (JSON.parse(hdr) as { seq: number; signature: Hex }) : undefined;
+          if (!ack || ack.seq !== n || !(await verify.verifyCheckpointSig(client, s.channel, chainId, pending.cp, ack.signature)))
+            return c.json({ error: "ack-required", seq: n }, 409);
+          pending.sigClient = ack.signature;
+        }
       }
     }
     if (n >= MAX_SEQ) return c.json({ error: "epoch-full" }, 409);
@@ -122,11 +130,19 @@ export function createProviderApp(o: ProviderOptions) {
     // (3) tidak melayani melebihi deposit (FR-24)
     const due = o.unitQty * s.terms.unitPrice;
     if ((await erc20Balance(o.ctx, o.usdg, s.channel)) < s.cumulativeAmount + due) return c.json(challenge(s), 402);
-    // (4) layani unit n; receipt + checkpoint n+1 ditandatangani provider
+    // (4) layani unit n
     const { m1, m2 } = o.metrics(n);
     const r: Receipt = makeReceipt(n, o.unitQty, m1, m2, s.terms.unitPrice);
     await s.tree.append(r);
     s.cumulativeAmount += due;
+    if (o.anchored) {
+      // Anchored (FR-25): daun Poseidon + kumulatif ditandatangani provider; klien mengirimnya ke `ack()` on-chain
+      // sendiri. Tidak ada checkpoint co-signed di sini — privasi §6.7 (metrik/harga tidak pernah di calldata ack).
+      const leaf: LeafMsg = { epoch: s.epoch, seq: n, leaf: rootHex(s.tree.leaves[n]), cumulativeAmount: s.cumulativeAmount };
+      const sigProvider = await signLeaf(o.account, s.channel, chainId, leaf);
+      return c.json({ result: `unit-${n}`, receipt: j(r), leaf: j(leaf), sigProvider, channel: s.channel });
+    }
+    // (co-signed) receipt + checkpoint n+1 ditandatangani provider
     const cp: Checkpoint = { epoch: s.epoch, seq: n + 1, cumulativeAmount: s.cumulativeAmount, receiptsRoot: await s.tree.root() };
     const sigProvider = await signCheckpoint(o.account, s.channel, chainId, cp);
     s.checkpoints.set(n + 1, { cp, sigProvider });
@@ -153,13 +169,21 @@ export function createProviderApp(o: ProviderOptions) {
     const client = clientOf(c); const s = client && sessions.get(client.toLowerCase());
     if (!s?.channel) return c.json({ error: "no channel" }, 409);
     const { seq, toProvider, sigClient } = (await c.req.json()) as { seq: number; toProvider: string; sigClient: Hex };
-    const n = s.tree.size;
-    let hi: number | undefined;
-    if (n === 0) hi = 0;
-    else if (s.checkpoints.get(n)?.sigClient) hi = n;
-    else if (s.checkpoints.get(n - 1)?.sigClient) hi = n - 1;
+    let hi: number | undefined; let owed = 0n;
+    if (o.anchored) {
+      // anchored: state on-chain adalah kebenaran — tutup di seq yang sudah di-ack (bisa tree.size − 1 bila unit terakhir belum di-ack).
+      const v = await readChannel(o.ctx, s.channel);
+      if (v.epoch !== s.epoch) return c.json({ error: "epoch-mismatch", epoch: v.epoch }, 409);
+      hi = v.seq;
+      owed = settle(s.tree.receipts.slice(0, hi), s.terms).cumulativeAmount;
+    } else {
+      const n = s.tree.size;
+      if (n === 0) hi = 0;
+      else if (s.checkpoints.get(n)?.sigClient) hi = n;
+      else if (s.checkpoints.get(n - 1)?.sigClient) hi = n - 1;
+      owed = hi === undefined ? 0n : hi === 0 ? 0n : s.checkpoints.get(hi)!.cp.cumulativeAmount;
+    }
     if (hi === undefined || seq !== hi) return c.json({ error: "checkpoint-not-acked", seq }, 409);
-    const owed = hi === 0 ? 0n : s.checkpoints.get(hi)!.cp.cumulativeAmount;
     if (BigInt(toProvider) !== owed) return c.json({ error: "amount-mismatch", toProvider: owed.toString() }, 409);
     const msg = { epoch: s.epoch, seq: hi, toProvider: owed };
     const ok = kind === "close"

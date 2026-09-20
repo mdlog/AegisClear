@@ -463,4 +463,86 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
       expect(await bal(dd.router)).toBe(0n);
     } finally { server3.close(); }
   });
+
+  describe("skenario 12 (FR-25 anchored): ack on-chain, startClose, bukti atas R on-chain", () => {
+    let server4: ReturnType<typeof serve>;
+    const PORT = 4027;
+    const fresh = async (usdgAmount: bigint) => {
+      const pk = generatePrivateKey(); const acct = privateKeyToAccount(pk);
+      const eth = await ctxOf(PK.deployer).walletClient.sendTransaction({ to: acct.address, value: 1_000_000_000_000_000_000n });
+      await publicClient.waitForTransactionReceipt({ hash: eth });
+      await mintUsdg(acct.address, usdgAmount);
+      return { pk, acct };
+    };
+    const mkAnchoredClient = (pk: Hex) => new AegisClient({
+      ctx: { ...ctxOf(pk), factory: (d as any).factoryAnchored }, account: privateKeyToAccount(pk), providerUrl: `http://127.0.0.1:${PORT}`, usdg: d.usdg, artifacts: art,
+    });
+    const words = (hex: string) => { const h = hex.replace(/^0x/, ""); const o: bigint[] = []; for (let i = 0; i + 64 <= h.length; i += 64) o.push(BigInt("0x" + h.slice(i, i + 64))); return o; };
+
+    beforeAll(() => {
+      expect((d as any).factoryAnchored).toMatch(/^0x/);
+      const terms = { unitPrice: 20_000n, maxM1: 800n, minM2: 90n, penaltyBps: 5000n, capBps: 3000n, nonce: randomNonce() };
+      const { app } = createProviderApp({
+        ctx: { ...ctxOf(PK.provider), factory: (d as any).factoryAnchored }, account: providerAccount, usdg: d.usdg, terms, anchored: true,
+        unitQty: 1n, deposit: 1_000_000n, challengeWindow: 120, responseWindow: 60,
+        metrics: (seq) => ({ m1: seq === 3 ? 1200n : 300n, m2: 95n }),
+      });
+      server4 = serve({ fetch: app.fetch, port: PORT });
+    });
+    afterAll(() => { server4?.close(); });
+
+    it("sengketa: 10 ack on-chain (1 pelanggaran) → startClose → bukti → settle 190.000 / 810.000; calldata ack tanpa metrik", async () => {
+      const { pk, acct } = await fresh(2_000_000n);
+      const c = mkAnchoredClient(pk);
+      const c0 = await bal(acct.address); const p0 = await bal(providerAddr);
+      await c.start();
+      expect(c.anchored).toBe(true);
+      for (let i = 0; i < 10; i++) await c.requestUnit();
+      expect(c.txs.filter((t) => t.label === "ack").length).toBe(10);
+      const v = await c.view();
+      expect(v.seq).toBe(10); expect(v.receiptsRoot).toBe(await c.tree.root()); expect(v.cumulativeAmount).toBe(200_000n);
+      const { payToClient } = await c.dispute();
+      expect(payToClient).toBe(10_000n);
+      expect(c.txs.map((t) => t.label)).toEqual(expect.arrayContaining(["startClose", "claimPenalty"]));
+      expect((await c.view()).hasProof).toBe(true);
+      if (CHAIN_ID === 31337) { await publicClient.request({ method: "evm_increaseTime", params: [121] } as any); await publicClient.request({ method: "evm_mine", params: [] } as any); }
+      else await new Promise((r) => setTimeout(r, 125_000));
+      await c.settle();
+      expect((await bal(providerAddr)) - p0).toBe(190_000n);
+      expect(c0 - (await bal(acct.address))).toBe(190_000n);
+      // Privasi anchored (spec §6.7): metrik & ambang tidak pernah masuk calldata/log ack — hanya hash daun + kumulatif.
+      for (const t of c.txs.filter((x) => x.label === "ack")) {
+        const tx = await publicClient.getTransaction({ hash: t.hash }); const rc = await publicClient.getTransactionReceipt({ hash: t.hash });
+        const ws = [...words("0x" + tx.input.slice(10)), ...rc.logs.flatMap((l) => words(l.data))];
+        for (const secret of [1200n, 300n, 95n, 800n, 90n, 5000n, 3000n]) expect(ws).not.toContain(secret);
+      }
+      console.table(c.txs.map((t) => ({ label: t.label, gasUsed: t.gasUsed.toString() })));
+    });
+
+    it("kooperatif anchored: 5 ack → close (klien menandatangani dulu) → provider +100.000", async () => {
+      const { pk, acct } = await fresh(2_000_000n);
+      const c = mkAnchoredClient(pk);
+      const p0 = await bal(providerAddr); const c0 = await bal(acct.address);
+      await c.start();
+      for (let i = 0; i < 5; i++) await c.requestUnit();
+      await c.finalAck();                                  // no-op di anchored
+      await c.closeCooperative();
+      expect((await c.view()).state).toBe("SETTLED");
+      expect((await bal(providerAddr)) - p0).toBe(100_000n);
+      expect(c0 - (await bal(acct.address))).toBe(100_000n);
+    });
+
+    it("keluar unilateral anchored: provider tidak menjawab → startClose → settle → deposit kembali penuh", async () => {
+      const { pk, acct } = await fresh(2_000_000n);
+      const c = mkAnchoredClient(pk);
+      const c0 = await bal(acct.address);
+      await c.start();
+      await c.exitUnilateral();
+      expect((await c.view()).state).toBe("CLOSING");
+      if (CHAIN_ID === 31337) { await publicClient.request({ method: "evm_increaseTime", params: [121] } as any); await publicClient.request({ method: "evm_mine", params: [] } as any); }
+      else await new Promise((r) => setTimeout(r, 125_000));
+      await c.settle();
+      expect(await bal(acct.address)).toBe(c0);
+    });
+  });
 });

@@ -1,6 +1,6 @@
 import type { Address, Hex, PublicClient, WalletClient, Transport, Chain, Account } from "viem";
 import { factoryAbi, channelAbi, erc20Abi, CHANNEL_STATE } from "./abi.js";
-import { type ChannelConfig, type Checkpoint, rootHex } from "../core/typedData.js";
+import { type ChannelConfig, type Checkpoint, type LeafMsg, rootHex } from "../core/typedData.js";
 import type { ProofCalldata } from "../core/prover.js";
 
 export interface ChainCtx {
@@ -63,6 +63,8 @@ export const closeCooperativeTx = (ctx: ChainCtx, ch: Address, seq: number, toPr
   write(ctx, ch, "closeCooperative", [BigInt(seq), toProvider, sigC, sigP]);
 export const rolloverTx = (ctx: ChainCtx, ch: Address, seq: number, toProvider: bigint, sigC: Hex, sigP: Hex) =>
   write(ctx, ch, "rollover", [BigInt(seq), toProvider, sigC, sigP]);
+export const ackTx = (ctx: ChainCtx, ch: Address, m: LeafMsg, sigP: Hex) => write(ctx, ch, "ack", [BigInt(m.seq), m.leaf, m.cumulativeAmount, sigP]);
+export const startCloseTx = (ctx: ChainCtx, ch: Address) => write(ctx, ch, "startClose", []);
 
 export async function erc20Transfer(ctx: ChainCtx, token: Address, to: Address, amount: bigint) {
   const hash = await ctx.walletClient.writeContract({ address: token, abi: erc20Abi, functionName: "transfer", args: [to, amount] });

@@ -6,6 +6,7 @@ export const factoryAbi = parseAbi([
   "function open(Config c, bytes sigClient, bytes sigProvider) returns (address)",
   "function IMPLEMENTATION() view returns (address)",
   "function MIN_CHALLENGE_WINDOW() view returns (uint32)",
+  "function POSEIDON() view returns (address)",
   "event ChannelOpened(address indexed channel, address indexed client, address indexed provider, bytes32 termsCommitment)",
 ]);
 
@@ -19,11 +20,14 @@ export const channelAbi = parseAbi([
   "function payToClient() view returns (uint128)",
   "function budget() view returns (uint256)",
   "function epoch() view returns (uint32)",
+  "function ANCHORED() view returns (bool)",
   "function cfg() view returns (address client, address provider, address token, bytes32 termsCommitment, uint32 challengeWindow, uint32 responseWindow, address payoutClient, address payoutProvider, bytes32 salt)",
   "event Opened(address indexed client, address indexed provider, bytes32 termsCommitment, uint32 challengeWindow)",
   "event Funded(address indexed from, uint256 amount)",
   "event Swept(uint256 amount)",
   "function submitCheckpoint(uint64 seq, uint128 cumulativeAmount, bytes32 receiptsRoot, bytes sigClient, bytes sigProvider)",
+  "function ack(uint64 seq, bytes32 leaf, uint128 cumulativeAmount, bytes sigProvider)",
+  "function startClose()",
   "function claimPenalty(uint256[8] proof, uint128 payToClient)",
   "function settle()",
   "function sweep()",
@@ -33,6 +37,8 @@ export const channelAbi = parseAbi([
   "event CheckpointSubmitted(uint64 seq, uint128 cumulativeAmount, bytes32 receiptsRoot, uint64 deadline)",
   "event PenaltyClaimed(address indexed by, uint64 seq, uint128 payToClient)",
   "event RolledOver(uint32 indexed newEpoch, uint64 closedSeq, uint256 toProvider, uint256 remaining)",
+  "event Acked(uint64 seq, bytes32 leaf, uint128 cumulativeAmount, bytes32 root)",
+  "event CloseStarted(address indexed by, uint64 seq, uint128 cumulativeAmount, bytes32 receiptsRoot, uint64 deadline)",
 ]);
 
 export const routerAbi = parseAbi([
