@@ -33,8 +33,9 @@ contract AegisChannel is ReentrancyGuard {
         "ChannelTerms(address client,address provider,address token,bytes32 termsCommitment,uint32 challengeWindow,uint32 responseWindow,address payoutClient,address payoutProvider,bytes32 salt)"
     );
     bytes32 public constant CHECKPOINT_TYPEHASH =
-        keccak256("Checkpoint(uint64 seq,uint128 cumulativeAmount,bytes32 receiptsRoot)");
-    bytes32 public constant CLOSE_TYPEHASH = keccak256("Close(uint64 seq,uint128 toProvider)");
+        keccak256("Checkpoint(uint32 epoch,uint64 seq,uint128 cumulativeAmount,bytes32 receiptsRoot)");
+    bytes32 public constant CLOSE_TYPEHASH = keccak256("Close(uint32 epoch,uint64 seq,uint128 toProvider)");
+    bytes32 public constant ROLLOVER_TYPEHASH = keccak256("Rollover(uint32 epoch,uint64 seq,uint128 toProvider)");
     uint64 public constant MAX_SEQ = 128;
 
     address public immutable FACTORY;
@@ -51,6 +52,7 @@ contract AegisChannel is ReentrancyGuard {
     uint128 public payToClient;        // hasil bukti tertunda
     uint64 public proofSeq;            // seq yang dibuktikan
     bool public hasProof;
+    uint32 public epoch;               // FR-10: setiap struct yang ditandatangani memuat epoch — checkpoint/close epoch lama tidak bisa di-replay setelah rollover
 
     event Opened(address indexed client, address indexed provider, bytes32 termsCommitment, uint32 challengeWindow);
     event Funded(address indexed from, uint256 amount);
@@ -58,6 +60,7 @@ contract AegisChannel is ReentrancyGuard {
     event PenaltyClaimed(address indexed by, uint64 seq, uint128 payToClient);
     event Settled(uint64 seq, uint128 cumulativeAmount, uint256 penalty, uint256 toProvider, uint256 toClient, bool cooperative);
     event Swept(uint256 amount);
+    event RolledOver(uint32 indexed newEpoch, uint64 closedSeq, uint256 toProvider, uint256 remaining);
     // Bentuk ERC-8183 (FR-27)
     event JobFunded(uint256 indexed jobId, address indexed client, uint256 amount);
     event PaymentReleased(uint256 indexed jobId, address indexed provider, uint256 amount);
@@ -112,11 +115,14 @@ contract AegisChannel is ReentrancyGuard {
             c.challengeWindow, c.responseWindow, c.payoutClient, c.payoutProvider, c.salt
         ));
     }
-    function hashCheckpoint(uint64 seq_, uint128 amount, bytes32 root) public pure returns (bytes32) {
-        return keccak256(abi.encode(CHECKPOINT_TYPEHASH, seq_, amount, root));
+    function hashCheckpoint(uint32 epoch_, uint64 seq_, uint128 amount, bytes32 root) public pure returns (bytes32) {
+        return keccak256(abi.encode(CHECKPOINT_TYPEHASH, epoch_, seq_, amount, root));
     }
-    function hashClose(uint64 seq_, uint128 toProvider) public pure returns (bytes32) {
-        return keccak256(abi.encode(CLOSE_TYPEHASH, seq_, toProvider));
+    function hashClose(uint32 epoch_, uint64 seq_, uint128 toProvider) public pure returns (bytes32) {
+        return keccak256(abi.encode(CLOSE_TYPEHASH, epoch_, seq_, toProvider));
+    }
+    function hashRollover(uint32 epoch_, uint64 seq_, uint128 toProvider) public pure returns (bytes32) {
+        return keccak256(abi.encode(ROLLOVER_TYPEHASH, epoch_, seq_, toProvider));
     }
 
     // ---------- funding ----------
@@ -143,7 +149,7 @@ contract AegisChannel is ReentrancyGuard {
         if (state != State.OPEN && state != State.CLOSING) revert WrongState();
         if (seq_ > MAX_SEQ) revert SeqTooLarge();
         if (state == State.CLOSING && seq_ <= seq) revert StaleCheckpoint();
-        _requireBothSigned(hashCheckpoint(seq_, amount, root), sigClient, sigProvider);
+        _requireBothSigned(hashCheckpoint(epoch, seq_, amount, root), sigClient, sigProvider);
         seq = seq_;
         cumulativeAmount = amount;
         receiptsRoot = root;
@@ -190,12 +196,36 @@ contract AegisChannel is ReentrancyGuard {
         if (state != State.OPEN && state != State.CLOSING) revert WrongState();
         if (seq_ > MAX_SEQ) revert SeqTooLarge();
         if (seq_ < seq) revert StaleCheckpoint();
-        _requireBothSigned(hashClose(seq_, toProvider), sigClient, sigProvider);
+        _requireBothSigned(hashClose(epoch, seq_, toProvider), sigClient, sigProvider);
         if (toProvider > budget()) revert ExceedsBudget();
         seq = seq_;
         hasProof = false;
         _payout(toProvider, 0, true);
     }
+
+    /// @notice Rollover kooperatif (FR-10): bayar epoch berjalan ke provider, sisa saldo menjadi budget epoch
+    ///         berikutnya dengan syarat (T) yang sama; seq/R/A/bukti di-reset; epoch++ sehingga tanda tangan
+    ///         epoch lama (checkpoint, close, rollover) tidak sah lagi. OPEN atau CLOSING; seq_ ≥ seq seperti close.
+    function rollover(uint64 seq_, uint128 toProvider, bytes calldata sigClient, bytes calldata sigProvider)
+        external nonReentrant
+    {
+        if (state != State.OPEN && state != State.CLOSING) revert WrongState();
+        if (seq_ > MAX_SEQ) revert SeqTooLarge();
+        if (seq_ < seq) revert StaleCheckpoint();
+        _requireBothSigned(hashRollover(epoch, seq_, toProvider), sigClient, sigProvider);
+        if (toProvider > budget()) revert ExceedsBudget();
+        uint32 newEpoch = ++epoch;
+        seq = 0; cumulativeAmount = 0; receiptsRoot = bytes32(0); deadline = 0;
+        hasProof = false; payToClient = 0; proofSeq = 0;
+        state = State.OPEN;
+        _resetEpochState();
+        if (toProvider > 0) IERC20(cfg.token).safeTransfer(cfg.payoutProvider, toProvider);
+        emit RolledOver(newEpoch, seq_, toProvider, budget());
+        emit PaymentReleased(channelIdField(), cfg.provider, toProvider);
+    }
+
+    /// @dev Hook untuk state per-epoch tambahan (mode anchored menimpa ini untuk me-nol-kan pohon inkremental).
+    function _resetEpochState() internal virtual {}
 
     /// @notice Setelah SETTLED: dana yang masuk belakangan → payoutClient (FR-6). Siapa pun boleh memanggil.
     function sweep() external nonReentrant {

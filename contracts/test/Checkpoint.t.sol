@@ -28,7 +28,7 @@ contract CheckpointTest is AegisTestBase {
 
     function test_checkpoint_requires_both_valid_sigs() public {
         (bytes memory sc,) = checkpointSigs(ch, 1, 20_000, ROOT);
-        bytes memory bad = Sigs.sign(0xDEAD, Sigs.digest(ch.domainSeparator(), ch.hashCheckpoint(1, 20_000, ROOT)));
+        bytes memory bad = Sigs.sign(0xDEAD, Sigs.digest(ch.domainSeparator(), ch.hashCheckpoint(ch.epoch(), 1, 20_000, ROOT)));
         vm.expectRevert(AegisChannel.BadSignature.selector);
         ch.submitCheckpoint(1, 20_000, ROOT, sc, bad);
     }

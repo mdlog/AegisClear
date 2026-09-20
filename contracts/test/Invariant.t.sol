@@ -24,7 +24,7 @@ contract Handler is Test {
     }
 
     function _cpSigs(uint64 s, uint128 a, bytes32 r) internal view returns (bytes memory, bytes memory) {
-        bytes32 d = Sigs.digest(ch.domainSeparator(), ch.hashCheckpoint(s, a, r));
+        bytes32 d = Sigs.digest(ch.domainSeparator(), ch.hashCheckpoint(ch.epoch(), s, a, r));
         return (Sigs.sign(clientPk, d), Sigs.sign(providerPk, d));
     }
 
@@ -69,7 +69,7 @@ contract Handler is Test {
         if (settled) return;
         uint128 tp = uint128(bound(toProv, 0, usdg.balanceOf(address(ch))));
         uint64 s = ch.seq();
-        bytes32 d = Sigs.digest(ch.domainSeparator(), ch.hashClose(s, tp));
+        bytes32 d = Sigs.digest(ch.domainSeparator(), ch.hashClose(ch.epoch(), s, tp));
         settledBudget = usdg.balanceOf(address(ch));
         uint256 p0 = usdg.balanceOf(provider); uint256 c0 = usdg.balanceOf(client);
         ch.closeCooperative(s, tp, Sigs.sign(clientPk, d), Sigs.sign(providerPk, d));

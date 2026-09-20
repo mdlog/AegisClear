@@ -59,7 +59,7 @@ abstract contract AegisTestBase is Test {
     function checkpointSigs(AegisChannel ch, uint64 s, uint128 a, bytes32 r)
         internal view returns (bytes memory sc, bytes memory sp)
     {
-        bytes32 d = Sigs.digest(ch.domainSeparator(), ch.hashCheckpoint(s, a, r));
+        bytes32 d = Sigs.digest(ch.domainSeparator(), ch.hashCheckpoint(ch.epoch(), s, a, r));
         sc = Sigs.sign(clientPk, d);
         sp = Sigs.sign(providerPk, d);
     }
@@ -67,7 +67,15 @@ abstract contract AegisTestBase is Test {
     function closeSigs(AegisChannel ch, uint64 s, uint128 toProvider)
         internal view returns (bytes memory sc, bytes memory sp)
     {
-        bytes32 d = Sigs.digest(ch.domainSeparator(), ch.hashClose(s, toProvider));
+        bytes32 d = Sigs.digest(ch.domainSeparator(), ch.hashClose(ch.epoch(), s, toProvider));
+        sc = Sigs.sign(clientPk, d);
+        sp = Sigs.sign(providerPk, d);
+    }
+
+    function rolloverSigs(AegisChannel ch, uint64 s, uint128 toProvider)
+        internal view returns (bytes memory sc, bytes memory sp)
+    {
+        bytes32 d = Sigs.digest(ch.domainSeparator(), ch.hashRollover(ch.epoch(), s, toProvider));
         sc = Sigs.sign(clientPk, d);
         sp = Sigs.sign(providerPk, d);
     }

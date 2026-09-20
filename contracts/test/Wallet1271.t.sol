@@ -22,7 +22,7 @@ contract Wallet1271Test is AegisTestBase {
         vm.prank(provider);
         AegisChannel ch = AegisChannel(factory.open(c, Sigs.sign(clientPk, d), ""));
         vm.prank(address(wallet)); usdg.transfer(address(ch), 3_000_000);
-        bytes32 cd = Sigs.digest(ch.domainSeparator(), ch.hashCheckpoint(10, 200_000, bytes32(uint256(5))));
+        bytes32 cd = Sigs.digest(ch.domainSeparator(), ch.hashCheckpoint(ch.epoch(), 10, 200_000, bytes32(uint256(5))));
         ch.submitCheckpoint(10, 200_000, bytes32(uint256(5)), Sigs.sign(clientPk, cd), Sigs.sign(providerPk, cd));
         vm.warp(block.timestamp + 120);
         ch.settle();
