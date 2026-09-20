@@ -12,7 +12,7 @@ import { createProviderApp } from "../src/provider/server.js";
 import { AegisClient } from "../src/client/agent.js";
 import {
   randomNonce, defaultArtifacts, erc20Balance, erc20Abi, erc20Transfer, commitTerms, signChannelTerms, signCheckpoint,
-  signClose, rootHex, predictChannel, merkleRoot, submitCheckpointTx, type ChainCtx, type ChannelConfig,
+  signClose, signRollover, rootHex, predictChannel, merkleRoot, submitCheckpointTx, type ChainCtx, type ChannelConfig,
 } from "../src/index.js";
 
 // DEPLOY_FILE (env) diresolve relatif terhadap REPO ROOT, bukan cwd proses: `pnpm --filter
@@ -160,6 +160,14 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
     expect(((await r10.json()) as any).toProvider).toBe("200000");
     // F-close-continue: setelah provider ikut menandatangani Close, tidak ada unit baru lagi
     await expect(c.requestUnit()).rejects.toThrow(/session-closing/);
+    // Cermin adversarial untuk /rollover — gating bersama yang sama (`countersign()`) harus menolak
+    // jumlah salah (409) dan tanda tangan bukan klien ini (400), persis seperti /close di atas.
+    const postRollover = async (seq: number, toProvider: bigint, signer = privateKeyToAccount(PK.clientC)) => {
+      const sigClient = await signRollover(signer, c.channel, CHAIN_ID, { epoch: c.epoch, seq, toProvider });
+      return fetch("http://127.0.0.1:4020/rollover", { method: "POST", headers: hdr, body: JSON.stringify({ seq, toProvider: toProvider.toString(), sigClient }) });
+    };
+    expect((await postRollover(10, 199_999n)).status).toBe(409);                                   // jumlah salah
+    expect((await postRollover(10, 200_000n, privateKeyToAccount(PK.clientD))).status).toBe(400);  // tanda tangan bukan klien ini
     // jalur yang benar tetap bisa menutup channel secara normal (tanda tangan baru atas pesan yang sama)
     await c.closeCooperative();
     expect((await c.view()).state).toBe("SETTLED");
@@ -306,6 +314,14 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
     expect(c.epoch).toBe(1); expect(c.tree.size).toBe(0);
     expect((await c.view()).epoch).toBe(1);
     expect((await bal(providerAddr)) - p0).toBe(2_560_000n);
+    // Idempotensi /rollover/confirm (resiliency review): panggilan kedua manual (mis. mensimulasikan
+    // retry klien setelah balasan pertama putus di jalan) harus 200 dengan exitSig PERSIS SAMA, tanpa
+    // menyentuh sesi lagi — epoch tidak berubah dan provider tetap melayani (dibuktikan oleh 5 unit +
+    // close di bawah yang menghasilkan saldo akhir persis sama seolah confirm hanya dipanggil sekali).
+    const confirmAgain = await fetch("http://127.0.0.1:4020/rollover/confirm", { method: "POST", headers: { "Aegis-Client": acct.address, "content-type": "application/json" } });
+    expect(confirmAgain.status).toBe(200);
+    expect(((await confirmAgain.json()) as any).exitSig).toBe(c.exitSig);
+    expect((await c.view()).epoch).toBe(1);
     for (let i = 0; i < 5; i++) await c.requestUnit();           // epoch 1: seq 0..4
     await c.finalAck();
     await c.closeCooperative();                                  // 100.000 ke provider, 340.000 kembali

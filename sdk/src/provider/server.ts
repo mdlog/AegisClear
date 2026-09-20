@@ -171,16 +171,35 @@ export function createProviderApp(o: ProviderOptions) {
   app.post("/close", (c) => countersign(c, "close"));
   app.post("/rollover", (c) => countersign(c, "rollover"));
 
-  /** Setelah tx rollover klien masuk: verifikasi on-chain (epoch+1, seq 0, OPEN) lalu mulai epoch baru di sesi. */
+  /**
+   * Idempoten dan murni turunan state on-chain (resiliency review, tidak ada di brief asli): efeknya
+   * ditentukan HANYA oleh `readChannel` saat ini, bukan oleh siapa yang memanggil atau berapa kali —
+   * jadi TIDAK butuh tanda tangan klien di sini. Retry setelah balasan pertama putus (klien tidak pernah
+   * menerima 200-nya) aman, dan panggilan pihak ketiga yang menyamar lewat header Aegis-Client (yang
+   * memang tidak diautentikasi, sama seperti route lain di file ini) tidak bisa mengubah apa pun selain
+   * apa yang state on-chain sudah mengizinkan.
+   *   - state bukan OPEN → rollover belum/tidak pernah masuk on-chain untuk sesi ini: 409.
+   *   - epoch on-chain == epoch sesi DAN sesi tidak `closing` → epoch ini sudah pernah dikonfirmasi
+   *     sebelumnya (ini panggilan kedua/retry): balas tiket keluar yang SAMA tanpa menyentuh
+   *     tree/checkpoints lagi (mencegah reset ganda / kehilangan progres epoch baru).
+   *   - epoch on-chain == epoch sesi + 1 DAN seq on-chain == 0 → rollover baru saja masuk on-chain:
+   *     mulai epoch baru di sesi (sekali) dan terbitkan tiket keluar seq-0 yang baru.
+   *   - selain itu (mis. sesi masih `closing` di epoch lama — tx belum/tidak masuk, atau epoch melompat
+   *     lebih dari satu) → 409, sama seperti sebelumnya.
+   */
   app.post("/rollover/confirm", async (c) => {
     const client = clientOf(c); const s = client && sessions.get(client.toLowerCase());
     if (!s?.channel) return c.json({ error: "no channel" }, 409);
     const v = await readChannel(o.ctx, s.channel);
-    if (v.epoch !== s.epoch + 1 || v.seq !== 0 || v.state !== "OPEN") return c.json({ error: "rollover-not-onchain", epoch: v.epoch, seq: v.seq, state: v.state }, 409);
-    s.epoch = v.epoch; s.closing = false; s.tree.reset(); s.cumulativeAmount = 0n; s.checkpoints.clear();
-    const cp0: Checkpoint = { epoch: s.epoch, seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };
-    s.exitSigProvider = await signCheckpoint(o.account, s.channel, chainId, cp0);
-    return c.json({ epoch: s.epoch, exitSig: s.exitSigProvider });
+    if (v.state !== "OPEN") return c.json({ error: "rollover-not-onchain", epoch: v.epoch, seq: v.seq, state: v.state }, 409);
+    if (v.epoch === s.epoch && !s.closing) return c.json({ epoch: s.epoch, exitSig: s.exitSigProvider });
+    if (v.epoch === s.epoch + 1 && v.seq === 0) {
+      s.epoch = v.epoch; s.closing = false; s.tree.reset(); s.cumulativeAmount = 0n; s.checkpoints.clear();
+      const cp0: Checkpoint = { epoch: s.epoch, seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };
+      s.exitSigProvider = await signCheckpoint(o.account, s.channel, chainId, cp0);
+      return c.json({ epoch: s.epoch, exitSig: s.exitSigProvider });
+    }
+    return c.json({ error: "rollover-not-onchain", epoch: v.epoch, seq: v.seq, state: v.state }, 409);
   });
 
   app.get("/state", async (c) => {
