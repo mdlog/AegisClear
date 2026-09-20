@@ -1747,7 +1747,7 @@ export function OfferView() {
 
 `web/src/components/PrivacyCards.tsx`:
 ```tsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { ChannelDetail, ConfigResponse, LeakResponse, RunSnapshot } from "../../shared/types";
 import { getChannel } from "../api";
 import { fmtUsdg, shortAddr } from "../format";
@@ -1784,7 +1784,7 @@ export function PrivacyCards({ cfg, run, leak }: { cfg: ConfigResponse | null; r
         {leak && leak.map((l) => (
           <p key={l.channel} className={l.leaks === 0 ? "ok" : "bad"}>
             leak-check {shortAddr(l.channel)}: <b>bocor {l.leaks}</b>, ambigu {l.ambiguous}, {l.txs.length} tx dipindai{" "}
-            {l.txs.map((h) => <Tx key={h} h={h} base={cfg?.explorerBase} />).reduce<React.ReactNode[]>((acc, el, i) => (i ? [...acc, " ", el] : [el]), [])}
+            {l.txs.map((h) => <Tx key={h} h={h} base={cfg?.explorerBase} />).reduce<ReactNode[]>((acc, el, i) => (i ? [...acc, " ", el] : [el]), [])}
           </p>
         ))}
       </div>
@@ -1792,8 +1792,6 @@ export function PrivacyCards({ cfg, run, leak }: { cfg: ConfigResponse | null; r
   );
 }
 ```
-(Add `import type React from "react";` at the top for the `React.ReactNode` type.)
-
 `web/src/components/DemoPanel.tsx`:
 ```tsx
 import { useEffect, useRef, useState } from "react";
