@@ -1,14 +1,24 @@
 import { useEffect, useState } from "react";
 import type { ConfigResponse } from "../shared/types";
+import { getConfig } from "./api";
+import { Header } from "./components/Header";
+import { ChannelsTable } from "./components/ChannelsTable";
+import { ChannelDrawer } from "./components/ChannelDrawer";
+import { DemoPanel } from "./components/DemoPanel";
+
 export function App() {
   const [cfg, setCfg] = useState<ConfigResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { fetch("/api/config").then((r) => r.json()).then(setCfg).catch((e) => setErr(String(e))); }, []);
+  const [selected, setSelected] = useState<string | null>(null);
+  useEffect(() => { getConfig().then(setCfg).catch((e) => setErr(String((e as Error).message))); }, []);
   return (
-    <main className="wrap">
-      <h1>AegisClear console</h1>
-      {err && <p className="banner error">server tidak jalan: <code>pnpm --filter @aegisclear/web start</code> ({err})</p>}
-      {cfg && <p>network <span className="pill">{cfg.network} · {cfg.chainId}</span> factory <code>{cfg.addresses.factory}</code></p>}
-    </main>
+    <div className="wrap">
+      <Header cfg={cfg} error={err} />
+      <div className="grid">
+        <section className="panel"><ChannelsTable cfg={cfg} onSelect={setSelected} /></section>
+        <section className="panel"><DemoPanel cfg={cfg} /></section>
+      </div>
+      {selected && <ChannelDrawer addr={selected} cfg={cfg} onClose={() => setSelected(null)} />}
+    </div>
   );
 }
