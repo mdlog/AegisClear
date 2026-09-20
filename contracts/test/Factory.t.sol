@@ -66,6 +66,18 @@ contract FactoryTest is AegisTestBase {
         ch.initialize(c, client, "", "");
     }
 
+    /// Slither ID-5/ID-7 (missing-zero-check): verifier/permit2 nol = implementasi cacat permanen → tolak saat deploy.
+    /// poseidonPath nol tetap sah (= mode co-signed, ID-6 by design).
+    function test_constructor_zero_verifier_or_permit2_reverts() public {
+        vm.expectRevert(AegisChannelFactory.ZeroAddress.selector);
+        new AegisChannelFactory(address(0), PERMIT2, 60, address(0));
+        vm.expectRevert(AegisChannelFactory.ZeroAddress.selector);
+        new AegisChannelFactory(address(verifier), address(0), 60, address(0));
+        AegisChannelFactory f = new AegisChannelFactory(address(verifier), PERMIT2, 60, address(0));
+        assertFalse(AegisChannel(f.IMPLEMENTATION()).ANCHORED());
+        assertEq(f.POSEIDON(), address(0));
+    }
+
     function test_bad_config_reverts() public {
         AegisChannel.Config memory c = defaultConfig();
         c.responseWindow = 121; // > challengeWindow

@@ -90,6 +90,7 @@ contract AegisChannel is ReentrancyGuard {
     error WrongMode();
     error NotClient();
     error AmountDecreased();
+    error InsufficientGas();
 
     constructor(address verifier, address permit2, address poseidonPath) {
         FACTORY = msg.sender;
@@ -308,11 +309,22 @@ contract AegisChannel is ReentrancyGuard {
     /// @dev Transfer + hook best-effort (FR-26): payee kontrak boleh menerapkan IAegisPayoutHook (mis. AegisTreasuryRouter).
     ///      Hook dipanggil dengan stipend tetap di dalam try/catch — payee yang revert/menghabiskan gas TIDAK bisa
     ///      menyandera settle/close/sweep pihak lain (T-hook). Semua pemanggil nonReentrant dan state sudah final.
+    ///
+    ///      Audit 2026-09 (M-1, docs/audit/slither-2026-09.md): `{gas: HOOK_GAS}` hanya batas ATAS — EIP-150 memberi
+    ///      callee min(HOOK_GAS, 63/64 gas tersisa). Pemanggil permissionless (settle/sweep) bisa memilih gas limit
+    ///      sehingga hook kehabisan gas tetapi tx luar tetap selesai; untuk payee router, token yang sudah ditransfer
+    ///      lalu tidak teratribusi (slack) dan bisa diambil siapa pun lewat onPayout(). Sebelum perbaikan, jendela itu
+    ///      ada untuk hook berbiaya ~227k-300k (di bawah itu, sisa 1/64 tidak cukup untuk LOG + sentry SSTORE 2300).
+    ///      Pemeriksaan pasca-panggilan bergaya OZ ERC2771Forwarder._checkForwardedGas: bila callee kehabisan gas, ia
+    ///      menerima tepat 63/64 gas tersisa X, jadi gasleft() = X/64; X/64 < HOOK_GAS/63 ⟹ X < 64/63·HOOK_GAS ⟹
+    ///      hook TIDAK ditawari stipend penuh → revert (pemanggil harus memberi gas cukup; estimateGas monoton).
+    ///      Hook yang gagal karena ulahnya sendiri (revert / membakar stipend penuh) tetap diabaikan (T-hook utuh).
     function _send(address to, address party, uint256 amount) internal {
         if (amount == 0) return;
         IERC20(cfg.token).safeTransfer(to, amount);
         if (to.code.length > 0) {
             try IAegisPayoutHook(to).onPayout{gas: HOOK_GAS}(party, cfg.token, amount) {} catch {}
+            if (gasleft() < HOOK_GAS / 63) revert InsufficientGas();
         }
     }
 

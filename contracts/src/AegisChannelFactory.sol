@@ -15,8 +15,12 @@ contract AegisChannelFactory {
     event ChannelOpened(address indexed channel, address indexed client, address indexed provider, bytes32 termsCommitment);
     error WindowTooShort();
     error AlreadyOpen();
+    error ZeroAddress();
 
+    /// @dev `poseidonPath` boleh nol (= mode co-signed, FR-25); verifier & permit2 tidak — implementasi immutable,
+    ///      salah deploy berarti claimPenalty/fundWithPermit2 mati permanen untuk semua channel factory ini (Slither ID-5/7).
     constructor(address verifier, address permit2, uint32 minChallengeWindow, address poseidonPath) {
+        if (verifier == address(0) || permit2 == address(0)) revert ZeroAddress();
         IMPLEMENTATION = address(new AegisChannel(verifier, permit2, poseidonPath));
         VERIFIER = verifier; PERMIT2 = permit2; MIN_CHALLENGE_WINDOW = minChallengeWindow; POSEIDON = poseidonPath;
     }

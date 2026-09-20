@@ -7,6 +7,8 @@ import {RevertingPayout} from "./mocks/RevertingPayout.sol";
 import {GasBurnerPayout} from "./mocks/GasBurnerPayout.sol";
 import {FreezableToken} from "./mocks/FreezableToken.sol";
 import {GarbageReturnToken} from "./mocks/GarbageReturnToken.sol";
+import {ReenteringToken} from "./mocks/ReenteringToken.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 contract TreasuryRouterTest is AegisTestBase {
     AegisTreasuryRouter router;
@@ -130,6 +132,24 @@ contract TreasuryRouterTest is AegisTestBase {
         assertEq(router.credit(provider, address(g)), 1_000);
         assertEq(router.totalCredit(address(g)), 1_000);
         assertEq(g.balanceOf(address(router)), 1_000);  // saldo mock tak berubah — transfer() dianggap gagal
+    }
+
+    /// Slither ID-4 (reentrancy-no-eth): credit/totalCredit ditulis SETELAH token.call di onPayout. Jalur lintas-fungsi
+    /// yang dimaksud (transfer() token jahat → claim() saat credit sementara membengkak) diblokir nonReentrant bersama:
+    /// claim revert ReentrancyGuardReentrantCall, transfer tetap jalan, dibayar tepat sekali, kredit kembali 0.
+    function test_onPayout_cross_function_reentrancy_into_claim_is_blocked() public {
+        ReenteringToken tok = new ReenteringToken();
+        tok.mint(address(router), 1_000);
+        tok.arm(router, provider);
+        vm.expectEmit(true, true, true, true, address(router));
+        emit AegisTreasuryRouter.PayoutRouted(provider, address(tok), provider, 1_000, true);
+        router.onPayout(provider, address(tok), 1_000);
+        assertFalse(tok.reenterOk());
+        assertEq(bytes4(tok.reenterErr()), ReentrancyGuard.ReentrancyGuardReentrantCall.selector);
+        assertEq(tok.balanceOf(provider), 1_000);              // dibayar sekali
+        assertEq(tok.balanceOf(address(router)), 0);
+        assertEq(router.credit(provider, address(tok)), 0);
+        assertEq(router.totalCredit(address(tok)), 0);
     }
 
     function test_claim_nothing_reverts() public {
