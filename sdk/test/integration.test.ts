@@ -11,7 +11,7 @@ import { foundry } from "viem/chains";
 import { createProviderApp } from "../src/provider/server.js";
 import { AegisClient } from "../src/client/agent.js";
 import {
-  randomNonce, defaultArtifacts, erc20Balance, erc20Abi, erc20Transfer, commitTerms, signChannelTerms, signCheckpoint,
+  randomNonce, defaultArtifacts, erc20Balance, erc20Abi, erc20Transfer, commitTerms, signChannelTerms, signCheckpoint, verifyCheckpointSig,
   signClose, signRollover, rootHex, predictChannel, merkleRoot, submitCheckpointTx, startCloseTx, routerAbi, type ChainCtx, type ChannelConfig,
 } from "../src/index.js";
 
@@ -338,6 +338,10 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
     await c.rollover();                                          // bayar 2.560.000, sisa 440.000 jadi budget epoch 1
     expect(c.epoch).toBe(1); expect(c.tree.size).toBe(0);
     expect((await c.view()).epoch).toBe(1);
+    // I1: tiket keluar epoch baru (Checkpoint(1,0,emptyRoot), BUKAN Close) sudah diverifikasi klien
+    // SEBELUM tx rollover di-broadcast (exitSigNext, lihat AegisClient.rollover()) — buktikan di sini
+    // bahwa c.exitSig memang sah untuk epoch yang baru, bukan cuma "ada".
+    expect(await verifyCheckpointSig(providerAddr, c.channel, CHAIN_ID, { epoch: 1, seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) }, c.exitSig!)).toBe(true);
     expect((await bal(providerAddr)) - p0).toBe(2_560_000n);
     // Idempotensi /rollover/confirm (resiliency review): panggilan kedua manual (mis. mensimulasikan
     // retry klien setelah balasan pertama putus di jalan) harus 200 dengan exitSig PERSIS SAMA, tanpa
@@ -354,6 +358,104 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
     expect((await bal(providerAddr)) - p0).toBe(2_660_000n);
     expect(c0 - (await bal(acct.address))).toBe(2_660_000n);
     expect(c.txs.map((t) => t.label)).toEqual(["fund", "rollover", "closeCooperative"]);
+  });
+
+  it("I1 negatif: countersign /rollover TANPA exitSigNext ditolak SEBELUM tx apa pun dikirim", async () => {
+    // Proxy Hono di depan provider ASLI (in-process, pola sama seperti F2 di bawah): meneruskan semua
+    // apa adanya, KECUALI balasan POST /rollover ber-status 200: field `exitSigNext` (I1) dihapus —
+    // mensimulasikan provider yang menandatangani `sigProvider` (Rollover) dengan benar tapi gagal
+    // menyertakan tiket epoch berikutnya (bug, downgrade, atau sengaja menahan agar bisa menyandera
+    // sisa budget epoch baru setelah tx rollover klien ter-mined — persis skenario yang dicegah I1).
+    const terms = { unitPrice: 20_000n, maxM1: 800n, minM2: 90n, penaltyBps: 5000n, capBps: 3000n, nonce: randomNonce() };
+    const honest = createProviderApp({
+      ctx: ctxOf(PK.provider), account: providerAccount, usdg: d.usdg, terms,
+      unitQty: 1n, deposit: 1_000_000n, challengeWindow: 60, responseWindow: 30,
+      metrics: () => ({ m1: 300n, m2: 95n }),
+    });
+    const tamper = new Hono();
+    tamper.all("/*", async (c) => {
+      const url = new URL(c.req.url);
+      const headers: Record<string, string> = {};
+      for (const h of ["Aegis-Client", "Aegis-Terms-Signature", "Aegis-Ack", "content-type"]) { const v = c.req.header(h); if (v) headers[h] = v; }
+      const init: RequestInit = { method: c.req.method, headers };
+      if (c.req.method === "POST") init.body = await c.req.text();
+      const res = await honest.app.request(url.pathname, init);
+      if (c.req.method === "POST" && url.pathname === "/rollover" && res.status === 200) {
+        const body = (await res.json()) as any;
+        delete body.exitSigNext;                 // I1: provider "lupa" menyertakan tiket epoch berikutnya
+        return c.json(body, 200);
+      }
+      return new Response(res.body, { status: res.status, headers: res.headers });
+    });
+    const tamperServer = serve({ fetch: tamper.fetch, port: 4030 });
+    try {
+      const pk = generatePrivateKey(); const acct = privateKeyToAccount(pk);
+      const eth = await ctxOf(PK.deployer).walletClient.sendTransaction({ to: acct.address, value: FUND_ETH });
+      await publicClient.waitForTransactionReceipt({ hash: eth });
+      await mintUsdg(acct.address, 1_000_000n);
+      const c = new AegisClient({ ctx: ctxOf(pk), account: acct, providerUrl: "http://127.0.0.1:4030", usdg: d.usdg, artifacts: art });
+      await c.start();
+      await c.requestUnit();      // channel harus ter-deploy on-chain dulu — rollover() (M3) membaca readChannel LEBIH DULU
+      expect(c.txs.map((t) => t.label)).toEqual(["fund"]);   // channel dibuka oleh TX PROVIDER, bukan klien — txs klien belum bertambah
+      const txsBefore = c.txs.length;
+      await expect(c.rollover()).rejects.toThrow(/bad provider exit ticket for next epoch/);
+      // Tidak ada tx yang terkirim akibat percobaan ini (bukan cuma rolloverTx — TIDAK ADA sama sekali).
+      expect(c.txs.length).toBe(txsBefore);
+      expect(c.txs.map((t) => t.label)).toEqual(["fund"]);
+      expect(c.epoch).toBe(0);
+      expect((await c.view()).epoch).toBe(0);
+    } finally { tamperServer.close(); }
+  });
+
+  it("M6: dua POST /job konkuren untuk klien yang sama tidak boleh meng-korupsi pohon provider (double-append)", async () => {
+    // Sesi/provider app TERPISAH (port sendiri) supaya bisa memeriksa `sessions5` langsung (tree.size,
+    // checkpoints) dan tidak bergantung pada state test lain di provider utama (:4020).
+    const terms = { unitPrice: 20_000n, maxM1: 800n, minM2: 90n, penaltyBps: 5000n, capBps: 3000n, nonce: randomNonce() };
+    const { app: app5, sessions: sessions5 } = createProviderApp({
+      ctx: ctxOf(PK.provider), account: providerAccount, usdg: d.usdg, terms,
+      unitQty: 1n, deposit: 1_000_000n, challengeWindow: 60, responseWindow: 30,
+      metrics: () => ({ m1: 300n, m2: 95n }),
+    });
+    const server5 = serve({ fetch: app5.fetch, port: 4044 });
+    try {
+      const pk = generatePrivateKey(); const acct = privateKeyToAccount(pk);
+      const eth = await ctxOf(PK.deployer).walletClient.sendTransaction({ to: acct.address, value: FUND_ETH });
+      await publicClient.waitForTransactionReceipt({ hash: eth });
+      await mintUsdg(acct.address, 1_000_000n);
+      const c = new AegisClient({ ctx: ctxOf(pk), account: acct, providerUrl: "http://127.0.0.1:4044", usdg: d.usdg, artifacts: art });
+      await c.start();
+      await c.requestUnit();     // buka channel on-chain + layani unit 0 (checkpoint 1 belum di-ack)
+      await c.finalAck();        // flush ack checkpoint 1 — supaya request pertama di bawah tidak butuh header Aegis-Ack
+      expect(c.tree.size).toBe(1);
+
+      // Dua POST /job MENTAH (bukan lewat AegisClient) untuk klien yang SAMA, ditembak bersamaan lewat
+      // Promise.all — tanpa serialisasi per klien (M6), keduanya bisa membaca `n = s.tree.size` yang
+      // SAMA sebelum salah satu sempat append (celah `await erc20Balance`/`leafHash`), lalu berdua
+      // menulis: tree.size melompat lebih dari 1 langkah per request SUKSES dan/atau kedua balasan
+      // mengklaim seq yang sama (korupsi). Dengan serialisasi, keduanya berjalan satu-per-satu.
+      const headers = { "Aegis-Client": acct.address };
+      const [r1, r2] = await Promise.all([
+        fetch("http://127.0.0.1:4044/job", { method: "POST", headers }),
+        fetch("http://127.0.0.1:4044/job", { method: "POST", headers }),
+      ]);
+      const [b1, b2] = await Promise.all([r1.json(), r2.json()]) as any[];
+      const s = sessions5.get(acct.address.toLowerCase())!;
+      const statuses = [r1.status, r2.status].sort();
+      if (statuses[0] === 200 && statuses[1] === 200) {
+        // Outcome (a) — brief final-fix-brief.md M6: kedua request berhasil, HARUS sequential (seq 1
+        // lalu seq 2, tidak boleh duplikat), dan pohon bertambah PERSIS 2 (1 sebelum race + 2 sukses).
+        const results = [b1.result, b2.result].sort();
+        expect(results).toEqual(["unit-1", "unit-2"]);
+        expect(s.tree.size).toBe(3);
+        expect(s.tree.receipts.map((r) => r.seq)).toEqual([0, 1, 2]);   // tidak ada seq duplikat/hilang
+      } else {
+        // Outcome (b) — brief final-fix-brief.md M6: salah satu ditolak 409 (ack-required, sequencing
+        // co-signed memang mensyaratkan ack per unit) — pohon bertambah PERSIS 1, bukan korupsi.
+        expect(statuses).toEqual([200, 409]);
+        expect(s.tree.size).toBe(2);
+        expect(s.tree.receipts.map((r) => r.seq)).toEqual([0, 1]);
+      }
+    } finally { server5.close(); }
   });
 
   it.skipIf(LOCAL_ONLY)("F2: balasan provider dengan tanda tangan checkpoint SALAH ditolak SEBELUM pohon disentuh; dispute() tetap bisa memakai checkpoint co-signed sebelumnya", async () => {

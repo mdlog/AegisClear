@@ -186,6 +186,12 @@ export class AegisClient {
   }
 
   async closeCooperative(): Promise<void> {
+    // M1 (final-fix brief): flush ack tertunda LEBIH DULU — tanpa ini, provider bisa saja belum menerima
+    // tanda tangan klien atas checkpoint TERTINGGI (`pendingAck`, diisi `requestUnit()` tapi baru
+    // dikirim `POST /ack` oleh `finalAck()`), dan gating `/close` di server (`countersign()`) jatuh balik
+    // ke seq TERTINGGI YANG SUDAH TER-ACK (n-1) alih-alih n — klien kehilangan pembayaran unit terakhir
+    // padahal tanda tangannya sendiri sudah ada, hanya belum sempat dikirim.
+    await this.finalAck();
     const seq = this.tree.size;
     const toProvider = settle(this.tree.receipts, this.terms).cumulativeAmount;
     const msg = { epoch: this.epoch, seq, toProvider };
@@ -201,31 +207,66 @@ export class AegisClient {
   /**
    * Rollover kooperatif (FR-10): bayar epoch berjalan, sisa deposit jadi budget epoch baru, seq/R/A reset,
    * epoch++. Klien menandatangani dulu (identitas + niat), provider ikut menandatangani, klien mengirim tx,
-   * lalu memberi tahu provider (`/rollover/confirm`) yang memverifikasi on-chain dan memberi tiket keluar baru.
+   * lalu memberi tahu provider (`/rollover/confirm`) — sinkronisasi idempoten sisi provider.
+   *
+   * I1 (final-fix brief, plan-level): dulu tiket keluar seq-0 epoch BERIKUTNYA hanya datang dari
+   * `/rollover/confirm`, YAITU SETELAH tx `rollover()` klien sendiri ter-mined — provider yang menahan
+   * balasan confirm bisa menyandera sisa budget epoch baru tanpa batas waktu (klien sudah membayar epoch
+   * lama lewat tx, tapi tidak pernah punya jalan keluar unilateral untuk epoch baru). Sekarang provider
+   * WAJIB menyertakan `exitSigNext` — tiket `Checkpoint(epoch+1, 0, 0, emptyRoot)` — dalam balasan
+   * `POST /rollover` itu sendiri (mode co-signed saja; lihat M5 untuk anchored), dan klien
+   * MEMVERIFIKASINYA SEBELUM mem-broadcast tx `rollover()` sama sekali: tanda tangan cacat/hilang berarti
+   * TIDAK ADA tx yang dikirim (`this.txs` tidak bertambah). Tiket ini aman ditandatangani di muka karena
+   * INERT sampai epoch benar-benar naik on-chain — yang mensyaratkan tanda tangan Rollover provider
+   * sendiri (jadi provider tetap "membayar" dengan tanda tangannya) — dan begitu hidup, ia persis tiket
+   * keluar seq-0 epoch manapun yang sudah dinetralkan responder tantangan (Task 15 Watcher).
+   *
+   * M3: `readChannel` dibaca LEBIH DULU — bila epoch on-chain sudah `this.epoch + 1` dengan `seq === 0`
+   * (rollover sudah ter-mined lebih dulu, mis. percobaan `rollover()` sebelumnya sempat mengirim tx tapi
+   * terputus sebelum commit), tx TIDAK dikirim ulang (dan tidak ada tanda tangan baru diminta) — langsung
+   * lanjut ke `/rollover/confirm`, yang tetap berlaku sebagai fallback sumber tiket keluar untuk kasus ini
+   * (lihat M5: fallback ini tidak berlaku di anchored).
    *
    * Setelah `rolloverTx` masuk, epoch SUDAH naik on-chain — tidak bisa dibatalkan lagi. `/rollover/confirm`
    * di sisi provider idempoten dan tidak butuh tanda tangan (murni turunan state on-chain, lihat
    * `provider/server.ts`), jadi confirm+verifikasi di bawah aman dicoba ulang (hingga 3x, jeda 500 ms) bila
    * balasannya gagal transien (koneksi putus, dst.) — tidak ada risiko provider mereset sesi dua kali.
    * `this.epoch`/`this.tree`/`this.checkpoints`/`this.pendingAck` BARU di-commit sebagai satu blok SETELAH
-   * tiket keluar epoch baru terverifikasi: bila provider membalas `exitSig` yang cacat (atau semua
-   * percobaan retry habis), method ini melempar dan state klien persis seperti sebelum confirm dipanggil.
-   * Pemanggil boleh memanggil `rollover()` lagi dengan aman — tx rollover tidak dikirim ulang di sini
-   * (sudah tercatat di `this.txs`); percobaan berikutnya akan gagal di `/rollover` (checkpoint-not-acked)
-   * bila `seq`/`toProvider` sudah berubah, tapi `/rollover/confirm` sendiri cukup dipanggil ulang untuk
-   * kasus umum (balasan pertama yang tidak pernah sampai ke klien).
+   * tiket keluar epoch baru terverifikasi: bila semua percobaan retry habis, method ini melempar dan state
+   * klien persis seperti sebelum confirm dipanggil. Pemanggil boleh memanggil `rollover()` lagi dengan
+   * aman — tx rollover tidak dikirim ulang di sini (sudah tercatat di `this.txs`); percobaan berikutnya
+   * akan gagal di `/rollover` (checkpoint-not-acked) bila `seq`/`toProvider` sudah berubah, tapi
+   * `/rollover/confirm` sendiri cukup dipanggil ulang untuk kasus umum (balasan pertama yang tidak pernah
+   * sampai ke klien).
    */
   async rollover(): Promise<void> {
-    const seq = this.tree.size;
-    const toProvider = settle(this.tree.receipts, this.terms).cumulativeAmount;
-    const msg = { epoch: this.epoch, seq, toProvider };
-    const sigClient = await signRollover(this.o.account, this.channel, this.chainId, msg);
-    const res = await fetch(`${this.o.providerUrl}/rollover`, { method: "POST", headers: this.hdr(), body: JSON.stringify({ seq, toProvider: toProvider.toString(), sigClient }) });
-    if (res.status !== 200) throw new Error(`POST /rollover ${res.status}: ${await res.text()}`);
-    const b = (await res.json()) as any;
-    if (Number(b.epoch) !== this.epoch || Number(b.seq) !== seq || bi(b.toProvider) !== toProvider) throw new Error("rollover reply mismatch");
-    if (!(await this.verify.verifyRolloverSig(this.cfg.provider, this.channel, this.chainId, msg, b.sigProvider))) throw new Error("bad provider rollover signature");
-    this.txs.push({ label: "rollover", ...(await rolloverTx(this.o.ctx, this.channel, seq, toProvider, sigClient, b.sigProvider)) });
+    // M1: flush ack tertunda LEBIH DULU — sama seperti closeCooperative(), provider baru mau
+    // menandatangani Rollover di seq TERTINGGI bila sudah menerima ack klien atas checkpoint itu.
+    await this.finalAck();
+
+    // M3: someone else's rollover tx may already be mined (retried call, dsb.) — jangan kirim tx/minta
+    // tanda tangan baru lagi bila begitu; langsung ke confirm/verify di bawah.
+    const pre = await readChannel(this.o.ctx, this.channel);
+    let exitSigNext: Hex | undefined;
+    if (!(pre.epoch === this.epoch + 1 && pre.seq === 0)) {
+      const seq = this.tree.size;
+      const toProvider = settle(this.tree.receipts, this.terms).cumulativeAmount;
+      const msg = { epoch: this.epoch, seq, toProvider };
+      const sigClient = await signRollover(this.o.account, this.channel, this.chainId, msg);
+      const res = await fetch(`${this.o.providerUrl}/rollover`, { method: "POST", headers: this.hdr(), body: JSON.stringify({ seq, toProvider: toProvider.toString(), sigClient }) });
+      if (res.status !== 200) throw new Error(`POST /rollover ${res.status}: ${await res.text()}`);
+      const b = (await res.json()) as any;
+      if (Number(b.epoch) !== this.epoch || Number(b.seq) !== seq || bi(b.toProvider) !== toProvider) throw new Error("rollover reply mismatch");
+      if (!(await this.verify.verifyRolloverSig(this.cfg.provider, this.channel, this.chainId, msg, b.sigProvider))) throw new Error("bad provider rollover signature");
+      if (!this.anchored) {
+        // I1: tiket epoch berikutnya WAJIB ada dan sah SEBELUM tx dikirim (lihat dokumentasi method di atas).
+        const cp0Next: Checkpoint = { epoch: this.epoch + 1, seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };
+        if (!b.exitSigNext || !(await this.verify.verifyCheckpointSig(this.cfg.provider, this.channel, this.chainId, cp0Next, b.exitSigNext)))
+          throw new Error("bad provider exit ticket for next epoch");
+        exitSigNext = b.exitSigNext as Hex;
+      }
+      this.txs.push({ label: "rollover", ...(await rolloverTx(this.o.ctx, this.channel, seq, toProvider, sigClient, b.sigProvider)) });
+    }
 
     let lastErr: unknown;
     for (let attempt = 1; attempt <= 3; attempt++) {
@@ -235,10 +276,22 @@ export class AegisClient {
         const cb = (await confirm.json()) as any;
         const onchain = await readChannel(this.o.ctx, this.channel);
         if (onchain.epoch !== this.epoch + 1 || Number(cb.epoch) !== onchain.epoch) throw new Error("epoch mismatch after rollover");
-        const cp0: Checkpoint = { epoch: onchain.epoch, seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };
-        if (!(await this.verify.verifyCheckpointSig(this.cfg.provider, this.channel, this.chainId, cp0, cb.exitSig))) throw new Error("bad provider exit ticket (new epoch)");
-        // Tiket keluar epoch baru terverifikasi — baru sekarang commit, sebagai satu blok.
-        this.epoch = onchain.epoch; this.exitSigProvider = cb.exitSig as Hex;
+        // M5: anchored tidak punya tiket co-signed sama sekali (exit unilateral = startClose() langsung).
+        let finalExitSig: Hex | undefined;
+        if (!this.anchored) {
+          // I1: pakai tiket yang SUDAH terverifikasi di atas bila ada ("prefers the pre-signed one") —
+          // confirm hanya dipakai sebagai fallback sumber tiket untuk jalur skip-tx M3 (di mana tidak
+          // ada `exitSigNext` dari langkah /rollover, karena langkah itu tidak pernah dipanggil).
+          if (exitSigNext) {
+            finalExitSig = exitSigNext;
+          } else {
+            const cp0: Checkpoint = { epoch: onchain.epoch, seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };
+            if (!(await this.verify.verifyCheckpointSig(this.cfg.provider, this.channel, this.chainId, cp0, cb.exitSig))) throw new Error("bad provider exit ticket (new epoch)");
+            finalExitSig = cb.exitSig as Hex;
+          }
+        }
+        // Tiket keluar epoch baru terverifikasi (atau tidak relevan, anchored) — baru sekarang commit, sebagai satu blok.
+        this.epoch = onchain.epoch; this.exitSigProvider = finalExitSig;
         this.tree.reset(); this.checkpoints.clear(); this.pendingAck = undefined;
         return;
       } catch (e) {
@@ -252,10 +305,16 @@ export class AegisClient {
   /** Unilateral: anchored → `startClose()` (state on-chain sudah otoritatif); co-signed → checkpoint TERTINGGI yang dipegang. Lalu bukti penalti bila ada (§6.4). */
   async dispute(): Promise<{ payToClient: bigint }> {
     if (this.anchored) {
+      const view = await readChannel(this.o.ctx, this.channel);
+      // M2 (final-fix brief): cek desync SEBELUM mengirim tx apa pun — dulu urutan ini terbalik (cek
+      // dilakukan setelah startClose() dikirim untuk state OPEN), jadi klien yang pohon lokalnya sudah
+      // tidak sinkron dengan chain tetap membayar gas untuk startClose() yang toh akan diikuti throw di
+      // bawah. Minor 6: pohon lokal harus persis mencerminkan seq on-chain sebelum membangun bukti — bila
+      // tidak, input sirkuit (dibangun dari this.tree.receipts) tidak akan cocok dengan receiptsRoot on-chain.
+      if (view.seq !== this.tree.size) throw new Error(`tree desynced from chain (seq ${view.seq}) — reconcile acks first`);
       // Review round 1 (IMPORTANT): channel bisa sudah CLOSING karena pihak lain (mis. provider) lebih
       // dulu memanggil startClose() — dispute() tetap harus bisa lanjut ke bukti tanpa memanggil
       // startClose() lagi (yang akan revert WrongState di kontrak).
-      const view = await readChannel(this.o.ctx, this.channel);
       if (view.state === "OPEN") {
         this.txs.push({ label: "startClose", ...(await startCloseTx(this.o.ctx, this.channel)) });
       } else if (view.state === "CLOSING") {
@@ -263,9 +322,6 @@ export class AegisClient {
       } else {
         throw new Error(`cannot dispute in state ${view.state}`);
       }
-      // Minor 6: pohon lokal harus persis mencerminkan seq on-chain sebelum membangun bukti — bila tidak,
-      // input sirkuit (dibangun dari this.tree.receipts) tidak akan cocok dengan receiptsRoot on-chain.
-      if (view.seq !== this.tree.size) throw new Error(`tree desynced from chain (seq ${view.seq}) — reconcile acks first`);
     } else {
       if (this.checkpoints.size === 0) throw new Error("no co-signed checkpoint");
       // Kunci tertinggi di `checkpoints`, bukan `tree.size` — keduanya sama berkat invarian requestUnit(),
