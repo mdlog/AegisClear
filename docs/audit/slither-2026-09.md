@@ -15,7 +15,7 @@ has a verdict — there is no "TBD".
 | Dependencies | OpenZeppelin v5.7.0, Permit2 (interfaces only), poseidon-solidity (`PoseidonT3`) |
 | Scope | `contracts/src/**` (7 contracts + 3 interfaces, 574 SLOC); `lib/`, `test/`, `script/` filtered; findings inside dependencies excluded |
 | Before-run commit | `4144d3d` on `feat/aegisclear-p1-ship` (contracts identical up to `127f92f`) |
-| After-run tree | this commit (fixes below applied) |
+| After-run tree | `5fe05c0` (fixes below applied) |
 | Raw output | [`slither-raw-2026-09.md`](./slither-raw-2026-09.md) (before + after, verbatim except naming-convention compacted) |
 
 Command lines (run from `contracts/`; Slither compiles through Foundry, no `--solc-remaps` needed):
@@ -40,7 +40,7 @@ slither . --filter-paths "test/|script/" --checklist
 
 ## 2. Summary
 
-| Severity | Before (4144d3d) | After (this commit) | True positive → fixed | Accepted risk / by design | False positive |
+| Severity | Before (4144d3d) | After (5fe05c0) | True positive → fixed | Accepted risk / by design | False positive |
 |---|---|---|---|---|---|
 | High | 3 | 3 | 0 | 0 | 3 (snarkjs `return` idiom) |
 | Medium | 2 | 2 | 0 | 0 | 2 |
@@ -70,8 +70,8 @@ IDs are Slither's checklist IDs from the *before* run (same numbering in the raw
 
 | ID | Detector · severity/conf. | Location | Verdict | Note |
 |---|---|---|---|---|
-| ID-5 | `missing-zero-check` · Low/Medium | `AegisChannelFactory.sol:19` (`verifier`) | **True positive → fixed in this commit** | The verifier address is baked into the immutable implementation shared by every clone of the factory; `verifier == 0` would make every `claimPenalty` revert forever (high-level call to a codeless address) — a silent, permanent misdeploy. Added `if (verifier == address(0) \|\| permit2 == address(0)) revert ZeroAddress();` in the factory constructor. Test: `Factory.t.sol::test_constructor_zero_verifier_or_permit2_reverts`. All deploy scripts and tests already pass non-zero values. |
-| ID-7 | `missing-zero-check` · Low/Medium | `AegisChannelFactory.sol:19` (`permit2`) | **True positive → fixed in this commit** | Same fix as ID-5; `permit2 == 0` would make `fundWithPermit2` permanently unusable (plain transfers would still work, so this is a usability hardening rather than a fund-safety issue). |
+| ID-5 | `missing-zero-check` · Low/Medium | `AegisChannelFactory.sol:19` (`verifier`) | **True positive → fixed in commit `5fe05c0`** | The verifier address is baked into the immutable implementation shared by every clone of the factory; `verifier == 0` would make every `claimPenalty` revert forever (high-level call to a codeless address) — a silent, permanent misdeploy. Added `if (verifier == address(0) \|\| permit2 == address(0)) revert ZeroAddress();` in the factory constructor. Test: `Factory.t.sol::test_constructor_zero_verifier_or_permit2_reverts`. All deploy scripts and tests already pass non-zero values. |
+| ID-7 | `missing-zero-check` · Low/Medium | `AegisChannelFactory.sol:19` (`permit2`) | **True positive → fixed in commit `5fe05c0`** | Same fix as ID-5; `permit2 == 0` would make `fundWithPermit2` permanently unusable (plain transfers would still work, so this is a usability hardening rather than a fund-safety issue). |
 | ID-6 | `missing-zero-check` · Low/Medium | `AegisChannelFactory.sol:19` (`poseidonPath`) | **Accepted — by design** | `poseidonPath == address(0)` *is* the co-signed mode selector (`ANCHORED = poseidonPath != address(0)`, spec §B.3: mode per factory, not per channel). Adding a zero-check would remove the co-signed mode. Still reported after the fix (1 remaining Low). Covered by `Anchored.t.sol::test_factory_modes` and `Factory.t.sol::test_constructor_zero_verifier_or_permit2_reverts` (asserts `POSEIDON()==0` ⇒ `ANCHORED()==false`). |
 | ID-8 | `reentrancy-events` · Low/Medium | `AegisChannelFactory.sol:31-39` (`open`: `ChannelOpened` emitted after `initialize` call) | **False positive** | The "external call" is `initialize` on a clone of our own implementation created in the same transaction. The only untrusted code it can reach is an ERC-1271 wallet via OZ `SignatureChecker.isValidSignatureNow`, which uses **`staticcall`** (OZ v5.7 `SignatureChecker.sol:89`) — the wallet cannot change state or re-enter `open`. Event order (`Opened` from the channel, then `ChannelOpened` from the factory) is deterministic. |
 | ID-9 | `timestamp` · Low/Medium | `AegisChannel.sol:180` (`ext > deadline` in `submitCheckpoint`) | **Accepted risk — documented design** | Challenge-window extension (`≤ responseWindow`, FR-12/13) uses `block.timestamp`. On Arbitrum the sequencer assigns timestamps (monotonic, bounded drift vs L1); the protocol tolerates seconds of skew because windows are ≥ 60 s (demo) and hours in production (`factoryProd`: 6 h). Sequencer censorship is T7 in the threat model (windows ≥ force-inclusion delay in production). |
@@ -117,7 +117,7 @@ Manual verification of the `_send` path (the reasoning the brief asked to docume
    `test_gas_burning_payee_is_capped_and_settle_succeeds`).
 4. **But the stipend was only an upper bound** — see M-1 below. This was found precisely while writing down point 3.
 
-### 3.5 Manual finding M-1 — hook stipend not guaranteed (Low) → fixed in this commit
+### 3.5 Manual finding M-1 — hook stipend not guaranteed (Low) → fixed in commit `5fe05c0`
 
 | | |
 |---|---|
@@ -182,7 +182,7 @@ the previous code, verified by re-running them against `git show 4144d3d:contrac
 
 ## 4. After-fix run
 
-Same command lines, tree with the fixes applied:
+Same command lines, tree `5fe05c0` with the fixes applied:
 
 ```text
 Number of optimization issues: 0
@@ -195,7 +195,7 @@ Number of high issues: 3       (all three the snarkjs return idiom, see ID-0..2)
 
 `forge test`: **118 passed, 0 failed** (111 existing + 7 new: 5 `HookGas.t.sol`, 1 `Factory.t.sol`, 1 `TreasuryRouter.t.sol`).
 
-## 5. Changes made in this audit commit
+## 5. Changes made in the audit commit `5fe05c0`
 
 | File | Change |
 |---|---|
