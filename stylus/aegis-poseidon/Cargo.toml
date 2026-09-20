@@ -1,0 +1,27 @@
+[package]
+name = "aegis-poseidon"
+version = "0.1.0"
+edition = "2021"
+description = "AegisClear anchored mode: circomlib Poseidon v1 (t=3) incremental Merkle insert for Robinhood Chain (Stylus)"
+
+[dependencies]
+stylus-sdk = "0.10.9"
+alloy-primitives = { version = "1", default-features = false }
+ark-ff = { version = "0.5", default-features = false }
+ark-bn254 = { version = "0.5", default-features = false, features = ["scalar_field"] }
+
+[dev-dependencies]
+serde_json = "1"
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+[features]
+export-abi = ["stylus-sdk/export-abi"]
+
+[profile.release]
+codegen-units = 1
+strip = true
+lto = true
+panic = "abort"
+opt-level = "z"
