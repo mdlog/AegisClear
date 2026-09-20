@@ -26,7 +26,7 @@ export interface RunSnapshot {
 }
 export interface ChannelSummary {
   channel: Address; factory: Address; factoryName: string; client: Address; provider: Address; termsCommitment: Hex;
-  state: ChannelState; seq: number; cumulativeAmount: string; budget: string; deadline: number; hasProof: boolean; payToClient: string;
+  state: ChannelState; seq: number; cumulativeAmount: string; receiptsRoot: Hex; budget: string; deadline: number; hasProof: boolean; payToClient: string;
   openedTx: Hex; openedBlock: string; runId?: string;
 }
 export interface ChannelEvent { name: string; args: Record<string, string>; txHash: Hex; blockNumber: string; gasUsed: string }

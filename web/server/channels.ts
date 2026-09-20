@@ -1,5 +1,5 @@
 import { getAddress, type Address, type Hex } from "viem";
-import { channelAbi, factoryAbi, readChannel, type ChainCtx } from "@aegisclear/sdk";
+import { channelAbi, factoryAbi, readChannel, rootHex, type ChainCtx } from "@aegisclear/sdk";
 import type { ChannelDetail, ChannelEvent, ChannelSummary } from "../shared/types.js";
 import type { WebConfig } from "./config.js";
 
@@ -27,7 +27,7 @@ export class ChannelIndex {
         const v = await readChannel(this.ctx, channel);
         out.push({
           channel, factory: f.address, factoryName: f.name, client: getAddress(l.args.client), provider: getAddress(l.args.provider), termsCommitment: l.args.termsCommitment,
-          state: v.state, seq: v.seq, cumulativeAmount: v.cumulativeAmount.toString(), budget: v.budget.toString(), deadline: v.deadline, hasProof: v.hasProof, payToClient: v.payToClient.toString(),
+          state: v.state, seq: v.seq, cumulativeAmount: v.cumulativeAmount.toString(), receiptsRoot: rootHex(v.receiptsRoot), budget: v.budget.toString(), deadline: v.deadline, hasProof: v.hasProof, payToClient: v.payToClient.toString(),
           openedTx: l.transactionHash, openedBlock: l.blockNumber.toString(), runId: this.runIdOf(channel),
         });
       }

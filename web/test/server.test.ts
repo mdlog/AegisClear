@@ -5,7 +5,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { AegisClient, defaultArtifacts } from "@aegisclear/sdk";
 import { loadConfig, REPO_ROOT } from "../server/config.js";
 import { createWebServer, type WebServer } from "../server/app.js";
-import type { ChannelSummary, ConfigResponse } from "../shared/types.js";
+import type { ChannelSummary, ConfigResponse, RunSnapshot } from "../shared/types.js";
 
 const DEPLOY = path.resolve(REPO_ROOT, process.env.DEPLOY_FILE ?? "contracts/deployments/local.json");
 const DEPLOY_EXISTS = existsSync(DEPLOY);
@@ -60,5 +60,47 @@ describe.skipIf(!DEPLOY_EXISTS)("web console server (Anvil)", () => {
     const r = await fetch(`${BASE}/api/channels/0x0000000000000000000000000000000000000001`);
     expect(r.status).toBe(404);
     expect((await fetch(`${BASE}/api/channels/not-an-address`)).status).toBe(404);
+  });
+
+  const waitRun = async (id: string) => {
+    for (let i = 0; i < 600; i++) { const r = await get<RunSnapshot>(`/api/demo/runs/${id}`); if (r.status !== "running") return r; await new Promise((res) => setTimeout(res, 500)); }
+    throw new Error("run timeout");
+  };
+  const post = (scenario: string) => fetch(`${BASE}/api/demo/run`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scenario }) });
+
+  it("POST /api/demo/run B-cooperative → 202; run selesai dengan 1 baris; channel bertanda runId", async () => {
+    const r = await post("B-cooperative"); expect(r.status).toBe(202);
+    const { runId } = (await r.json()) as { runId: string };
+    const run = await waitRun(runId);
+    expect(run.status, run.error).toBe("done");
+    expect(run.result!.map((x) => x.pasar)).toEqual(["B: AegisClear kooperatif"]);
+    expect(run.result![0].klien_provider).toBe("0.00 / 2.00");
+    expect(run.steps.some((s) => s.phase === "serve" && s.progress?.total === 100)).toBe(true);
+    expect(run.channels.length).toBe(1);
+    const ch = (await get<{ channels: ChannelSummary[] }>("/api/channels")).channels.find((x) => x.channel === run.channels[0]);
+    expect(ch?.runId).toBe(runId);
+  });
+
+  it("B-dispute: busy saat berjalan; hasil 0.07 / 1.93 dengan bukti; SSE replay + done", async () => {
+    const r = await post("B-dispute"); expect(r.status).toBe(202);
+    const { runId } = (await r.json()) as { runId: string };
+    expect((await post("A-complete")).status).toBe(409);
+    const run = await waitRun(runId);
+    expect(run.status, run.error).toBe("done");
+    expect(run.result![0].klien_provider).toBe("0.07 / 1.93");
+    expect(Number(run.result![0].proving_ms)).toBeGreaterThan(0);
+    expect(run.steps.map((s) => s.phase)).toEqual(expect.arrayContaining(["fund", "serve", "dispute", "prove", "wait", "settle"]));
+    expect(run.steps.filter((s) => s.txHash).map((s) => s.label)).toEqual(expect.arrayContaining(["fund", "submitCheckpoint", "claimPenalty", "settle"]));
+    const sse = await (await fetch(`${BASE}/api/demo/runs/${runId}/events`)).text();
+    expect(sse).toMatch(/event: step\n/); expect(sse).toMatch(/event: done\n/);
+    expect(sse.split("event: step").length - 1).toBe(run.steps.length);
+  });
+
+  it("skenario tidak dikenal → 400; run ulang untuk klien yang sesinya SETTLED diterima", async () => {
+    expect((await post("nope")).status).toBe(400);
+    const r = await post("A-reject"); expect(r.status).toBe(202);
+    const run = await waitRun(((await r.json()) as { runId: string }).runId);
+    expect(run.status, run.error).toBe("done"); expect(run.result![0].klien_provider).toBe("2.00 / 0");
+    expect(run.steps.filter((s) => s.phase === "escrow" && s.txHash).length).toBe(5);
   });
 });

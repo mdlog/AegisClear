@@ -11,6 +11,10 @@ import type { ConfigResponse } from "../shared/types.js";
 import type { WebConfig } from "./config.js";
 import { makeChain, type ChainServices } from "./chain.js";
 import { ChannelIndex } from "./channels.js";
+import { streamSSE } from "hono/streaming";
+import type { ScenarioId, SseEvent } from "../shared/types.js";
+import { RunStore } from "./runs.js";
+import { makeRunner } from "./demo.js";
 
 const DIST = fileURLToPath(new URL("../dist/", import.meta.url));
 const MIME: Record<string, string> = {
@@ -22,7 +26,7 @@ export const j = (o: unknown) => JSON.parse(JSON.stringify(o, (_, v) => (typeof 
 
 export interface WebServer {
   app: Hono; cfg: WebConfig;
-  services: { chain: ChainServices; index: ChannelIndex; provider: ReturnType<typeof createProviderApp>; runIdOf: Map<Address, string> };
+  services: { chain: ChainServices; index: ChannelIndex; provider: ReturnType<typeof createProviderApp>; runIdOf: Map<Address, string>; store: RunStore; runner: ReturnType<typeof makeRunner> };
   start(): Promise<{ port: number }>; stop(): Promise<void>;
 }
 
@@ -34,12 +38,14 @@ export function createWebServer(cfg: WebConfig): WebServer {
   const clients = [{ label: "A" as const, address: privateKeyToAccount(cfg.keys.a).address }, { label: "B" as const, address: privateKeyToAccount(cfg.keys.b).address }];
   const { chainId: _c, deployBlock: _b, ...addresses } = cfg.deployment as unknown as Record<string, unknown>;
   const runIdOf = new Map<Address, string>();   // channel → runId (diisi Task 4)
-  const index = new ChannelIndex(cfg, chain.ctx(cfg.keys.provider), (ch) => runIdOf.get(ch));
+  const index = new ChannelIndex(cfg, chain.ctx(cfg.keys.provider), (ch) => runIdOf.get(ch), 1000);
   const providerApp = createProviderApp({
     ctx: chain.ctx(cfg.keys.provider), account: providerAccount, usdg: cfg.deployment.usdg, terms: TERMS_BASE, unitQty: 1n, deposit: DEPOSIT_B,
     challengeWindow: cfg.windows.challenge, responseWindow: cfg.windows.response, metrics: metricsFor,
   });
   app.route("/provider", providerApp.app);
+  const store = new RunStore();
+  const runner = makeRunner({ cfg, chain, store, provider: providerApp, runIdOf, providerUrl: `http://127.0.0.1:${cfg.port}/provider` });
 
   app.get("/api/config", (c) => {
     const body: ConfigResponse = {
@@ -56,6 +62,30 @@ export function createWebServer(cfg: WebConfig): WebServer {
     return d ? c.json(d) : c.json({ error: "unknown channel" }, 404);
   });
 
+  app.post("/api/demo/run", async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { scenario?: string };
+    const r = await runner.start(body.scenario as ScenarioId);
+    if ("runId" in r) return c.json(r, 202);
+    return c.json(r, r.error === "unknown-scenario" ? 400 : 409);
+  });
+  app.get("/api/demo/runs", (c) => c.json(store.list()));
+  app.get("/api/demo/runs/:id", (c) => { const r = store.get(c.req.param("id")); return r ? c.json(r) : c.json({ error: "unknown run" }, 404); });
+  app.get("/api/demo/runs/:id/events", (c) => {
+    const id = c.req.param("id");
+    if (!store.get(id)) return c.json({ error: "unknown run" }, 404);
+    return streamSSE(c, async (stream) => {
+      const queue: SseEvent[] = []; let finished = false; let aborted = false;
+      const unsub = store.subscribe(id, (ev) => { queue.push(ev); if (ev.type !== "step") finished = true; });
+      stream.onAbort(() => { aborted = true; });
+      while (!aborted) {
+        while (queue.length) { const ev = queue.shift()!; await stream.writeSSE({ event: ev.type, data: JSON.stringify(ev.data), id: ev.type === "step" ? String(ev.data.i) : "end" }); }
+        if (finished) break;
+        await stream.sleep(200);
+      }
+      unsub();
+    });
+  });
+
   // ---- static (web/dist) dengan fallback SPA; selalu terdaftar TERAKHIR ----
   app.get("/*", (c) => {
     let p = decodeURIComponent(new URL(c.req.url).pathname);
@@ -68,7 +98,7 @@ export function createWebServer(cfg: WebConfig): WebServer {
 
   let server: ServerType | undefined; let watcher: Watcher | undefined;
   return {
-    app, cfg, services: { chain, index, provider: providerApp, runIdOf },
+    app, cfg, services: { chain, index, provider: providerApp, runIdOf, store, runner },
     start: () => new Promise((resolve) => {
       // Responder T1 in-process (README §(d)): wajib berjalan di proses provider ini.
       watcher = providerApp.startProviderWatcher({ intervalMs: cfg.network === "local" ? 2_000 : 15_000, fromBlock: cfg.deployBlock, log: (s) => console.log(`[watcher] ${s}`) });
