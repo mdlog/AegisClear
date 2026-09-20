@@ -18,6 +18,10 @@ import { privateKeyToAccount } from "viem/accounts";
 import { Watcher } from "./watcher.js";
 import { parseWatcherEnv } from "./env.js";
 
+// Re-export supaya `parseWatcherEnv` juga bisa diimpor dari `cli.ts` langsung (sdk/test/cli.test.ts mengimpor
+// dari `./env.js`, sumber sesungguhnya, tapi titik masuk publik CLI ini tetap membawanya juga).
+export { parseWatcherEnv };
+
 function main(): void {
   let env: ReturnType<typeof parseWatcherEnv>;
   try {
