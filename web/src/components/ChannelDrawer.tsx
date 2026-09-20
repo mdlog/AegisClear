@@ -7,7 +7,12 @@ import { Addr, Tx } from "./Header";
 export function ChannelDrawer({ addr, cfg, onClose }: { addr: string; cfg: ConfigResponse | null; onClose: () => void }) {
   const [d, setD] = useState<ChannelDetail | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { setD(null); setErr(null); getChannel(addr).then(setD).catch((e) => setErr(String((e as Error).message))); }, [addr]);
+  useEffect(() => {
+    let alive = true;
+    setD(null); setErr(null);
+    getChannel(addr).then((x) => { if (alive) setD(x); }).catch((e) => { if (alive) setErr(String((e as Error).message)); });
+    return () => { alive = false; };
+  }, [addr]);
   const base = cfg?.explorerBase;
   return (
     <aside className="drawer" aria-label="detail channel">
@@ -30,7 +35,7 @@ export function ChannelDrawer({ addr, cfg, onClose }: { addr: string; cfg: Confi
           {d.events.length === 0 && <p className="muted">belum ada</p>}
           <ol className="log">
             {d.events.map((e, i) => (
-              <li key={i}>
+              <li key={e.txHash + i}>
                 <span className="ph">{e.name}</span> <Tx h={e.txHash} base={base} /> <span className="muted">{gasFmt(e.gasUsed)} gas</span>
                 <div className="args">{Object.entries(e.args).map(([k, v]) => <span key={k}><b>{k}</b>={v} </span>)}</div>
               </li>

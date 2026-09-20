@@ -26,7 +26,14 @@ export function ChannelsTable({ cfg, onSelect }: { cfg: ConfigResponse | null; o
             <thead><tr><th>channel</th><th>klien</th><th>state</th><th>seq</th><th>A (USDG)</th><th>budget</th><th>deadline</th><th>bukti</th></tr></thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.channel} className="row-click" onClick={() => onSelect(r.channel)}>
+                <tr
+                  key={r.channel}
+                  className="row-click"
+                  tabIndex={0}
+                  role="button"
+                  onClick={() => onSelect(r.channel)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(r.channel); } }}
+                >
                   <td><Addr a={r.channel} base={cfg?.explorerBase} />{r.runId && <span className="tag">run</span>}{r.factoryName !== "factory" && <span className="tag">{r.factoryName}</span>}</td>
                   <td><Addr a={r.client} base={cfg?.explorerBase} /></td>
                   <td><span className={`pill st-${r.state}`}>{r.state}</span></td>

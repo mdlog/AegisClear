@@ -16,7 +16,9 @@ export function DemoPanel({ cfg }: { cfg: ConfigResponse | null }) {
   const [run, setRun] = useState<RunSnapshot | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [leak, setLeak] = useState<LeakResponse[] | null>(null);
+  const [checking, setChecking] = useState(false);
   const unsub = useRef<(() => void) | undefined>(undefined);
+  const gen = useRef(0);
   const attach = (id: string) => {
     unsub.current?.();
     unsub.current = subscribeRun(id, (ev) => {
@@ -25,13 +27,22 @@ export function DemoPanel({ cfg }: { cfg: ConfigResponse | null }) {
     });
   };
   useEffect(() => {
-    getRuns().then((rs) => { if (rs[0]) return getRun(rs[0].id).then((r) => { setRun(r); if (r.status === "running") attach(r.id); }); }).catch(() => {});
+    const g = ++gen.current;
+    getRuns()
+      .then((rs) => { if (rs[0]) return getRun(rs[0].id).then((r) => { if (g === gen.current) { setRun(r); if (r.status === "running") attach(r.id); } }); })
+      .catch((e) => { if (g === gen.current) setErr(String((e as Error).message)); });
     return () => unsub.current?.();
   }, []);
   const start = async (s: ScenarioId) => {
     setErr(null); setLeak(null);
-    try { const { runId } = await startRun(s); setRun(await getRun(runId)); attach(runId); }
-    catch (e) { setErr(String((e as Error).message)); }
+    const g = ++gen.current;
+    try {
+      const { runId } = await startRun(s);
+      const r = await getRun(runId);
+      if (g === gen.current) { setRun(r); attach(runId); }
+    } catch (e) {
+      if (g === gen.current) setErr(String((e as Error).message));
+    }
   };
   const running = run?.status === "running";
   return (
@@ -44,10 +55,17 @@ export function DemoPanel({ cfg }: { cfg: ConfigResponse | null }) {
           <div className="runhead"><span className={`pill st-${run.status}`}>{run.status}</span> <code>{run.scenario}</code> <span className="muted">#{run.id}</span></div>
           <StepLog steps={run.steps} base={cfg?.explorerBase} />
           {run.error && <p className="banner error">{run.error}</p>}
-          {run.result && <ResultTable rows={run.result} base={cfg?.explorerBase} />}
+          {run.result && <div className="scroll"><ResultTable rows={run.result} base={cfg?.explorerBase} /></div>}
           {run.status === "done" && run.channels.length > 0 && (
             <>
-              <div className="buttons"><button onClick={() => leakCheck(run.id).then(setLeak).catch((e) => setErr(String((e as Error).message)))}>Periksa kebocoran (calldata + log semua tx channel)</button></div>
+              <div className="buttons">
+                <button
+                  disabled={checking}
+                  onClick={() => { setChecking(true); leakCheck(run.id).then(setLeak).catch((e) => setErr(String((e as Error).message))).finally(() => setChecking(false)); }}
+                >
+                  Periksa kebocoran (calldata + log semua tx channel)
+                </button>
+              </div>
               <PrivacyCards cfg={cfg} run={run} leak={leak} />
             </>
           )}

@@ -12,13 +12,13 @@ export function App() {
   const [selected, setSelected] = useState<string | null>(null);
   useEffect(() => { getConfig().then(setCfg).catch((e) => setErr(String((e as Error).message))); }, []);
   return (
-    <div className="wrap">
+    <main className="wrap">
       <Header cfg={cfg} error={err} />
       <div className="grid">
         <section className="panel"><ChannelsTable cfg={cfg} onSelect={setSelected} /></section>
         <section className="panel"><DemoPanel cfg={cfg} /></section>
       </div>
       {selected && <ChannelDrawer addr={selected} cfg={cfg} onClose={() => setSelected(null)} />}
-    </div>
+    </main>
   );
 }

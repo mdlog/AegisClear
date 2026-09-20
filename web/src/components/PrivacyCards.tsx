@@ -6,7 +6,14 @@ import { Tx } from "./Header";
 
 export function PrivacyCards({ cfg, run, leak }: { cfg: ConfigResponse | null; run: RunSnapshot; leak: LeakResponse[] | null }) {
   const [chs, setChs] = useState<ChannelDetail[]>([]);
-  useEffect(() => { Promise.all(run.channels.map(getChannel)).then(setChs).catch(() => setChs([])); }, [run.id, run.status]);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    Promise.all(run.channels.map(getChannel))
+      .then((cs) => { if (alive) { setChs(cs); setErr(null); } })
+      .catch((e) => { if (alive) setErr(String((e as Error).message)); });
+    return () => { alive = false; };
+  }, [run.id, run.status]);
   return (
     <div className="cards">
       <div className="card private">
@@ -23,6 +30,7 @@ export function PrivacyCards({ cfg, run, leak }: { cfg: ConfigResponse | null; r
       </div>
       <div className="card chain">
         <h3>Yang dilihat chain</h3>
+        {err && <p className="banner error">{err}</p>}
         {chs.map((c) => (
           <dl className="kv" key={c.channel}>
             <dt>channel</dt><dd><code>{shortAddr(c.channel)}</code> · {c.state}</dd>
