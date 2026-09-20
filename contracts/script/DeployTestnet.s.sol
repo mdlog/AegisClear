@@ -27,6 +27,7 @@ contract DeployTestnet is Script {
         // POSEIDON_STYLUS = alamat program Stylus AegisPoseidon (FR-25) bila sudah di-deploy di Robinhood Chain;
         // kosong → Rencana B: PoseidonPathYul (Solidity/Yul, keluaran identik, lebih mahal gas).
         address poseidon = vm.envOr("POSEIDON_STYLUS", address(0));
+        bool stylusOverride = poseidon != address(0);
         vm.startBroadcast();
         MockUSDG usdg = new MockUSDG();
         SLASettlementVerifier verifier = new SLASettlementVerifier();
@@ -39,11 +40,9 @@ contract DeployTestnet is Script {
         // Known-answer check (Task 8 Step 3d-ii): hash2(1,2) circomlib v1 t=3 — jalan untuk KEDUANYA, override
         // Stylus (POSEIDON_STYLUS di-set) maupun fallback Yul di atas; salah wiring/deploy Poseidon gagal jelas
         // di sini, bukan diam-diam menghasilkan root yang salah di factoryAnchored.
-        require(
-            IPoseidonPath(poseidon).hash2(1, 2)
-                == 7853200120776062878684798364095072458815029376092732009249414926327459813530,
-            "POSEIDON_STYLUS: wrong Poseidon"
-        );
+        // Program Stylus TIDAK bisa disimulasikan oleh EVM lokal Foundry (bytecode WASM → OpcodeNotFound), jadi untuk
+        // override Stylus pemeriksaan dilakukan lewat eth_call ke node asli (vm.rpc); fallback Yul dipanggil langsung.
+        require(_hash2(poseidon, stylusOverride) == 7853200120776062878684798364095072458815029376092732009249414926327459813530, "POSEIDON_STYLUS: wrong Poseidon");
         AegisChannelFactory factoryAnchored = new AegisChannelFactory(address(verifier), PERMIT2, 60, poseidon);
         SimpleJobEscrow escrow = new SimpleJobEscrow(address(usdg));
         AegisTreasuryRouter router = new AegisTreasuryRouter();
@@ -67,5 +66,14 @@ contract DeployTestnet is Script {
         vm.serializeUint(j, "chainId", block.chainid);
         string memory out = vm.serializeUint(j, "deployBlock", deployBlock);
         vm.writeJson(out, "deployments/testnet-46630.json");
+    }
+
+    function _hash2(address poseidon, bool viaRpc) internal returns (uint256) {
+        if (!viaRpc) return IPoseidonPath(poseidon).hash2(1, 2);
+        bytes memory ret = vm.rpc(
+            "eth_call",
+            string.concat('[{"to":"', vm.toString(poseidon), '","data":"', vm.toString(abi.encodeCall(IPoseidonPath.hash2, (1, 2))), '"},"latest"]')
+        );
+        return abi.decode(ret, (uint256));
     }
 }
