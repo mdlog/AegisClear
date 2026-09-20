@@ -6,6 +6,7 @@ import {MockUSDG} from "../src/MockUSDG.sol";
 import {SLASettlementVerifier} from "../src/SLASettlementVerifier.sol";
 import {AegisChannelFactory} from "../src/AegisChannelFactory.sol";
 import {SimpleJobEscrow} from "../src/SimpleJobEscrow.sol";
+import {AegisTreasuryRouter} from "../src/AegisTreasuryRouter.sol";
 
 /// forge script script/DeployLocal.s.sol --rpc-url http://127.0.0.1:8545 --broadcast \
 ///   --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
@@ -22,6 +23,7 @@ contract DeployLocal is Script {
         SLASettlementVerifier verifier = new SLASettlementVerifier();
         AegisChannelFactory factory = new AegisChannelFactory(address(verifier), PERMIT2, 60); // factory demo (D5)
         SimpleJobEscrow escrow = new SimpleJobEscrow(address(usdg));
+        AegisTreasuryRouter router = new AegisTreasuryRouter();
         usdg.mint(CLIENT_A, 100e6);
         usdg.mint(CLIENT_B, 100e6);
         usdg.mint(CLIENT_C, 100e6);
@@ -32,6 +34,7 @@ contract DeployLocal is Script {
         vm.serializeAddress(j, "verifier", address(verifier));
         vm.serializeAddress(j, "factory", address(factory));
         vm.serializeAddress(j, "escrow", address(escrow));
+        vm.serializeAddress(j, "router", address(router));
         string memory out = vm.serializeUint(j, "chainId", block.chainid);
         vm.writeJson(out, "deployments/local.json");
     }

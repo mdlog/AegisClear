@@ -12,7 +12,7 @@ import { createProviderApp } from "../src/provider/server.js";
 import { AegisClient } from "../src/client/agent.js";
 import {
   randomNonce, defaultArtifacts, erc20Balance, erc20Abi, erc20Transfer, commitTerms, signChannelTerms, signCheckpoint,
-  signClose, signRollover, rootHex, predictChannel, merkleRoot, submitCheckpointTx, type ChainCtx, type ChannelConfig,
+  signClose, signRollover, rootHex, predictChannel, merkleRoot, submitCheckpointTx, routerAbi, type ChainCtx, type ChannelConfig,
 } from "../src/index.js";
 
 // DEPLOY_FILE (env) diresolve relatif terhadap REPO ROOT, bukan cwd proses: `pnpm --filter
@@ -43,7 +43,7 @@ const DEPLOY_EXISTS = existsSync(DEPLOY);
 if (!DEPLOY_EXISTS) console.warn(`integration: deploy file not found at ${DEPLOY} — suite skipped`);
 
 describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisChannel", () => {
-  let d: { usdg: Address; factory: Address };
+  let d: { usdg: Address; factory: Address; router?: Address };
   let server: ReturnType<typeof serve>;
   let latestCoSigned: ReturnType<typeof createProviderApp>["latestCoSigned"];
   let latestCoSignedByChannel: ReturnType<typeof createProviderApp>["latestCoSignedByChannel"];
@@ -431,6 +431,36 @@ describe.skipIf(!DEPLOY_EXISTS)("integrasi Anvil: provider ↔ klien ↔ AegisCh
       await b.settle();
       expect((await b.view()).state).toBe("SETTLED");
       expect(await bal(meB)).toBe(b0);
+    } finally { server3.close(); }
+  });
+
+  it("skenario 13 (FR-26): payoutProvider = AegisTreasuryRouter → treasury menerima pembayaran dalam tx close yang sama", async () => {
+    const dd = d as typeof d & { router: Address };
+    expect(dd.router).toMatch(/^0x/);
+    const treasury = privateKeyToAccount(generatePrivateKey()).address;
+    const setT = await ctxOf(PK.provider).walletClient.writeContract({ address: dd.router, abi: routerAbi, functionName: "setTreasury", args: [treasury] });
+    await publicClient.waitForTransactionReceipt({ hash: setT });
+    const terms = { unitPrice: 20_000n, maxM1: 800n, minM2: 90n, penaltyBps: 5000n, capBps: 3000n, nonce: randomNonce() };
+    const { app: app3 } = createProviderApp({
+      ctx: ctxOf(PK.provider), account: providerAccount, usdg: d.usdg, terms, payoutProvider: dd.router,
+      unitQty: 1n, deposit: 1_000_000n, challengeWindow: 60, responseWindow: 30, metrics: () => ({ m1: 300n, m2: 95n }),
+    });
+    const server3 = serve({ fetch: app3.fetch, port: 4028 });
+    try {
+      const pk = generatePrivateKey(); const acct = privateKeyToAccount(pk);
+      const eth = await ctxOf(PK.deployer).walletClient.sendTransaction({ to: acct.address, value: 1_000_000_000_000_000_000n });
+      await publicClient.waitForTransactionReceipt({ hash: eth });
+      await mintUsdg(acct.address, 2_000_000n);
+      const c = new AegisClient({ ctx: ctxOf(pk), account: acct, providerUrl: "http://127.0.0.1:4028", usdg: d.usdg, artifacts: art });
+      await c.start();
+      expect(c.cfg.payoutProvider.toLowerCase()).toBe(dd.router.toLowerCase());
+      for (let i = 0; i < 5; i++) await c.requestUnit();
+      await c.finalAck();
+      const p0 = await bal(providerAddr);
+      await c.closeCooperative();
+      expect(await bal(treasury)).toBe(100_000n);              // 5 × 20.000 langsung ke treasury
+      expect(await bal(providerAddr)).toBe(p0);                // EOA provider tidak tersentuh
+      expect(await bal(dd.router)).toBe(0n);
     } finally { server3.close(); }
   });
 });

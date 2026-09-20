@@ -6,6 +6,7 @@ import {MockUSDG} from "../src/MockUSDG.sol";
 import {SLASettlementVerifier} from "../src/SLASettlementVerifier.sol";
 import {AegisChannelFactory} from "../src/AegisChannelFactory.sol";
 import {SimpleJobEscrow} from "../src/SimpleJobEscrow.sol";
+import {AegisTreasuryRouter} from "../src/AegisTreasuryRouter.sol";
 
 /// Robinhood Chain testnet 46630. ETH uji: faucet.quicknode.com/robinhood/testnet atau faucets.chain.link/robinhood-testnet.
 /// forge script script/DeployTestnet.s.sol --rpc-url https://rpc.testnet.chain.robinhood.com --broadcast --private-key $PK \
@@ -21,6 +22,7 @@ contract DeployTestnet is Script {
         AegisChannelFactory factoryDemo = new AegisChannelFactory(address(verifier), PERMIT2, 60);
         AegisChannelFactory factoryProd = new AegisChannelFactory(address(verifier), PERMIT2, 6 hours);
         SimpleJobEscrow escrow = new SimpleJobEscrow(address(usdg));
+        AegisTreasuryRouter router = new AegisTreasuryRouter();
         usdg.mint(msg.sender, 1_000e6);
         vm.stopBroadcast();
         string memory j = "deploy";
@@ -29,6 +31,7 @@ contract DeployTestnet is Script {
         vm.serializeAddress(j, "factory", address(factoryDemo));
         vm.serializeAddress(j, "factoryProd", address(factoryProd));
         vm.serializeAddress(j, "escrow", address(escrow));
+        vm.serializeAddress(j, "router", address(router));
         string memory out = vm.serializeUint(j, "chainId", block.chainid);
         vm.writeJson(out, "deployments/testnet-46630.json");
     }

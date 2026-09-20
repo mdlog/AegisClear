@@ -35,6 +35,15 @@ export const channelAbi = parseAbi([
   "event RolledOver(uint32 indexed newEpoch, uint64 closedSeq, uint256 toProvider, uint256 remaining)",
 ]);
 
+export const routerAbi = parseAbi([
+  "function setTreasury(address treasury)",
+  "function treasuryOf(address agent) view returns (address)",
+  "function destinationOf(address agent) view returns (address)",
+  "function credit(address agent, address token) view returns (uint256)",
+  "function claim(address token, address to)",
+  "event PayoutRouted(address indexed party, address indexed token, address indexed dest, uint256 amount, bool forwarded)",
+]);
+
 export const erc20Abi = parseAbi([
   "function balanceOf(address) view returns (uint256)",
   "function transfer(address to, uint256 amount) returns (bool)",

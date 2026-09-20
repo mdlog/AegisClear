@@ -15,6 +15,8 @@ import { Watcher } from "../watcher/watcher.js";
 
 export interface ProviderOptions {
   ctx: ChainCtx; account: PrivateKeyAccount; usdg: Address;
+  /** alamat penerima payout provider — treasury/router/Safe; default account.address (FR-26/D8). */
+  payoutProvider?: Address;
   /**
    * Syarat komersial (harga, ambang, penalti, cap). `nonce` DIABAIKAN: setiap sesi memakai nonce
    * CSPRNG baru (`randomNonce()`), sehingga `termsCommitment` berbeda per channel — satu nonce untuk
@@ -56,7 +58,7 @@ export function createProviderApp(o: ProviderOptions) {
     const cfg: ChannelConfig = {
       client, provider: o.account.address, token: o.usdg, termsCommitment: rootHex(await commitTerms(terms)),
       challengeWindow: o.challengeWindow, responseWindow: o.responseWindow,
-      payoutClient: client, payoutProvider: o.account.address, salt: ("0x" + randomBytes(32).toString("hex")) as Hex,
+      payoutClient: client, payoutProvider: o.payoutProvider ?? o.account.address, salt: ("0x" + randomBytes(32).toString("hex")) as Hex,
     };
     const predicted = await predictChannel(o.ctx, cfg);
     const cp0: Checkpoint = { epoch: 0, seq: 0, cumulativeAmount: 0n, receiptsRoot: await merkleRoot([]) };

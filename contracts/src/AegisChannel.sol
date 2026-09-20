@@ -7,6 +7,7 @@ import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/Signa
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {ISignatureTransfer} from "permit2/src/interfaces/ISignatureTransfer.sol";
 import {ISLASettlementVerifier} from "./interfaces/ISLASettlementVerifier.sol";
+import {IAegisPayoutHook} from "./interfaces/IAegisPayoutHook.sol";
 
 /// @title AegisChannel — micro-escrow channel USDG per pasangan agen (spec §8.1).
 /// @dev Satu clone EIP-1167 per channel; alamat = atribusi. Tidak ada owner/pause/upgrade.
@@ -128,7 +129,7 @@ contract AegisChannel is ReentrancyGuard {
     // ---------- funding ----------
     /// @notice Pendanaan tanpa allowance langsung ke channel: Permit2 permitTransferFrom, owner = msg.sender (FR-3).
     /// @dev Transfer ERC-20 biasa (termasuk settlement x402 ke alamat ini) juga sah — budget() = saldo.
-    function fundWithPermit2(ISignatureTransfer.PermitTransferFrom calldata permit, bytes calldata signature) external {
+    function fundWithPermit2(ISignatureTransfer.PermitTransferFrom calldata permit, bytes calldata signature) external nonReentrant {
         if (state != State.OPEN && state != State.CLOSING) revert WrongState();
         if (permit.permitted.token != cfg.token) revert WrongToken();
         PERMIT2.permitTransferFrom(
@@ -219,7 +220,7 @@ contract AegisChannel is ReentrancyGuard {
         hasProof = false; payToClient = 0; proofSeq = 0;
         state = State.OPEN;
         _resetEpochState();
-        if (toProvider > 0) IERC20(cfg.token).safeTransfer(cfg.payoutProvider, toProvider);
+        _send(cfg.payoutProvider, cfg.provider, toProvider);
         emit RolledOver(newEpoch, seq_, toProvider, budget());
         emit PaymentReleased(channelIdField(), cfg.provider, toProvider);
     }
@@ -231,7 +232,7 @@ contract AegisChannel is ReentrancyGuard {
     function sweep() external nonReentrant {
         if (state != State.SETTLED) revert WrongState();
         uint256 b = budget();
-        if (b > 0) IERC20(cfg.token).safeTransfer(cfg.payoutClient, b);
+        _send(cfg.payoutClient, cfg.client, b);
         emit Swept(b);
     }
 
@@ -241,9 +242,8 @@ contract AegisChannel is ReentrancyGuard {
         uint256 toProvider = owedToProvider < b ? owedToProvider : b;
         uint256 toClient = b - toProvider;
         state = State.SETTLED;
-        IERC20 t = IERC20(cfg.token);
-        if (toProvider > 0) t.safeTransfer(cfg.payoutProvider, toProvider);
-        if (toClient > 0) t.safeTransfer(cfg.payoutClient, toClient);
+        _send(cfg.payoutProvider, cfg.provider, toProvider);
+        _send(cfg.payoutClient, cfg.client, toClient);
         uint256 jobId = channelIdField();
         emit Settled(seq, cumulativeAmount, penalty, toProvider, toClient, cooperative);
         emit PaymentReleased(jobId, cfg.provider, toProvider);
@@ -251,6 +251,19 @@ contract AegisChannel is ReentrancyGuard {
     }
 
     // ---------- internal ----------
+    uint256 private constant HOOK_GAS = 150_000;
+
+    /// @dev Transfer + hook best-effort (FR-26): payee kontrak boleh menerapkan IAegisPayoutHook (mis. AegisTreasuryRouter).
+    ///      Hook dipanggil dengan stipend tetap di dalam try/catch — payee yang revert/menghabiskan gas TIDAK bisa
+    ///      menyandera settle/close/sweep pihak lain (T-hook). Semua pemanggil nonReentrant dan state sudah final.
+    function _send(address to, address party, uint256 amount) internal {
+        if (amount == 0) return;
+        IERC20(cfg.token).safeTransfer(to, amount);
+        if (to.code.length > 0) {
+            try IAegisPayoutHook(to).onPayout{gas: HOOK_GAS}(party, cfg.token, amount) {} catch {}
+        }
+    }
+
     function _digest(bytes32 structHash) internal view returns (bytes32) {
         return keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
     }
