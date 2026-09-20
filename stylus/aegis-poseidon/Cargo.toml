@@ -24,4 +24,4 @@ codegen-units = 1
 strip = true
 lto = true
 panic = "abort"
-opt-level = "z"
+opt-level = 3
