@@ -70,3 +70,52 @@
   --danger: #FF8A70;
   --scrim: rgb(0 0 0 / 0.5);
 }
+
+/*
+ * prefers-contrast: more (README §6.1). Same hues, with lightness moved in OKLCH until every text colour reaches 7:1 on
+ * every surface and on the 5–9 % tints over the sheet, hairline rules reach 3:1 and strong rules 4.5:1. The dark plate is
+ * a little deeper so the accents keep their chroma (proof stays pink, danger stays coral). Checked by tokens.test.ts.
+ */
+@media (prefers-contrast: more) {
+  :root {
+    --rule: #7C8680;
+    --rule-strong: #5D6C65;
+    --ink-2: #404E48;
+    --engrave: #165440;
+    --proof: #91045E;
+    --caution: #684302;
+    --danger: #921D01;
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #12241E;
+    --sheet: #192D27;
+    --sheet-2: #1F362E;
+    --stub: #261B20;
+    --rule: #6A827A;
+    --rule-strong: #89A095;
+    --ink-2: #BBCBC3;
+    --engrave: #8FD7B6;
+    --on-engrave: #12241E;
+    --proof: #FEB2D4;
+    --caution: #F2C055;
+    --danger: #FEB6A5;
+  }
+}
+
+@media (prefers-contrast: more) and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #12241E;
+    --sheet: #192D27;
+    --sheet-2: #1F362E;
+    --stub: #261B20;
+    --rule: #6A827A;
+    --rule-strong: #89A095;
+    --ink-2: #BBCBC3;
+    --engrave: #8FD7B6;
+    --on-engrave: #12241E;
+    --proof: #FEB2D4;
+    --caution: #F2C055;
+    --danger: #FEB6A5;
+  }
+}

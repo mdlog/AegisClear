@@ -35,8 +35,9 @@ export default defineConfig({
   },
   preview: { host: "127.0.0.1", port: 4046, strictPort: true, proxy },
   // Unit tests run in node; component tests opt into jsdom with a `// @vitest-environment jsdom` docblock.
+  // Vitest stubs CSS to "" except `css.include`: tokens.css is kept so styles/tokens.test.ts can read its `?raw` text.
   test: {
     setupFiles: ["./src/test/setup.ts"],
-    css: { modules: { classNameStrategy: "non-scoped" } },
+    css: { include: [/styles\/tokens\.css/], modules: { classNameStrategy: "non-scoped" } },
   },
 });
