@@ -2,9 +2,9 @@
 
 `aegisclear-console/` is the folder chosen to become the new AegisClear frontend. This review compares its current state (a Manus-generated prototype, "Web App (static only)" template) with this handoff folder. It is a **fix list for the next build session**. On any conflict, `README.md`, `PRODUCT_CONTEXT.md`, `API_CONTRACT.md`, `LAYOUT_SPEC.md` and `DESIGN_BRIEF.md` win. Line numbers refer to the files as found on 23 Sep 2026.
 
-## Status (updated 23 Sep 2026, after step 5)
+## Status (updated 23 Sep 2026, after step 6)
 
-**Done:** steps 1–5 (step 5 is the keyboard, contrast and touch pass listed as open in the previous update; §G's own list numbers it differently).
+**Done:** steps 1–6 (step 5 is the keyboard, contrast and touch pass listed as open in the previous update; §G's own list numbers it differently).
 - **Step 1, strip and integrate:**
   - B3 removed: Manus plugins, `__manus__/` debug collector, storage proxy, `Map.tsx`, OAuth helpers, `ManusDialog`, template pages and hooks, 50+ unused shadcn components, Tailwind, the wouter patch.
   - F: dependencies cut to 6 runtime + 8 dev packages.
@@ -67,8 +67,25 @@
   - At 1024 px the header ran 10 px past the edge in fixture mode. The wordmark suffix now hides below 1280 px, and nav labels no longer wrap.
   - A Playwright `fullPage` screenshot under touch emulation resets `pointer: coarse` for the rest of the page's life. Use viewport screenshots for touch QA.
 
-**Still open:**
-- **Step 6:** `pnpm build:web`, then a testnet run in the browser from click to `0.07 / 1.93` and `0 leaks` (Definition of Done "Live"), then video QA at 1920 × 1080.
+- **Step 6, testnet integration (Definition of Done "Live"):**
+  - `pnpm build:web` → `web/dist`. Initial JS is 138.5 KB gzip (budget 180), and the live build carries no fixture data. The one recorded run id in the bundle is the example in the "not a run id" copy.
+  - `AEGIS_NETWORK=testnet pnpm --filter @aegisclear/web serve`, then real clicks in Chrome at 1920 × 1080, light theme, on testnet v2:
+
+    | Scenario | Click → verdict | Split | Leak check |
+    |---|---|---|---|
+    | `B-dispute` (twice) | 151 s | `0.07 / 1.93` | `Leaks 0` of 5 tx |
+    | `B-anchored-dispute` | 140 s | `0.02 / 0.38` | `Leaks 0` of 25 tx |
+    | `B-rollover` | 116 s | `0.00 / 2.66` | `Leaks 0` of 4 tx |
+
+  - A `window` marker set before the click survived to the verdict, so there was no reload. Every request was same-origin.
+  - axe found 0 violations on Desk, Channels, a channel record, the run verdict with the leak check, Offer and Deployment, in light and dark, with live data at 1920 × 1080.
+  - Screenshots: `docs/media/console-testnet-2026-09-23/`. Numbers and channels: root README §Lihat di browser.
+  - Known and accepted: one transient `404 GET /api/channels/<new channel>` per run. It happens while the server's scanner has not indexed the channel yet; the run view recovers on the next poll. Chrome still logs it as a console error.
+
+**Still open (Definition of Done):**
+- Lighthouse accessibility and best practices ≥ 95 (not run).
+- Video QA at 1440 px and at 50 % zoom for the headline figures. 1920 × 1080 was checked, and 390, 768, 1024 and 1280 are covered by `pnpm qa`.
+- In the browser on testnet: `B-cooperative`, `A-complete`, `A-reject` and `Run all four` (they were verified through the API on 20 Sep).
 
 **Line numbers below refer to the original prototype.** A backup of it is at `arbitrum-sg/.backup/aegisclear-console-manus-original-2026-09-23.tgz`.
 
