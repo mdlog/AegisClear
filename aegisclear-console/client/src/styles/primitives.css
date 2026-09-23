@@ -36,6 +36,20 @@ a:hover { text-decoration-color: currentColor; }
 .icon-btn:hover { color: var(--ink); background: var(--sheet-2); border-color: var(--rule); }
 @media (pointer: coarse) { .icon-btn { width: 44px; height: 44px; } }
 
+/*
+ * Touch layouts (README §6.1; LAYOUT_SPEC < 768): every target is at least 44 × 44 px. A link that stands on its own
+ * gets a 44 px box around its line; links inside running text (p) keep their line (WCAG 2.5.8 "inline"). :where()
+ * keeps these at zero specificity, so a component that sets its own display, padding or size still decides.
+ */
+@media (pointer: coarse) {
+  .btn { min-height: 44px; min-width: 44px; }
+  :where(a[href]) { display: inline-block; min-width: 44px; padding-block: max(0px, calc((44px - 1lh) / 2)); }
+  :where(p) :where(a[href]) { display: inline; min-width: 0; padding-block: 0; }
+  :where(summary) { padding-block: max(0px, calc((44px - 1lh) / 2)); }
+  :where(select, [role="tab"]) { min-height: 44px; }
+  :where(label:has(> input[type="checkbox"], > input[type="radio"])) { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+}
+
 /* A sheet: the only surface. Unequal heights, 1 px rule, 4 px radius, no shadow. */
 .sheet { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius); }
 

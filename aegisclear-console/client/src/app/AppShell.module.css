@@ -19,7 +19,7 @@
 .navList { display: flex; gap: 4px; list-style: none; }
 .navLink {
   display: inline-flex; align-items: center; min-height: 36px; padding: 0 10px;
-  color: var(--ink-2); font-size: 14px; line-height: 20px; font-weight: 600; text-decoration: none;
+  color: var(--ink-2); font-size: 14px; line-height: 20px; font-weight: 600; text-decoration: none; white-space: nowrap;
   border-bottom: 2px solid transparent;
 }
 .navLink:hover { color: var(--ink); }
@@ -67,18 +67,22 @@
 
 @media (max-width: 1279px) {
   .header { gap: 16px; padding: 8px 24px; }
+  /* At 1024 the cluster (live chip, plate, fixture badge) ran 10 px past the edge; the suffix makes the room. */
+  .brandSuffix { display: none; }
   .main { padding: 24px 24px 48px; }
   .liveTitle { display: none; }
-  .shortcutsWord, .shortcuts kbd { display: none; }
+  .shortcuts kbd { display: none; }
+  /* The word leaves the layout but still names the button (display: none would leave an icon with no name). */
+  .shortcutsWord { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 }
 
 @media (max-width: 1023px) {
   .header { flex-wrap: wrap; }
-  .brandSuffix { display: none; }
 }
 
 @media (max-width: 767px) {
-  .header { padding: 8px 16px; gap: 8px 12px; }
+  /* Wrapped into three or four rows the header is ~220 px, a quarter of a phone screen: it scrolls away here. */
+  .header { position: static; padding: 8px 16px; gap: 8px 12px; }
   .brand { font-size: 20px; line-height: 24px; font-stretch: 112.5%; }
   .menuButton { display: inline-flex; min-height: 44px; }
   .nav { order: 3; flex-basis: 100%; flex-direction: column; align-items: stretch; }
@@ -91,3 +95,5 @@
   .footer { padding: 16px; }
   .theme { width: 44px; height: 44px; }
 }
+
+@media (pointer: coarse) { .plate, .liveChip { min-height: 44px; } }

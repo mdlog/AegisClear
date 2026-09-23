@@ -30,7 +30,7 @@
 .menuLink { font-size: 14px; }
 
 /* Lifecycle rail: sticky under the global header while the tape scrolls. */
-.rail { position: sticky; top: 56px; z-index: 20; display: grid; gap: 4px; padding: 6px 0; background: var(--paper); border-bottom: 1px solid var(--rule); }
+.rail { position: sticky; top: var(--header-h, 56px); z-index: 20; display: grid; gap: 4px; padding: 6px 0; background: var(--paper); border-bottom: 1px solid var(--rule); }
 .railList { display: flex; flex-wrap: wrap; gap: 0; list-style: none; }
 .station { flex: 1 1 0; min-width: 132px; }
 .stationLink {
@@ -56,7 +56,7 @@
 /* Live mode: tape column about 2/3, context rail about 1/3 at ≥ 1280 px. */
 .liveGrid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 16px; align-items: start; }
 .tapeColumn { display: grid; gap: 12px; min-width: 0; }
-.context { position: sticky; top: 132px; display: grid; gap: 10px; padding: 16px 20px; }
+.context { position: sticky; top: calc(var(--header-h, 56px) + 76px); display: grid; gap: 10px; padding: 16px 20px; }
 .contextTitle { font-size: 15px; line-height: 22px; font-weight: 650; }
 .contextFacts { display: grid; gap: 8px; }
 .contextFacts > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); align-items: center; gap: 8px; }
@@ -66,10 +66,10 @@
 
 /* Tape and acts */
 .tape { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
-.leg { display: grid; gap: 8px; scroll-margin-top: 140px; }
+.leg { display: grid; gap: 8px; scroll-margin-top: calc(var(--header-h, 56px) + 84px); }
 .legLine { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 6px 0; border-bottom: 1px solid var(--rule-strong); }
 .legCount { color: var(--ink-2); font-size: 13px; font-weight: 600; }
-.act { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius); scroll-margin-top: 140px; }
+.act { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius); scroll-margin-top: calc(var(--header-h, 56px) + 84px); }
 .actHead { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; padding: 10px 16px; }
 .actTitle { font-size: 15px; line-height: 22px; font-weight: 650; }
 .actSummary { flex: 1; min-width: 0; color: var(--ink-2); font-size: 14px; line-height: 20px; }
@@ -105,7 +105,7 @@
 /* The Resolution block: stations in logical order, joined by a drawn line. */
 .resolution { display: grid; gap: 12px; }
 .stations { display: grid; list-style: none; }
-.rStation { position: relative; display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; padding-bottom: 12px; scroll-margin-top: 140px; }
+.rStation { position: relative; display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; padding-bottom: 12px; scroll-margin-top: calc(var(--header-h, 56px) + 84px); }
 .rStation::before { content: ""; position: absolute; left: 5px; top: 14px; bottom: 0; width: 1px; background: var(--rule-strong); }
 .rStation:last-child::before { display: none; }
 .rGlyph { position: relative; z-index: 1; width: 11px; height: 11px; margin-top: 5px; overflow: hidden; background: var(--sheet); border: 1.5px solid var(--ink-2); border-radius: var(--radius-glyph); }
@@ -176,3 +176,6 @@
   .unitGrid { grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 2px; padding: 6px; }
   .menuBody { right: auto; left: 0; width: min(300px, calc(100vw - 32px)); }
 }
+
+/* Touch layouts: 44 px targets (README §6.1). */
+@media (pointer: coarse) { .tab, .stationLink { min-height: 44px; } }

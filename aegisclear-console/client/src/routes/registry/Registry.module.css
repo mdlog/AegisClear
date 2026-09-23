@@ -80,3 +80,6 @@
   .blocking > * { background: none; }
   .blocking > :first-child { box-shadow: none; }
 }
+
+/* Touch layouts: 44 px targets (README §6.1). */
+@media (pointer: coarse) { .check, .select select, .tag { min-height: 44px; } }

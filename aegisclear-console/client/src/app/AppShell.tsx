@@ -1,6 +1,6 @@
 // Global chrome (LAYOUT_SPEC navigation): wordmark, four destinations, and a right cluster with the live-run chip,
 // the network plate and the fixture badge. No sidebar, no header call to action.
-import { useEffect, useId, useRef, useState } from "react";
+import { type RefObject, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, ScrollRestoration, useLoaderData, useLocation, useNavigate, useNavigation } from "react-router";
 import { Keyboard, Menu, Monitor, Moon, Sun, X } from "lucide-react";
 import type { ConfigResponse } from "@aegis/types";
@@ -26,13 +26,15 @@ export function AppShell() {
 function Chrome({ config }: { config: ConfigResponse }) {
   const navigation = useNavigation();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const header = useRef<HTMLElement>(null);
   useGlobalShortcuts(() => setShortcutsOpen(true));
   useFocusOnNavigation();
+  useHeaderHeight(header);
   return (
     <div className={styles.shell}>
       <a className="skip-link" href="#main">{copy.skip}</a>
       {navigation.state !== "idle" && <div className={styles.pending} role="progressbar" aria-label="Loading page" />}
-      <header className={styles.header}>
+      <header ref={header} className={styles.header}>
         <Wordmark />
         <MainNav />
         <div className={styles.cluster}>
@@ -83,6 +85,26 @@ function useGlobalShortcuts(openList: () => void) {
     if (run) navigate(`/runs/${run.id}`);
     else announce(shortcutsCopy.noRun);
   });
+}
+
+/**
+ * Publishes the sticky header's height as --header-h (0 below 768 px, where it scrolls away), so the run rail sticks right
+ * under it even when the header wraps to two rows (LAYOUT_SPEC run view). A fixed 56 px hid the rail at 768–1023.
+ */
+function useHeaderHeight(header: RefObject<HTMLElement | null>) {
+  useLayoutEffect(() => {
+    const el = header.current;
+    if (!el || typeof ResizeObserver === "undefined") return; // jsdom has no layout
+    const root = document.documentElement;
+    const publish = () => root.style.setProperty("--header-h", `${getComputedStyle(el).position === "sticky" ? el.offsetHeight : 0}px`);
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    publish();
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--header-h");
+    };
+  }, [header]);
 }
 
 /** After a page change, focus the new page's heading, so screen readers start there (unless a shortcut asked otherwise). */

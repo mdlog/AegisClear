@@ -57,3 +57,6 @@
   .railTable tbody tr { padding: 8px 0; border-top: 1px solid var(--rule); }
   .session { padding: 16px; }
 }
+
+/* Touch layouts: the state counts are links in a flex row, not running text, so they get 44 px boxes (README §6.1). */
+@media (pointer: coarse) { .onChain a { display: inline-flex; align-items: center; min-height: 44px; } }

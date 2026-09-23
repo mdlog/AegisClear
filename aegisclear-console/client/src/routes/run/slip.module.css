@@ -49,7 +49,9 @@
 .binaryCaption { color: var(--ink-2); font-size: 12px; line-height: 16px; font-weight: 600; }
 .binaryBars { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; }
 .binaryBar { display: grid; grid-template-columns: auto minmax(40px, 1fr) auto; align-items: center; gap: 2px 8px; font-size: 13px; line-height: 16px; }
-.binaryBar a { font-size: 12px; }
+/* The two "Seen live" links sit 4 px apart when the bars stack: 24 px boxes keep them apart (WCAG 2.5.8), 44 on touch. */
+.binaryBar a { display: inline-flex; align-items: center; min-height: 24px; font-size: 12px; }
+@media (pointer: coarse) { .binaryBar a { min-height: 44px; } }
 
 /* The stub's top: why the proof moved exactly this much, in proof ink, computed privately. */
 .why { display: grid; gap: 4px; }

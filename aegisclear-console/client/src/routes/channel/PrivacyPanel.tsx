@@ -32,9 +32,10 @@ export function PrivacyPanel({ detail, config }: { detail: ChannelDetail; config
       </div>
       {detail.mode === "anchored" && <p className={styles.caveat}>{copy.anchoredCaveat}</p>}
       <p className="meta">{inferenceLine}</p>
-      <p>
+      {/* A div, not a p: the link stands alone, so on touch layouts it gets a 44 px box (primitives.css). */}
+      <div>
         {detail.runId ? <Link to={`/runs/${detail.runId}?leak=1`}>{copy.leakFromRun}</Link> : <span className="meta">{copy.leakNeedsRun}</span>}
-      </p>
+      </div>
     </section>
   );
 }
