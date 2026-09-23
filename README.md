@@ -8,16 +8,25 @@ Spesifikasi lengkap: [`prd-arsitektur.md`](./prd-arsitektur.md). Log toolchain &
 
 ## Lihat di browser (web console)
 
+Console operator ada di [`aegisclear-console/`](./aegisclear-console/) (React 19 + React Router v7, desain "security-print" terang/gelap, label Inggris untuk juri). Ia di-build ke `web/dist` lalu disajikan oleh server Hono yang sama (`web/server`, port 4040); server itulah yang memegang kunci demo, provider x402, dan prover Groth16.
+
 ```bash
-# Lokal (Anvil 8545 + DeployLocal sudah jalan, zkey ada di circuits/build/):
-pnpm web                                  # = pnpm --filter @aegisclear/web start → http://localhost:4040
+# Sekali: dependensi console (paket mandiri, di luar workspace pnpm), lalu build ke web/dist
+pnpm -C aegisclear-console install --ignore-workspace
+pnpm -C aegisclear-console build:web
 # Testnet 46630 (butuh RPC_URL, PK_PROVIDER, PK_CLIENT_A, PK_CLIENT_B, PK_DEPLOYER di .env — dibaca otomatis):
-AEGIS_NETWORK=testnet pnpm web
+AEGIS_NETWORK=testnet pnpm --filter @aegisclear/web serve    # → http://localhost:4040
+# Lokal (Anvil 8545 + DeployLocal sudah jalan, zkey ada di circuits/build/):
+pnpm --filter @aegisclear/web serve
+# Tanpa chain sama sekali: memutar ulang rekaman di docs/frontend/fixtures
+VITE_API_MODE=fixtures pnpm -C aegisclear-console dev         # → http://127.0.0.1:4047
 ```
+
+`pnpm web` masih menjalankan UI lama (`web/src`, cadangan): perintah itu mem-build `web/` ke `web/dist` dan **menimpa** build console baru, jadi jalankan `pnpm -C aegisclear-console build:web` lagi untuk kembali. Pengembangan: `pnpm -C aegisclear-console dev` (Vite di 127.0.0.1:4047, proxy `/api` dan `/provider` ke :4040). Pemeriksaan: `check`, `test` (306 test), `gate`, dan `qa` (103 cek di Chrome asli, mode fixture) lewat `pnpm -C aegisclear-console <skrip>`. Brief desain, kontrak API, dan rekaman fixture: [`docs/frontend/`](./docs/frontend/).
 
 Mode local mengabaikan `RPC_URL` non-localhost (jatuh ke Anvil `127.0.0.1:8545` + catatan sekali di log) dan menolak start bila chain id yang benar-benar dilayani RPC ≠ 31337 (atau ≠ chain id testnet di mode testnet). Server hanya mendengarkan di `127.0.0.1`; set `WEB_HOST=0.0.0.0` untuk mengekspos (semua endpoint tanpa autentikasi, kunci demo ada di proses ini).
 
-Halaman `http://localhost:4040` (port `WEB_PORT`) memuat: **dashboard channel** (semua `ChannelOpened` di factory deployment, state/seq/A/budget/deadline/bukti, klik untuk detail + event), **panel demo** Pasar A vs Pasar B — tombol menjalankan skenario §14 di server (provider, klien A/B, proving Groth16 semuanya di proses Node; tidak ada wallet di browser) dan men-stream langkahnya (SSE) dengan tautan explorer, lalu tabel perbandingan, kartu **"privat"** (syarat & metrik yang tidak pernah masuk chain) vs **"yang dilihat chain"** (T, R, A, payToClient) dan tombol **leak-check**; serta JSON 402 mentah yang dilihat klien x402. Provider yang sama di-mount di `http://localhost:4040/provider` (`GET /job` → 402) lengkap dengan challenge responder in-process. Pengembangan UI: `pnpm web:dev` (Vite di :4043, proxy ke :4040). API: `GET /api/config`, `/api/channels`, `/api/channels/:addr`, `POST /api/demo/run {scenario}`, `GET /api/demo/runs`, `/api/demo/runs/:id`, `/api/demo/runs/:id/events` (SSE), `/api/demo/leak-check/:runId`, `/api/offer?client=A|B`.
+Halaman `http://localhost:4040` (port `WEB_PORT`) memuat: **Desk** (papan tiga rel dari run terbaru — x402 `exact`, escrow biner, AegisClear — plus peluncur skenario §14 dan run sesi ini); **run view** (tape live lewat SSE: Fund → Open → Serve → Resolve → Settle, grid receipt 16 × 8, blok Resolution dengan interval proving dan hitung mundur jendela tantangan; setelah selesai menjadi *settlement slip*: stub syarat privat vs sisi chain dengan angka `0.07 / 1.93`, segel T/R yang digambar dari hash, dan tombol **Check for leaks**); **Channels** (semua `ChannelOpened` di ketiga factory, filter di URL); **channel record** (rail siklus hidup, settlement per epoch, panel privasi, event trail); **x402 offer** (JSON 402 beranotasi yang dilihat klien x402); dan **Deployment** (alamat v2 dan batasan yang diketahui). Skenario berjalan di server (provider, klien A/B, proving Groth16 semuanya di proses Node; tidak ada wallet di browser). Provider yang sama di-mount di `http://localhost:4040/provider` (`GET /job` → 402) lengkap dengan challenge responder in-process. Pengembangan UI lama: `pnpm web:dev` (Vite di :4043, proxy ke :4040). API: `GET /api/config`, `/api/channels`, `/api/channels/:addr`, `POST /api/demo/run {scenario}`, `GET /api/demo/runs`, `/api/demo/runs/:id`, `/api/demo/runs/:id/events` (SSE), `/api/demo/leak-check/:runId`, `/api/offer?client=A|B`.
 
 Sejak deploy v1 (20 Sep 2026; kini v2), `AEGIS_NETWORK=testnet` otomatis memakai alamat di `contracts/deployments/testnet-46630.json` (`factory`, `factoryProd`, `factoryAnchored`, `router`, `poseidon`); dashboard channel memindai ketiga factory sekaligus dan menandai setiap channel dengan factory asalnya, termasuk tag `factoryAnchored` untuk channel anchored (Stylus `AegisPoseidon`) — lihat [Rollover, treasury router, anchored mode](#rollover-treasury-router-anchored-mode).
 
@@ -32,7 +41,17 @@ Sejak deploy v1 (20 Sep 2026; kini v2), `AEGIS_NETWORK=testnet` otomatis memakai
 | `A-complete` (escrow biner, kontrol) | **0 / 2.00** | **384.176** — `approve` 52.441 · `createJob` 132.604 · `fund` 109.987 · `submit` 37.082 · `complete` 52.062 | — | 13 s | `SimpleJobEscrow` |
 | `A-reject` (escrow biner, kontrol) | **2.00 / 0** | **367.017** — `approve` 52.441 · `createJob` 115.482 · `fund` 109.999 · `submit` 37.094 · `reject` 52.001 | — | 13 s | `SimpleJobEscrow` |
 
-Durasi memuat jendela tantangan nyata (60 s) dan ~2,5 s per blok konfirmasi; run ini dijalankan lewat `POST /api/demo/run` + `GET /api/demo/runs/:id` (bukan klik di browser — ekstensi browser tidak tersedia di sesi verifikasi), sehingga yang belum diverifikasi hanyalah rendering UI-nya di testnet, bukan datanya.
+Durasi memuat jendela tantangan nyata (60 s) dan ~2,5 s per blok konfirmasi; run di atas dijalankan lewat `POST /api/demo/run` + `GET /api/demo/runs/:id`, bukan klik di browser.
+
+**Diverifikasi di browser dengan console baru (23 Sep 2026, Chrome 1920 × 1080, testnet v2):** klik tombol di Desk sampai verdict dan leak-check tanpa reload halaman; semua request same-origin; axe 0 pelanggaran di setiap halaman, tema terang dan gelap.
+
+| Skenario | Baris hasil (klien / provider) | Gas siklus di 46630 | Proving | Klik → verdict | Leak-check | Channel |
+|---|---|---|---|---|---|---|
+| `B-dispute` | **0.07 / 1.93** | 584.859 | 3,5 s | 151 s | bocor 0, ambigu 0, 5 tx | [`0x862Fea9D…3b5a`](https://explorer.testnet.chain.robinhood.com/address/0x862Fea9De214303D146DA79596EEe35e30273b5a) |
+| `B-anchored-dispute` | **0.02 / 0.38** | 4.891.559 | 3,4 s | 140 s | bocor 0, ambigu 0, 25 tx | [`0x14C5d55B…5a44`](https://explorer.testnet.chain.robinhood.com/address/0x14C5d55B081c5a7F2fD169f71F77b4d9112D5a44) |
+| `B-rollover` | **0.00 / 2.66** | 304.002 | — | 116 s | bocor 0, ambigu 0, 4 tx | [`0x4073eF03…Ef8f`](https://explorer.testnet.chain.robinhood.com/address/0x4073eF031b160a40927Af6593f902cA50969Ef8f) |
+
+Run `B-dispute` pertama hari itu: 583.559 gas, proving 4,1 s, channel [`0x1365e210…41c8`](https://explorer.testnet.chain.robinhood.com/address/0x1365e210026F3f3c42A925bF32aA2C3DAe0841c8).
 
 ## Daftar isi
 - [Lihat di browser (web console)](#lihat-di-browser-web-console)
