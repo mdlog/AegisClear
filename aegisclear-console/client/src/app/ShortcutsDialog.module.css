@@ -1,0 +1,14 @@
+/* A real overlay, so it gets the brief's scrim and a 1 px rule-strong edge; never a shadow (README §1.1 C4). */
+.dialog {
+  width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 64px); margin: auto; padding: 0;
+  color: var(--ink); background: var(--sheet); border: 1px solid var(--rule-strong); border-radius: var(--radius);
+}
+.dialog::backdrop { background: var(--scrim); }
+.body { display: grid; gap: 14px; padding: 20px 24px; }
+.list { display: grid; gap: 6px; }
+.row { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: baseline; gap: 12px; }
+.row kbd { display: inline-block; min-width: 28px; padding: 1px 8px; text-align: center; background: var(--sheet-2); border: 1px solid var(--rule-strong); border-radius: var(--radius-glyph); }
+.toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; font-weight: 600; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--engrave); }
+.body > button { justify-self: start; }
+@media (pointer: coarse) { .toggle { min-height: 44px; } }

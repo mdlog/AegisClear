@@ -1,0 +1,5 @@
+.bar { display: flex; gap: 2px; width: 100%; min-width: 48px; overflow: hidden; }
+.provider { min-width: 2px; background: var(--engrave); border-radius: 1px; }
+.client { min-width: 3px; background: var(--proof); border-radius: 1px; }
+.hatchFrame { position: relative; color: var(--ink-2); border: 1px solid var(--ink-2); border-radius: 1px; }
+.hatch { position: absolute; inset: 0; }

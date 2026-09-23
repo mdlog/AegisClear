@@ -1,0 +1,2 @@
+.seal { flex: none; color: var(--engrave); }
+.letter { fill: currentColor; font-size: 0.56px; font-stretch: 125%; font-weight: 750; }

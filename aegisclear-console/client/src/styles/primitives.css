@@ -1,0 +1,45 @@
+/*
+ * Shared primitives (DESIGN_BRIEF §3 type scale, §5 controls). Route layouts live in co-located CSS modules.
+ * Width is the hierarchy tool: 112.5 route titles, 100 body and headings, 87.5 dense tables, 125 display numerals.
+ */
+h1 { font-size: 26px; line-height: 32px; font-stretch: 112.5%; font-weight: 700; letter-spacing: 0; }
+h2 { font-size: 19px; line-height: 26px; font-weight: 650; }
+h3 { font-size: 15px; line-height: 22px; font-weight: 600; }
+
+/* Links are ink with an underline: colour alone never marks a link (and there is no blue anywhere). */
+a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; text-decoration-color: var(--rule-strong); }
+a:hover { text-decoration-color: currentColor; }
+
+.meta { color: var(--ink-2); font-size: 13px; line-height: 18px; font-weight: 450; }
+.mono { font-family: var(--font-mono); font-size: 13.5px; line-height: 20px; }
+.lede { max-width: 72ch; color: var(--ink-2); }
+
+/* Buttons: primary is an engrave fill; secondary is ink on sheet with a rule-strong border. 24 px minimum target. */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 36px; padding: 0 14px;
+  color: var(--ink); background: var(--sheet); border: 1px solid var(--rule-strong); border-radius: var(--radius);
+  font-size: 14px; line-height: 20px; font-weight: 600; text-decoration: none; white-space: nowrap;
+  transition: background-color 150ms var(--ease), border-color 150ms var(--ease);
+}
+.btn:hover:not(:disabled) { background: var(--sheet-2); }
+.btn--primary { color: var(--on-engrave); background: var(--engrave); border-color: var(--engrave); }
+.btn--primary:hover:not(:disabled) { background: color-mix(in srgb, var(--engrave) 86%, var(--ink)); }
+.btn--quiet { background: transparent; border-color: var(--rule); }
+.btn--small { min-height: 28px; padding: 0 10px; font-size: 13px; line-height: 18px; }
+
+/* Icon-only controls (copy, explorer): 24 × 24 minimum (WCAG 2.5.8), 44 × 44 on touch layouts. */
+.icon-btn {
+  display: inline-grid; place-items: center; flex: none; width: 24px; height: 24px;
+  color: var(--ink-2); border: 1px solid transparent; border-radius: var(--radius); text-decoration: none;
+}
+.icon-btn:hover { color: var(--ink); background: var(--sheet-2); border-color: var(--rule); }
+@media (pointer: coarse) { .icon-btn { width: 44px; height: 44px; } }
+
+/* A sheet: the only surface. Unequal heights, 1 px rule, 4 px radius, no shadow. */
+.sheet { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius); }
+
+/* Labelled values: label above, value below, never "A · B · C" strings. */
+.field { display: grid; gap: 2px; min-width: 0; }
+.field > dt, .field > .field-label { color: var(--ink-2); font-size: 13px; line-height: 18px; font-weight: 450; }
+.field > dd, .field > .field-value { font-size: 15px; line-height: 22px; font-weight: 600; }

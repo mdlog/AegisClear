@@ -1,0 +1,59 @@
+/* Two columns at ≥ 1280 px: framing ≈ 7/12, controls ≈ 5/12 (LAYOUT_SPEC Desk). No centred hero (README §1.1 C5). */
+.page { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 24px; align-items: start; }
+.framing, .controls { display: grid; gap: 16px; min-width: 0; }
+.page > :last-child { grid-column: 1 / -1; }
+
+.problem { display: grid; gap: 12px; padding-bottom: 4px; }
+.problemLine { max-width: 38ch; font-size: 28px; line-height: 34px; font-stretch: 112.5%; font-weight: 700; }
+.answer { max-width: 62ch; font-size: 17px; line-height: 26px; }
+.evidence { display: grid; gap: 6px; }
+.evidenceTitle { color: var(--ink-2); font-size: 13px; line-height: 18px; font-weight: 600; }
+.evidenceFigures { display: flex; flex-wrap: wrap; gap: 8px 28px; }
+.evidenceFigures div { display: flex; flex-direction: column-reverse; }
+.evidenceValue { font-size: 19px; line-height: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+.rails { padding: 4px 0 0; overflow-x: auto; }
+.railTable { width: 100%; text-align: left; }
+.railCaption { padding: 12px 20px 8px; font-size: 15px; line-height: 22px; font-weight: 600; text-align: left; }
+.railTable th, .railTable td { padding: 12px 16px; border-top: 1px solid var(--rule); vertical-align: top; }
+.railTable thead th { padding-top: 8px; padding-bottom: 8px; color: var(--ink-2); background: var(--sheet-2); font-size: 13px; line-height: 18px; font-stretch: 87.5%; font-weight: 600; }
+.railTable tbody th { width: 22%; font-weight: 650; }
+.railTable tbody td:nth-child(2) { width: 32%; }
+.backCell { display: grid; gap: 6px; }
+.back { font-weight: 600; }
+.aegisRow > * { background: color-mix(in srgb, var(--engrave) 5%, var(--sheet)); }
+.aegisRow th { color: var(--engrave); }
+.bound { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 13px; line-height: 18px; }
+
+.onChain { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+
+.latest { display: grid; justify-items: start; gap: 8px; padding: 16px 20px; }
+.latestLive { border-left: 3px solid var(--caution); }
+.latestHeading { color: var(--ink-2); font-size: 13px; line-height: 18px; font-weight: 600; }
+.latestTitle { font-size: 19px; line-height: 26px; font-weight: 650; }
+.latestFacts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; }
+
+.session { display: grid; gap: 12px; padding: 20px 24px; }
+.tableWrap { position: relative; overflow-x: auto; }
+.sessionTable { width: 100%; text-align: left; font-stretch: 87.5%; }
+.sessionCaption { padding-bottom: 8px; color: var(--ink-2); font-size: 13px; line-height: 18px; text-align: left; font-stretch: 100%; }
+.sessionTable th, .sessionTable td { height: var(--row); padding: 0 12px; border-bottom: 1px solid var(--rule); font-size: 14px; line-height: 20px; white-space: nowrap; }
+.sessionTable thead th { color: var(--ink-2); background: var(--sheet-2); font-size: 13px; font-weight: 600; }
+.sessionTable tbody th { font-weight: 600; }
+.sessionTable tbody tr:last-child > * { border-bottom: 0; }
+.num { text-align: right; font-variant-numeric: tabular-nums lining-nums; }
+.placeholder { height: calc(var(--row) * 3); background: var(--sheet-2); border-radius: var(--radius); }
+
+@media (max-width: 1279px) {
+  .page { grid-template-columns: minmax(0, 1fr); }
+  .problemLine { max-width: 36ch; }
+}
+@media (max-width: 767px) {
+  .problemLine { font-size: 24px; line-height: 30px; }
+  .railTable thead { display: none; }
+  .railTable tr { display: grid; }
+  .railTable tbody th, .railTable tbody td:nth-child(2) { width: auto; }
+  .railTable th, .railTable td { border-top: 0; padding: 4px 16px; }
+  .railTable tbody tr { padding: 8px 0; border-top: 1px solid var(--rule); }
+  .session { padding: 16px; }
+}

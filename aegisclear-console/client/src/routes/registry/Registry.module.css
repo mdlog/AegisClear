@@ -1,0 +1,82 @@
+.page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.head { display: grid; gap: 8px; }
+.summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; }
+.count { font-size: 19px; line-height: 26px; font-weight: 650; }
+.stale { color: var(--caution); font-size: 13px; line-height: 18px; font-weight: 600; }
+
+.filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 24px; padding: 12px 16px; }
+.group { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; min-width: 0; }
+.group legend { float: left; margin-right: 8px; color: var(--ink-2); font-size: 13px; line-height: 18px; font-weight: 600; }
+.check { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; font-size: 14px; line-height: 20px; cursor: pointer; }
+.check input { width: 16px; height: 16px; accent-color: var(--engrave); }
+.optCount { color: var(--ink-2); font-size: 13px; font-variant-numeric: tabular-nums; }
+.select { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; line-height: 20px; }
+.select span { color: var(--ink-2); font-size: 13px; font-weight: 600; }
+.select select { min-height: 32px; padding: 0 8px; background: var(--sheet); border: 1px solid var(--rule-strong); border-radius: var(--radius); }
+.clear { margin-left: auto; }
+
+.tableWrap { position: relative; overflow-x: auto; background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius); }
+.table { width: 100%; min-width: 1100px; table-layout: fixed; text-align: left; font-stretch: 87.5%; }
+.colChannel { width: 300px; }
+.colClient { width: 200px; }
+.colMode { width: 110px; }
+.colState { width: 130px; }
+.colNum { width: 72px; }
+.colMoney { width: 120px; }
+.colBlock { width: 128px; }
+
+.table th, .table td { height: var(--row); padding: 0 12px; border-bottom: 1px solid var(--rule); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.table thead th { position: sticky; top: 0; z-index: 1; color: var(--ink-2); background: var(--sheet-2); font-size: 13px; line-height: 18px; font-weight: 600; }
+.table thead abbr { text-decoration: none; }
+.table td { font-size: 14px; line-height: 20px; font-weight: 420; }
+.table tbody tr:last-child > * { border-bottom: 0; }
+.table tbody tr:hover > * { background: var(--sheet-2); }
+.num { text-align: right; font-variant-numeric: tabular-nums lining-nums; }
+.muted { color: var(--ink-2); }
+
+.channelCell { font-weight: 400; }
+.channel { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.channelLink { margin: 0 2px 0 4px; font-family: var(--font-mono); font-size: 13.5px; font-stretch: 100%; }
+.tag {
+  display: inline-flex; align-items: center; min-height: 20px; margin-left: 4px; padding: 0 6px;
+  color: var(--ink); background: var(--sheet-2); border: 1px solid var(--rule-strong); border-radius: var(--radius-glyph);
+  font-size: 12px; line-height: 16px; font-weight: 600; text-decoration: none;
+}
+.clientLabel { font-weight: 600; }
+
+/* A row that would trigger 409 client-has-open-channel: a caution rule plus words, never colour alone. */
+.blocking > * { background: color-mix(in srgb, var(--caution) 7%, var(--sheet)); }
+.blocking > :first-child { box-shadow: inset 3px 0 0 var(--caution); }
+.blockNote { margin-left: 8px; color: var(--caution); font-size: 13px; font-weight: 600; }
+
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.notice { display: grid; justify-items: start; gap: 8px; padding: 24px; }
+.placeholder { display: grid; gap: 1px; padding: 0; overflow: hidden; }
+.placeholder span { height: var(--row); background: var(--sheet-2); }
+.placeholder span:nth-child(odd) { background: var(--sheet); }
+
+@media (max-width: 1023px) {
+  .table { min-width: 760px; }
+  .table [data-hide="medium"] { display: none; }
+  .table col:nth-child(6), .table col:nth-child(8), .table col:nth-child(10) { width: 0; }
+}
+
+/* Below 768 px each row becomes a card; the explicit roles in the markup keep the table semantics. */
+@media (max-width: 767px) {
+  .tableWrap { overflow: visible; background: none; border: 0; }
+  .table { min-width: 0; table-layout: auto; }
+  .table colgroup, .table thead { display: none; }
+  .table tbody { display: grid; gap: 8px; }
+  .table tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; padding: 12px; background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius); }
+  .table th, .table td { display: block; height: auto; padding: 0; border: 0; white-space: normal; }
+  .table tbody tr:hover > * { background: none; }
+  .table td::before { content: attr(data-label); display: block; color: var(--ink-2); font-size: 12px; line-height: 16px; font-weight: 600; }
+  .table td.num { text-align: left; }
+  .channelCell { grid-column: 1 / -1; }
+  .table [data-hide] { display: none; }
+  .filters { gap: 12px; }
+  .clear { margin-left: 0; }
+  .blocking { border-left: 3px solid var(--caution) !important; }
+  .blocking > * { background: none; }
+  .blocking > :first-child { box-shadow: none; }
+}

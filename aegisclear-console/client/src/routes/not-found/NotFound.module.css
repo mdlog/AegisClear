@@ -1,0 +1,3 @@
+.notice { display: grid; gap: 12px; max-width: 760px; padding: 24px; }
+.notice code { overflow-wrap: anywhere; }
+.links { display: flex; flex-wrap: wrap; gap: 8px 20px; list-style: none; }

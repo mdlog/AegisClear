@@ -1,0 +1,136 @@
+/*
+ * The settlement slip (DESIGN_BRIEF §5 "The settlement slip", §6 motion, §7 differentiator).
+ * One grid, four columns: fact | private value (the stub, on the stub tint) | perforation | chain half.
+ * Every mirror row places its cells on the same grid row, so private and public values align across the perforation.
+ */
+.slip {
+  position: relative;
+  display: grid;
+  grid-template-columns: [fact] minmax(128px, 208px) [private] minmax(0, 1fr) [perf] 32px [chain] minmax(0, 1.75fr) [end];
+  align-items: start;
+  background: var(--sheet);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.stubBg { grid-column: fact / perf; grid-row: 1 / -1; align-self: stretch; background: var(--stub); }
+
+.stubHead, .chainHead { grid-row: 1; padding: 10px 16px 4px; font-size: 13px; line-height: 18px; font-weight: 650; color: var(--ink-2); }
+.stubHead { grid-column: fact / perf; }
+.chainHead { grid-column: chain / end; padding-left: 20px; }
+
+.stubTop { grid-column: fact / perf; grid-row: 2; padding: 4px 16px 12px; }
+.chainTop { grid-column: chain / end; grid-row: 2; display: grid; grid-template-columns: minmax(0, 1fr) minmax(190px, 240px); gap: 10px 24px; padding: 0 20px 10px; }
+.chainTop > .deposit, .chainTop > .facts { grid-column: 1 / -1; }
+
+/* Display numerals: Archivo wdth 125, 88 px at the 1536 target (clamp 64–96), tabular. */
+.split { display: grid; gap: 6px; min-width: 0; }
+.numerals { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0 24px; }
+.figure { display: grid; }
+.figureLabel { color: var(--ink-2); font-size: 13px; line-height: 16px; font-weight: 600; }
+.clientFigure, .providerFigure {
+  font-size: clamp(56px, 4.7vw, 96px); line-height: 0.92; font-stretch: 125%; font-weight: 700; letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.clientFigure { color: var(--proof); }
+.slip:not([data-disputed]) .clientFigure { color: var(--ink); }
+.providerFigure { color: var(--engrave); }
+.unit { align-self: flex-end; padding-bottom: 4px; color: var(--ink-2); font-size: 15px; font-weight: 450; }
+
+.bar { display: grid; gap: 4px; }
+.barLabels { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; color: var(--ink-2); font-size: 13px; line-height: 18px; }
+.deposit { font-size: 14px; line-height: 20px; font-weight: 600; }
+.facts { display: flex; flex-wrap: wrap; gap: 4px 28px; }
+.facts div { display: flex; align-items: baseline; gap: 8px; }
+.facts dt { color: var(--ink-2); font-size: 12px; line-height: 16px; }
+.facts dd { font-size: 14px; line-height: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.binary { display: grid; gap: 4px; }
+.binaryCaption { color: var(--ink-2); font-size: 12px; line-height: 16px; font-weight: 600; }
+.binaryBars { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; }
+.binaryBar { display: grid; grid-template-columns: auto minmax(40px, 1fr) auto; align-items: center; gap: 2px 8px; font-size: 13px; line-height: 16px; }
+.binaryBar a { font-size: 12px; }
+
+/* The stub's top: why the proof moved exactly this much, in proof ink, computed privately. */
+.why { display: grid; gap: 4px; }
+.whyLabel { font-size: 15px; line-height: 20px; font-weight: 650; }
+.whyLine { color: var(--proof); font-size: 15px; line-height: 21px; font-weight: 600; }
+.whyCaption { color: var(--ink-2); font-size: 12px; line-height: 16px; }
+.whyQuiet { color: var(--ink); font-size: 14px; line-height: 20px; }
+.reading { grid-column: private / perf; color: var(--ink-2); font-size: 13px; padding: 6px 0; }
+
+/* The perforation: 6 px holes at a 12 px pitch, punched through to the paper (an SVG mask, so it follows the theme). */
+.perf { grid-column: perf; align-self: stretch; position: relative; z-index: 1; }
+.perf::before {
+  content: ""; position: absolute; top: 6px; bottom: 6px; left: 50%; width: 8px; margin-left: -4px;
+  background: var(--paper);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='12'%3E%3Ccircle cx='4' cy='6' r='3' fill='%23000'/%3E%3C/svg%3E") repeat-y center top / 8px 12px;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='12'%3E%3Ccircle cx='4' cy='6' r='3' fill='%23000'/%3E%3C/svg%3E") repeat-y center top / 8px 12px;
+}
+
+/* The mirror: display: contents keeps table roles while the cells sit on the slip grid. */
+.mirror, .mirrorRow { display: contents; }
+.srOnlyRow { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+.fact { grid-column: fact; padding: 4px 8px 3px 16px; color: var(--ink-2); font-size: 13px; line-height: 18px; font-weight: 450; }
+.private { grid-column: private; padding: 3px 8px 3px 0; color: var(--proof); font-size: 14px; line-height: 20px; font-weight: 600; }
+.privateNote { display: block; color: var(--ink-2); font-size: 12px; line-height: 16px; font-weight: 450; }
+.chainCell { grid-column: chain / end; padding: 3px 20px; font-size: 14px; line-height: 20px; }
+.mark { grid-column: perf; justify-self: center; z-index: 2; width: 10px; height: 10px; margin-top: 8px; background: var(--engrave); border: 2px solid var(--sheet); border-radius: var(--radius-glyph); }
+
+.seals { grid-column: chain / end; display: grid; align-content: center; gap: 8px; padding: 4px 20px; align-self: stretch; }
+.sealPair { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; }
+.sealBlock { display: flex; align-items: center; gap: 12px; }
+.sealBlock figcaption { display: grid; gap: 2px; max-width: 170px; }
+.sealLabel { font-size: 13px; line-height: 18px; font-weight: 600; }
+.sealCaption { color: var(--ink-2); font-size: 12px; line-height: 16px; }
+
+.stubFoot { grid-column: fact / perf; padding: 8px 16px 10px; color: var(--ink-2); font-size: 12px; line-height: 16px; }
+.chainFoot { grid-column: chain / end; display: grid; gap: 2px; padding: 8px 20px 10px; color: var(--ink-2); font-size: 12px; line-height: 16px; border-top: 1px solid var(--rule); }
+.caveat { padding-left: 8px; border-left: 3px solid var(--caution); color: var(--ink); }
+
+/* The leak verdict: three separate figures, never a dotted string. "Leaks 0" is the 64 px verdict figure. */
+.leak { display: grid; align-content: start; gap: 8px; }
+.leakFigures dl { display: grid; grid-template-columns: repeat(2, auto); gap: 4px 20px; justify-content: start; }
+.leakFigures dl > div { display: grid; }
+.leakFigures dt { color: var(--ink-2); font-size: 13px; line-height: 16px; font-weight: 600; }
+.leakFigures dd { font-size: 26px; line-height: 30px; font-stretch: 112.5%; font-weight: 700; font-variant-numeric: tabular-nums; }
+.leakMain { grid-column: 1 / -1; }
+.leakMain dd { font-size: 64px; line-height: 60px; font-stretch: 125%; color: var(--engrave); }
+.bad { color: var(--danger) !important; }
+.warn { color: var(--caution) !important; }
+.leakNote { color: var(--ink-2); font-size: 13px; line-height: 18px; }
+.leakDetails { display: grid; gap: 4px; padding-left: 18px; font-size: 13px; }
+.leakTxs summary { font-size: 13px; cursor: pointer; }
+.leakTxs ol { display: grid; gap: 2px; margin-top: 4px; padding-left: 20px; font-size: 13px; }
+
+/* Motion, exactly one moment: the scan rule descends the stub, marks land row by row, the verdict settles. */
+.scanRule { grid-column: fact / perf; align-self: stretch; position: relative; pointer-events: none; }
+.scanRule::after { content: ""; position: absolute; left: 0; right: 0; height: 2px; background: var(--engrave); animation: scan 600ms var(--ease) forwards; }
+.scanning .mark { animation: markIn 120ms ease-out both; animation-delay: calc(var(--i) * 60ms + 60ms); }
+.scanning .leakFigures { animation: settle 120ms ease-out 600ms both; }
+@keyframes scan { from { top: 0; opacity: 1; } 90% { opacity: 1; } to { top: 100%; opacity: 0; } }
+@keyframes markIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes settle { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* Below 960 px the stub stacks above the chain half and the perforation turns horizontal (DESIGN_BRIEF §5).
+ * The mirror cells keep their DOM order; `order` groups them: the whole stub, the perforation, then the chain half. */
+@media (max-width: 959px) {
+  .slip { display: flex; flex-direction: column; align-items: stretch; }
+  .slip > *, .mirror > *, .mirrorRow > * { min-width: 0; }
+  .stubBg, .scanRule, .mark { display: none; }
+  .stubHead, .stubTop, .fact, .private, .stubFoot, .reading { background: var(--stub); }
+  .stubHead { order: 1; }
+  .stubTop { order: 2; }
+  .fact, .private, .reading { order: 3; }
+  .fact { padding: 6px 16px 0; }
+  .private { padding: 0 16px 6px; }
+  .stubFoot { order: 4; }
+  .perf { order: 5; height: 16px; }
+  .perf::before { top: 50%; bottom: auto; left: 8px; right: 8px; width: auto; height: 8px; margin: -4px 0 0; -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x; -webkit-mask-size: 12px 8px; mask-size: 12px 8px; }
+  .chainHead { order: 6; padding-left: 16px; }
+  .chainTop { order: 7; grid-template-columns: minmax(0, 1fr); padding: 0 16px 10px; }
+  .binaryBars { grid-template-columns: minmax(0, 1fr); }
+  .seals { order: 8; padding: 8px 16px; }
+  .chainCell { order: 9; padding: 6px 16px; border-top: 1px solid var(--rule); }
+  .chainFoot { order: 10; padding: 8px 16px 12px; }
+}

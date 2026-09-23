@@ -1,0 +1,78 @@
+.page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.head { display: grid; gap: 8px; }
+.crumbs { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 13px; line-height: 18px; }
+.stale { color: var(--caution); font-size: 13px; line-height: 18px; font-weight: 600; }
+.notice { display: grid; justify-items: start; gap: 8px; max-width: 760px; padding: 20px 24px; }
+
+.section { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 20px 24px; min-width: 0; }
+
+/* Identity bar: the T seal (64 px) heads the record (README §1.1 C4). */
+.identity { display: flex; align-items: flex-start; gap: 20px; padding: 20px 24px; }
+.identityBody { display: grid; gap: 12px; min-width: 0; }
+.address { font-size: 15px; }
+.facts { display: flex; flex-wrap: wrap; gap: 12px 32px; }
+
+/* Lifecycle rail: stations joined by a drawn connector line, never text arrows. */
+.rail { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 1fr); gap: 0; list-style: none; overflow-x: auto; }
+.station { position: relative; display: grid; align-content: start; gap: 4px; padding: 20px 16px 4px 0; }
+.station::before { content: ""; position: absolute; top: 5px; left: 0; right: 0; height: 1px; background: var(--rule-strong); }
+.station::after { content: ""; position: absolute; top: 0; left: 0; width: 11px; height: 11px; background: var(--engrave); border: 1.5px solid var(--engrave); border-radius: var(--radius-glyph); }
+.station:last-child::before { right: auto; width: 16px; }
+.current::after { background: var(--sheet); border-color: var(--caution); }
+.current h3 { color: var(--caution); }
+.stationFacts { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; color: var(--ink-2); font-size: 13px; line-height: 18px; }
+.proofMeta { color: var(--proof); font-size: 13px; line-height: 18px; font-weight: 600; }
+.ackList { display: grid; gap: 2px; margin-top: 8px; list-style: none; font-size: 13px; line-height: 18px; }
+.ackList li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+
+/* Settlement: figures, not a KPI row. The proof's refund carries the proof ink (DESIGN_BRIEF §4). */
+.money { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px 48px; }
+.figure { display: grid; gap: 2px; }
+.figure strong { font-size: 32px; line-height: 38px; font-stretch: 112.5%; font-weight: 700; }
+.figure strong [data-unit] { font-size: 15px; font-stretch: 100%; font-weight: 450; }
+.moneyNote { display: grid; gap: 4px; align-self: center; }
+.decision { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-weight: 600; }
+
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px; align-items: start; }
+.kv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
+.kv dd { font-weight: 450; min-width: 0; }
+.wide { grid-column: 1 / -1; }
+.block { display: block; }
+.proofValue { color: var(--proof); font-weight: 600 !important; }
+.tokenName { margin-right: 8px; font-weight: 600; }
+
+.tableWrap { position: relative; overflow-x: auto; }
+.table { width: 100%; text-align: left; }
+.table th, .table td { padding: 8px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.table thead th { color: var(--ink-2); background: var(--sheet-2); font-size: 13px; line-height: 18px; font-stretch: 87.5%; font-weight: 600; vertical-align: middle; }
+.table tbody th { font-weight: 600; }
+.table tfoot th, .table tfoot td { border-bottom: 0; font-weight: 600; }
+.table tbody tr:last-child > * { border-bottom: 0; }
+.caption { padding-bottom: 8px; color: var(--ink-2); font-size: 13px; line-height: 18px; text-align: left; caption-side: top; }
+.num { text-align: right; font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; }
+.privateValue { color: var(--ink); }
+.caveat { padding-left: 12px; border-left: 3px solid var(--caution); }
+
+.trail { font-stretch: 87.5%; }
+.trail td, .trail th { font-size: 14px; line-height: 20px; }
+.eventName { white-space: nowrap; }
+.args { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.arg { display: inline-flex; align-items: center; gap: 6px; }
+.argName { color: var(--ink-2); font-family: var(--font-mono); font-size: 12.5px; }
+.who { margin-right: 4px; font-weight: 600; }
+.groupRow > * { background: var(--sheet-2); }
+
+.placeholder { display: grid; gap: 16px; }
+.placeholder span { height: 120px; background: var(--sheet-2); border: 1px solid var(--rule); border-radius: var(--radius); }
+.placeholder span:nth-child(2) { height: 96px; }
+
+@media (max-width: 1279px) { .split { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 767px) {
+  .identity, .section { padding: 16px; }
+  .identity { flex-direction: column; }
+  .kv { grid-template-columns: minmax(0, 1fr); }
+  .rail { grid-auto-flow: row; grid-auto-columns: auto; }
+  .station { padding: 0 0 16px 24px; }
+  .station::before { top: 0; bottom: 0; left: 5px; right: auto; width: 1px; height: auto; }
+  .station:last-child::before { bottom: auto; height: 12px; width: 1px; }
+}

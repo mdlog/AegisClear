@@ -1,0 +1,72 @@
+/*
+ * Design tokens: docs/frontend/DESIGN_BRIEF.md §3–§5.
+ * A two-ink print on security paper plus one proof ink. Each colour carries one meaning:
+ *   engrave = cleared / paid to the provider / structure;  proof = private, or derived from private data by the proof;
+ *   caution = challenge window, running;  danger = leak found, error.  There is no blue anywhere.
+ * Light "Paper" is primary (recorded demo); dark "Plate" follows the OS or the manual toggle.
+ */
+:root {
+  color-scheme: light;
+
+  --paper: #E6ECE8;
+  --sheet: #F6F8F6;
+  --sheet-2: #EEF2EF;
+  --stub: #F4E9EE;
+  --rule: #C5D0CA;
+  --rule-strong: #7B8A83;
+  --ink: #15201B;
+  --ink-2: #4A5852;
+  --engrave: #1D5A45;
+  --on-engrave: #F6F8F6;
+  --proof: #A3126B;
+  --caution: #8A5A00;
+  --danger: #B42D0E;
+  --scrim: rgb(21 32 27 / 0.4);
+
+  --font-sans: "Archivo Variable", system-ui, sans-serif;
+  --font-mono: "Atkinson Hyperlegible Mono Variable", ui-monospace, monospace;
+
+  /* 4 px spacing base; sheets and controls 4 px radius, state glyphs 2 px, never pills */
+  --radius: 4px;
+  --radius-glyph: 2px;
+  --row: 36px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #1E302A;
+    --sheet: #253A33;
+    --sheet-2: #2C433B;
+    --stub: #33272C;
+    --rule: #344A43;
+    --rule-strong: #6F857B;
+    --ink: #E3ECE7;
+    --ink-2: #A9B9B1;
+    --engrave: #7CC4A4;
+    --on-engrave: #1E302A;
+    --proof: #F58DBF;
+    --caution: #E8B64A;
+    --danger: #FF8A70;
+    --scrim: rgb(0 0 0 / 0.5);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #1E302A;
+  --sheet: #253A33;
+  --sheet-2: #2C433B;
+  --stub: #33272C;
+  --rule: #344A43;
+  --rule-strong: #6F857B;
+  --ink: #E3ECE7;
+  --ink-2: #A9B9B1;
+  --engrave: #7CC4A4;
+  --on-engrave: #1E302A;
+  --proof: #F58DBF;
+  --caution: #E8B64A;
+  --danger: #FF8A70;
+  --scrim: rgb(0 0 0 / 0.5);
+}

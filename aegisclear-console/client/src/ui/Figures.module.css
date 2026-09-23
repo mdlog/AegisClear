@@ -1,0 +1,4 @@
+.amount, .gas { font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; }
+.unit { color: var(--ink-2); font-weight: 450; font-size: 0.87em; }
+.proof { color: var(--proof); }
+.engrave { color: var(--engrave); }

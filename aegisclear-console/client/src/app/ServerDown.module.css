@@ -1,0 +1,11 @@
+.page { min-height: 100vh; }
+.header { display: flex; align-items: center; min-height: 56px; padding: 8px 32px; border-bottom: 1px solid var(--rule); }
+.main { padding: 48px 32px; }
+.notice { display: grid; gap: 16px; max-width: 760px; padding: 24px; border-left: 3px solid var(--caution); }
+.body { max-width: 62ch; }
+.commands { display: grid; gap: 12px; }
+.command { display: grid; gap: 4px; }
+.command dd { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.command code { min-width: 0; padding: 6px 10px; overflow-x: auto; white-space: nowrap; background: var(--sheet-2); border: 1px solid var(--rule); border-radius: var(--radius); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+@media (max-width: 767px) { .header { padding: 8px 16px; } .main { padding: 24px 16px; } .notice { padding: 16px; } }

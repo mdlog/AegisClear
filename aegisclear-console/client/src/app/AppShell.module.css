@@ -1,0 +1,93 @@
+.shell { display: flex; flex-direction: column; min-height: 100vh; }
+
+.pending { position: fixed; z-index: 60; inset: 0 0 auto; height: 2px; background: var(--engrave); }
+
+.header {
+  position: sticky; z-index: 40; top: 0;
+  display: flex; align-items: center; gap: 24px;
+  min-height: 56px; padding: 8px 32px;
+  background: var(--paper); border-bottom: 1px solid var(--rule);
+}
+
+.wordmark { display: inline-flex; align-items: baseline; gap: 8px; color: var(--ink); text-decoration: none; white-space: nowrap; }
+.seal { align-self: center; width: 28px; height: 28px; color: var(--engrave); }
+.brand { font-size: 22px; line-height: 28px; font-stretch: 125%; font-weight: 750; }
+.brandSuffix { color: var(--ink-2); font-size: 15px; line-height: 22px; font-weight: 450; }
+
+.nav { display: flex; align-items: center; }
+.menuButton { display: none; }
+.navList { display: flex; gap: 4px; list-style: none; }
+.navLink {
+  display: inline-flex; align-items: center; min-height: 36px; padding: 0 10px;
+  color: var(--ink-2); font-size: 14px; line-height: 20px; font-weight: 600; text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+.navLink:hover { color: var(--ink); }
+.navLink[aria-current="page"] { color: var(--ink); border-bottom-color: var(--engrave); }
+
+.cluster { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+
+.liveChip {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px;
+  color: var(--ink); background: var(--sheet); border: 1px solid var(--caution); border-radius: var(--radius);
+  font-size: 13px; line-height: 18px; text-decoration: none; white-space: nowrap;
+}
+.liveGlyph { position: relative; width: 10px; height: 10px; overflow: hidden; color: var(--caution); border: 1.5px solid currentColor; border-radius: var(--radius-glyph); }
+.liveGlyph::after { content: ""; position: absolute; inset: 0 50% 0 0; background: currentColor; }
+.liveWord { color: var(--caution); font-weight: 650; }
+.liveTitle { font-weight: 600; }
+.liveClock { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+/* Network plate: a 3 px engrave bar, never a pill. Local chain turns the plate caution. */
+.plate {
+  display: grid; padding: 2px 10px 2px 10px; min-height: 36px; align-content: center;
+  color: var(--ink); background: var(--sheet); border: 1px solid var(--rule); border-left: 3px solid var(--engrave); border-radius: var(--radius);
+  text-decoration: none; white-space: nowrap;
+}
+.plateName { color: var(--engrave); font-size: 13px; line-height: 16px; font-weight: 650; }
+.plateLocal { border-left-color: var(--caution); }
+.plateLocal .plateName { color: var(--caution); }
+.plateMeta { color: var(--ink-2); font-size: 12px; line-height: 16px; font-weight: 450; }
+
+.fixture {
+  display: grid; padding: 2px 10px; min-height: 36px; align-content: center;
+  border: 1px dashed var(--rule-strong); border-radius: var(--radius); white-space: nowrap;
+}
+.fixtureName { font-size: 13px; line-height: 16px; font-weight: 650; }
+
+.theme { width: 32px; height: 32px; }
+.shortcuts kbd { padding: 0 5px; font-size: 12px; line-height: 16px; background: var(--sheet-2); border: 1px solid var(--rule-strong); border-radius: var(--radius-glyph); }
+
+.main { flex: 1; width: 100%; max-width: 1760px; margin: 0 auto; padding: 20px 32px 48px; outline: none; }
+
+.footer { padding: 16px 32px 24px; border-top: 1px solid var(--rule); }
+.footerList { display: flex; flex-wrap: wrap; gap: 4px 0; list-style: none; color: var(--ink-2); font-size: 13px; line-height: 18px; }
+.footerList li { padding: 0 12px; border-left: 1px solid var(--rule); }
+.footerList li:first-child { padding-left: 0; border-left: 0; }
+
+@media (max-width: 1279px) {
+  .header { gap: 16px; padding: 8px 24px; }
+  .main { padding: 24px 24px 48px; }
+  .liveTitle { display: none; }
+  .shortcutsWord, .shortcuts kbd { display: none; }
+}
+
+@media (max-width: 1023px) {
+  .header { flex-wrap: wrap; }
+  .brandSuffix { display: none; }
+}
+
+@media (max-width: 767px) {
+  .header { padding: 8px 16px; gap: 8px 12px; }
+  .brand { font-size: 20px; line-height: 24px; font-stretch: 112.5%; }
+  .menuButton { display: inline-flex; min-height: 44px; }
+  .nav { order: 3; flex-basis: 100%; flex-direction: column; align-items: stretch; }
+  .navList { display: none; flex-direction: column; gap: 0; padding: 8px 0; }
+  .navList[data-open="true"] { display: flex; }
+  .navLink { min-height: 44px; padding: 0 4px; border-bottom: 0; border-left: 2px solid transparent; padding-left: 10px; }
+  .navLink[aria-current="page"] { border-left-color: var(--engrave); }
+  .cluster { gap: 8px; flex-wrap: wrap; }
+  .main { padding: 16px 16px 40px; }
+  .footer { padding: 16px; }
+  .theme { width: 44px; height: 44px; }
+}

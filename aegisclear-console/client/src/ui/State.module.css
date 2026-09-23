@@ -1,0 +1,14 @@
+.state { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; line-height: 18px; font-weight: 600; white-space: nowrap; }
+.extra { font-weight: 450; font-variant-numeric: tabular-nums; }
+.glyph { position: relative; flex: none; width: 10px; height: 10px; overflow: hidden; border: 1.5px solid currentColor; border-radius: var(--radius-glyph); }
+.filled { background: currentColor; }
+.half::after { content: ""; position: absolute; inset: 0 50% 0 0; background: currentColor; }
+.dotted { border-style: dotted; }
+.cross::before, .cross::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1.5px; margin-left: -0.75px; background: currentColor; transform: rotate(45deg); }
+.cross::after { transform: rotate(-45deg); }
+
+.tone-ink { color: var(--ink); }
+.tone-ink-2 { color: var(--ink-2); }
+.tone-caution { color: var(--caution); }
+.tone-engrave { color: var(--engrave); }
+.tone-danger { color: var(--danger); }
