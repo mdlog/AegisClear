@@ -82,10 +82,12 @@
   - Screenshots: `docs/media/console-testnet-2026-09-23/`. Numbers and channels: root README §Lihat di browser.
   - Known and accepted: one transient `404 GET /api/channels/<new channel>` per run. It happens while the server's scanner has not indexed the channel yet; the run view recovers on the next poll. Chrome still logs it as a console error.
 
-**Still open (Definition of Done):**
-- Lighthouse accessibility and best practices ≥ 95 (not run).
-- Video QA at 1440 px and at 50 % zoom for the headline figures. 1920 × 1080 was checked, and 390, 768, 1024 and 1280 are covered by `pnpm qa`.
-- In the browser on testnet: `B-cooperative`, `A-complete`, `A-reject` and `Run all four` (they were verified through the API on 20 Sep).
+**Definition of Done: met (23 Sep 2026).** The last three items:
+- **Lighthouse** (desktop, live testnet data): accessibility 100 and best practices 100 on Desk, Channels, a channel record, the `all` run, Offer and Deployment.
+- **Video QA:** 1920 × 1080 is the recorded video (`video/`, 125 % CSS zoom). 1440 was checked in light and dark, and 390, 768, 1024 and 1280 are covered by `pnpm qa`. At 50 % zoom the headline figures `0.07 / 1.93` and `Leaks 0` stay readable (≈ 50 px on screen) and nothing overflows.
+- **The remaining scenarios in the browser on testnet:** **Run all four** (`mue3ev9q-eb7bd0`, 258 s) covers A-complete `0 / 2.00`, A-reject `2.00 / 0`, B-cooperative `0.00 / 2.00` (0 leaks in 3 tx) and B-dispute `0.07 / 1.93` (0 leaks in 5 tx). Both channel tabs read correctly.
+
+Known cosmetic item (not a Definition of Done failure): at 1440 px the slip's binary-escrow labels wrap ("Complete: 0 / 2.00" breaks after the slash). At 1536 px and wider they fit.
 
 **Line numbers below refer to the original prototype.** A backup of it is at `arbitrum-sg/.backup/aegisclear-console-manus-original-2026-09-23.tgz`.
 

@@ -75,7 +75,7 @@ A live run (testnet or local) also needs the root `pnpm install`, the circuit ar
 
 Pages: **Desk** (the same job on three rails, from the latest run, plus the scenario launcher) · **run view** (a live tape over SSE: Fund → Open → Serve → Resolve → Settle, a 16 × 8 receipt grid, the proving time and the challenge-window countdown; it ends as the settlement slip, with the private terms beside the chain's view and a **Check for leaks** button) · **Channels** (every `ChannelOpened` across the three factories) · **channel record** (lifecycle, per-epoch settlement, privacy panel, event trail) · **x402 offer** (the annotated 402 JSON an x402 client sees) · **Deployment** (v2 addresses and known limitations).
 
-Screenshots from the 23 Sep 2026 testnet run (1920 × 1080): [Desk](docs/media/console-testnet-2026-09-23/01-desk.png) · [x402 offer](docs/media/console-testnet-2026-09-23/02-x402-offer.png) · [live resolve: proof and challenge window](docs/media/console-testnet-2026-09-23/03-live-resolve-proof-and-window.png) · [channel record](docs/media/console-testnet-2026-09-23/05-channel-record.png) · [anchored verdict](docs/media/console-testnet-2026-09-23/06-anchored-verdict.png) · [rollover verdict](docs/media/console-testnet-2026-09-23/07-rollover-verdict.png).
+Screenshots from the 23 Sep 2026 testnet run (1920 × 1080): [Desk](docs/media/console-testnet-2026-09-23/01-desk.png) · [x402 offer](docs/media/console-testnet-2026-09-23/02-x402-offer.png) · [live resolve: proof and challenge window](docs/media/console-testnet-2026-09-23/03-live-resolve-proof-and-window.png) · [channel record](docs/media/console-testnet-2026-09-23/05-channel-record.png) · [anchored verdict](docs/media/console-testnet-2026-09-23/06-anchored-verdict.png) · [rollover verdict](docs/media/console-testnet-2026-09-23/07-rollover-verdict.png) · [all four rows, Market A vs AegisClear](docs/media/console-testnet-2026-09-23/08-all-four-result.png).
 
 ## Verified
 
@@ -88,6 +88,8 @@ Screenshots from the 23 Sep 2026 testnet run (1920 × 1080): [Desk](docs/media/c
 | `B-rollover` | **0.00 / 2.66** | 304,002 | — | 116 s | 0 leaks, 0 ambiguous, 4 tx | [`0x4073eF03…Ef8f`](https://explorer.testnet.chain.robinhood.com/address/0x4073eF031b160a40927Af6593f902cA50969Ef8f) |
 
 The first `B-dispute` run that day, the one in the screenshot at the top: 583,559 gas, proving 4.1 s, channel [`0x1365e210…41c8`](https://explorer.testnet.chain.robinhood.com/address/0x1365e210026F3f3c42A925bF32aA2C3DAe0841c8).
+
+**Run all four** (the four comparison rows with both demo clients, clicked in the browser on 23 Sep 2026, 258 s): binary escrow complete `0 / 2.00` (364,500 gas) and reject `2.00 / 0` (364,503), with price, thresholds and penalty readable as plain text on the explorer; AegisClear cooperative close `0.00 / 2.00` (181,463 gas, [`0xcdeE…999A`](https://explorer.testnet.chain.robinhood.com/address/0xcdeED550761E0E9dEAc6382F51D36E00395D999A), 0 leaks in 3 tx) and dispute `0.07 / 1.93` (581,256 gas, proving 4.0 s, [`0x8Ba0…Deb3`](https://explorer.testnet.chain.robinhood.com/address/0x8Ba0B0E8889DaD777aBECB84960566026Fc1Deb3), 0 leaks in 5 tx). Lighthouse on six console pages with live testnet data: accessibility 100, best practices 100.
 
 **Through the console API, 20 Sep 2026** (testnet v2, all six scenarios, 0 leaks and 0 ambiguous on every AegisClear channel). The result rows are identical to Anvil's because the penalty function is deterministic; only gas and waiting time differ. Durations include the real 60 s challenge window and about 2.5 s per confirmation block.
 

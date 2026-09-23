@@ -54,6 +54,8 @@ Durasi memuat jendela tantangan nyata (60 s) dan ~2,5 s per blok konfirmasi; run
 
 Run `B-dispute` pertama hari itu: 583.559 gas, proving 4,1 s, channel [`0x1365e210…41c8`](https://explorer.testnet.chain.robinhood.com/address/0x1365e210026F3f3c42A925bF32aA2C3DAe0841c8).
 
+**Run all four** (empat baris perbandingan dengan kedua klien demo, diklik di browser 23 Sep 2026, 258 s): escrow biner complete `0 / 2.00` (364.500 gas) dan reject `2.00 / 0` (364.503), dengan harga, ambang, dan penalti terbaca sebagai teks biasa di explorer; AegisClear kooperatif `0.00 / 2.00` (181.463 gas, [`0xcdeE…999A`](https://explorer.testnet.chain.robinhood.com/address/0xcdeED550761E0E9dEAc6382F51D36E00395D999A), bocor 0 dari 3 tx) dan sengketa `0.07 / 1.93` (581.256 gas, proving 4,0 s, [`0x8Ba0…Deb3`](https://explorer.testnet.chain.robinhood.com/address/0x8Ba0B0E8889DaD777aBECB84960566026Fc1Deb3), bocor 0 dari 5 tx). Lighthouse di enam halaman console dengan data testnet live: aksesibilitas 100, best practices 100.
+
 ## Daftar isi
 - [Lihat di browser (web console)](#lihat-di-browser-web-console)
 - [Ringkasan produk](#ringkasan-produk)
