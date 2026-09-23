@@ -2,9 +2,9 @@
 
 `aegisclear-console/` is the folder chosen to become the new AegisClear frontend. This review compares its current state (a Manus-generated prototype, "Web App (static only)" template) with this handoff folder. It is a **fix list for the next build session**. On any conflict, `README.md`, `PRODUCT_CONTEXT.md`, `API_CONTRACT.md`, `LAYOUT_SPEC.md` and `DESIGN_BRIEF.md` win. Line numbers refer to the files as found on 23 Sep 2026.
 
-## Status (updated 23 Sep 2026, after steps 1–4 of §G)
+## Status (updated 23 Sep 2026, after step 5)
 
-**Done:** §G steps 1–4.
+**Done:** steps 1–5 (step 5 is the keyboard, contrast and touch pass listed as open in the previous update; §G's own list numbers it differently).
 - **Step 1, strip and integrate:**
   - B3 removed: Manus plugins, `__manus__/` debug collector, storage proxy, `Map.tsx`, OAuth helpers, `ManusDialog`, template pages and hooks, 50+ unused shadcn components, Tailwind, the wouter patch.
   - F: dependencies cut to 6 runtime + 8 dev packages.
@@ -39,26 +39,36 @@
   - Channel record: the T seal, the lifecycle rail, a per-epoch settlement card, the on-chain state, the privacy panel and the event trail.
   - Offer: annotated in two columns, with a `payTo` registry check.
   - Deployment: the testnet-v2 guard and the five known limits.
+- **Step 5, keyboard, contrast and touch (§1.1 C8, README §6.1):**
+  - Single-key shortcuts `n`, `r`, `l` and `?`, with the list dialog and its switch to turn them off (`app/shortcuts.ts`, `ShortcutsDialog.tsx`).
+  - Follow-live on the run tape, with "Jump to live" once the operator scrolls up (`routes/run/useFollowLive.ts`).
+  - `prefers-contrast: more`: the same hues, with lightness moved in OKLCH until every text colour is ≥ 7:1 on every surface and on the tints, hairline rules ≥ 3:1 and strong rules ≥ 4.5:1. The dark plate is a little deeper, so proof stays pink and danger stays coral. `styles/tokens.test.ts` checks every pair, read from the stylesheet.
+  - Touch layouts (`pointer: coarse`): every target is ≥ 44 × 44 px. One zero-specificity rule in `primitives.css` covers plain links, summaries, selects, tabs and checkbox labels; components that size themselves carry their own override.
 - **Evidence:**
-  - Tests: 21 files and 284 tests, with a component test file per route in jsdom against the recorded fixtures, plus axe on 10 routes.
-  - axe in Chrome: 0 violations at any impact level, in light and dark.
-  - Layout: no page scrolls sideways at 390, 768, 1024 or 1280 px, and the B-dispute slip fits 1536 × 864 unscrolled.
-  - Build: initial JS is 136.5 KB gzip (the budget is 180), and the live build carries no fixture data.
+  - Tests: 23 files and 306 tests, with a component test file per route in jsdom against the recorded fixtures, plus axe on 10 routes and the token contrast pairs.
+  - `pnpm qa` (new: playwright-core and the local Chrome, fixture mode, no chain) runs 103 checks, all passing. They cover:
+    - targets: 44 px on a 390 px touch layout (every route, the open menu, the shortcut list and a live run), and 24 px at 1280 with the WCAG 2.5.8 spacing exception;
+    - axe AA with 0 violations at 390 (touch) and at 1280 in light and dark;
+    - no sideways scroll at 390, 768 and 1024;
+    - the run rail below the header at 390, 768, 1024 and 1280;
+    - `prefers-contrast: more`: the tokens switch, and axe's AAA contrast rule passes on every route in light, dark and OS-dark.
+  - The B-dispute slip fits 1536 × 864 unscrolled.
+  - Build: initial JS is 136.5 KB gzip (the budget is 180; measured in step 4), and the live build carries no fixture data.
   - Conformance gate: 0 failures.
 - **Found and fixed along the way:**
   - The dev port 4045 is on Chrome's and Firefox's unsafe-port list (`ERR_UNSAFE_PORT`), so the dev server moved to 4047.
   - Channels closed by signatures have a zero receipts root, so they now read "never sent" instead of "hidden inside R".
   - The rollover's breaches are now listed per epoch (7 + 1).
+- **Found and fixed in step 5.** `pnpm qa` caught all of these; none show at 1280 px or in jsdom. The step-4 evidence ("axe 0 violations", "no sideways scroll at 1024") was measured at 1280 and wider, and did not hold below that.
+  - Below 1280 px the Shortcuts button had no accessible name (axe `button-name`, critical), because its word was `display: none`. The word is now visually hidden but still names the button.
+  - When the binary bars stack, their two "Seen live" links were 16 px tall and 4 px apart (WCAG 2.5.8). They are now 24 px boxes, and 44 px on touch.
+  - The run rail stuck at a fixed 56 px, so it slid under the header wherever the header wraps (768–1023 px). The header now publishes its height as `--header-h`, which the rail, the context rail and the scroll margins use.
+  - On phones the sticky header wrapped to about 220 px, a quarter of the screen, and covered scrolled content. Below 768 px it now scrolls away.
+  - At 1024 px the header ran 10 px past the edge in fixture mode. The wordmark suffix now hides below 1280 px, and nav labels no longer wrap.
+  - A Playwright `fullPage` screenshot under touch emulation resets `pointer: coarse` for the rest of the page's life. Use viewport screenshots for touch QA.
 
-**Still open, in order:**
-- **Step 5:**
-  - keyboard shortcuts `n`, `r` and `l`, plus the `?` dialog with its switch to turn single-key shortcuts off (§1.1 C8);
-  - follow-live scrolling with "Jump to live" on the run tape;
-  - `prefers-contrast`;
-  - a 44 px touch-target review.
-
-  Live regions and working buttons are already in place.
-- **Step 6:** integration run on testnet.
+**Still open:**
+- **Step 6:** `pnpm build:web`, then a testnet run in the browser from click to `0.07 / 1.93` and `0 leaks` (Definition of Done "Live"), then video QA at 1920 × 1080.
 
 **Line numbers below refer to the original prototype.** A backup of it is at `arbitrum-sg/.backup/aegisclear-console-manus-original-2026-09-23.tgz`.
 
