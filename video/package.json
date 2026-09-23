@@ -1,0 +1,9 @@
+{
+  "name": "aegisclear-demo-video",
+  "private": true,
+  "type": "module",
+  "description": "Re-shootable demo video pipeline. See README.md.",
+  "devDependencies": {
+    "playwright": "1.61.1"
+  }
+}

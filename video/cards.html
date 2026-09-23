@@ -1,0 +1,45 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>cards</title>
+<!-- Title and end cards at 1920 × 1080 (they sit outside the console's zoomed <body>), in the console's
+     light "Paper" palette (DESIGN_BRIEF §4). Addresses come from the take via render(). -->
+<style>
+  :root { --paper:#E6ECE8; --sheet:#F6F8F6; --ink:#15201B; --ink-2:#4A5852; --rule:#C5D0CA; --engrave:#1D5A45; --proof:#A3126B; }
+  html, body { margin:0; width:100vw; height:100vh; background:var(--paper); color:var(--ink); overflow:hidden;
+    font-family: "Inter", "Inter Display", ui-sans-serif, system-ui, sans-serif; }
+  .card { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; padding:0 160px 140px; box-sizing:border-box; opacity:0; transition:opacity .35s ease; }
+  .card.on { opacity:1; }
+  .eyebrow { display:flex; align-items:center; gap:15px; color:var(--engrave); font: 600 21px/1.2 "Inter", sans-serif; }
+  .eyebrow::before { content:""; width:40px; height:4px; background:var(--engrave); }
+  h1 { font-family:"Inter Display", "Inter", sans-serif; font-size:130px; line-height:1; letter-spacing:-.04em; margin:30px 0 22px; font-weight:700; }
+  .sub { font-size:45px; line-height:1.25; color:var(--ink-2); max-width:26ch; letter-spacing:-.01em; }
+  .sub b { color:var(--proof); font-weight:600; }
+  .foot { position:absolute; left:160px; right:160px; bottom:160px; display:flex; justify-content:space-between; align-items:flex-end; border-top:1px solid var(--rule); padding-top:28px; color:var(--ink-2); font: 22px/1.4 "DejaVu Sans Mono", ui-monospace, monospace; }
+  .links { display:grid; gap:15px; font: 31px/1.25 "DejaVu Sans Mono", ui-monospace, monospace; color:var(--ink); margin-top:40px; }
+  .links span { display:inline-block; width:7.5em; color:var(--ink-2); }
+</style>
+<div class="card" id="title">
+  <div class="eyebrow">Arbitrum Open House Singapore, Online Buildathon</div>
+  <h1>AegisClear</h1>
+  <div class="sub">Recourse for machine payments, <b>without opening the books.</b></div>
+  <div class="foot"><span>Escrow at the x402 payTo, settled by a Groth16 proof</span><span>Robinhood Chain testnet, chain 46630</span></div>
+</div>
+<div class="card" id="end">
+  <div class="eyebrow">Every run in this video settled on Robinhood Chain testnet</div>
+  <h1>AegisClear</h1>
+  <div class="links">
+    <div><span>code</span>github.com/mdlog/AegisClear</div>
+    <div><span>proving key</span>release v0.1.0-zkey</div>
+    <div><span>factory</span><b id="factory"></b></div>
+    <div><span>Stylus</span><b id="poseidon"></b> AegisPoseidon</div>
+  </div>
+  <div class="foot"><span>Arbitrum Open House Singapore, Online Buildathon</span><span>Robinhood Chain testnet, chain 46630</span></div>
+</div>
+<script>
+  window.render = ({ card, factory = "", poseidon = "" }) => {
+    document.getElementById("factory").textContent = factory;
+    document.getElementById("poseidon").textContent = poseidon;
+    document.querySelectorAll(".card").forEach((c) => c.classList.toggle("on", c.id === card));
+    return new Promise((r) => setTimeout(r, 400));
+  };
+</script>
