@@ -1,0 +1,6 @@
+{
+  "httpStatus": 404,
+  "body": {
+    "error": "run tidak dikenal atau tidak punya channel Pasar B"
+  }
+}

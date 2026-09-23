@@ -1,0 +1,429 @@
+{
+  "httpStatus": 200,
+  "body": [
+    {
+      "id": "mudg39dg-1815b0",
+      "scenario": "all",
+      "status": "done",
+      "startedAt": 1790128166452,
+      "steps": [],
+      "channels": [
+        "0x3E110b43b9a89D7874d840167D7DdD5A13E4672a",
+        "0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC"
+      ],
+      "result": [
+        {
+          "pasar": "A: evaluator biner (complete)",
+          "klien_provider": "0 / 2.00",
+          "penentu": "alamat evaluator",
+          "terlihat": "harga, ambang, penalti (string)",
+          "gas": "330854",
+          "proving_ms": "-",
+          "txs": [
+            {
+              "label": "approve",
+              "hash": "0x9713041a405e234385115b4e3cabc020fb9b2545991142f0ffe488eebd9ab261"
+            },
+            {
+              "label": "createJob (syarat di calldata)",
+              "hash": "0x9e55914045768b3eeebfd96a57d29e22123f43a34d377d227a55da9f3b38429e"
+            },
+            {
+              "label": "fund",
+              "hash": "0x9e9281bcb7aacb52e1becb2cf93ba237ed4c0ac28d5e0105d17955abce3b4b7e"
+            },
+            {
+              "label": "submit (provider)",
+              "hash": "0x59688a7472f9167b6dc70669e0a84a8d8ced1d76f55dc684f1a0a6951e7149df"
+            },
+            {
+              "label": "complete (evaluator = klien)",
+              "hash": "0x2ba63048d5513fd7aba60e567ec281ca91ee72893cc1b0740a8ad255ed6a182e"
+            }
+          ]
+        },
+        {
+          "pasar": "A: evaluator biner (reject)",
+          "klien_provider": "2.00 / 0",
+          "penentu": "alamat evaluator",
+          "terlihat": "harga, ambang, penalti (string)",
+          "gas": "330781",
+          "proving_ms": "-",
+          "txs": [
+            {
+              "label": "approve",
+              "hash": "0xa82406c6bb9e9152f51c33c6eb87237030b714789f92a164cf8228ce0865265d"
+            },
+            {
+              "label": "createJob (syarat di calldata)",
+              "hash": "0x0f70a09ac74942eb08ec32df64d95e221dc60d954e646815711115592a58692c"
+            },
+            {
+              "label": "fund",
+              "hash": "0x0f21e3152ad3ac67e11b381d5f5a2f6189a5087344069aa4fec465e4bd45df4b"
+            },
+            {
+              "label": "submit (provider)",
+              "hash": "0x73b5d86c0e0478d138a7702313e1717a7246656283a93f418bbd740a33ba3981"
+            },
+            {
+              "label": "reject (evaluator = klien)",
+              "hash": "0x78e39fd204fa540739d0472089784054299122b57d2ca2fc5f5daa7e7c532492"
+            }
+          ]
+        },
+        {
+          "pasar": "B: AegisClear kooperatif",
+          "klien_provider": "0.00 / 2.00",
+          "penentu": "dua tanda tangan",
+          "terlihat": "T, R, jumlah",
+          "gas": "163025",
+          "proving_ms": "-",
+          "txs": [
+            {
+              "label": "fund",
+              "hash": "0x0f1317c68bf208a116dd1084606b7ce269ed6108b16e38633d1f6427bc8b5b40"
+            },
+            {
+              "label": "closeCooperative",
+              "hash": "0x15eefd1659bba162b1ab5e3cb262b8e57f135b184786aef8985a7f60a77dbd32"
+            }
+          ]
+        },
+        {
+          "pasar": "B: AegisClear sengketa (bukti)",
+          "klien_provider": "0.07 / 1.93",
+          "penentu": "bukti Groth16",
+          "terlihat": "T, R, jumlah, payToClient",
+          "gas": "545702",
+          "proving_ms": "3184",
+          "txs": [
+            {
+              "label": "fund",
+              "hash": "0x72c05ccd26f985dbf93bb912d6b3b6fbc6f59a2ff0c75c6f9ba0d5694421224b"
+            },
+            {
+              "label": "submitCheckpoint",
+              "hash": "0xcd1f42f610b00d37e704f819850d3956e1f691263bf985f936e85b059dd737b1"
+            },
+            {
+              "label": "claimPenalty",
+              "hash": "0x0ae0bc2071c1dc2cee25cf3096e5ae68e6ae8413e3ae5ae63ba934b5c28a03ae"
+            },
+            {
+              "label": "settle",
+              "hash": "0xa0d19115178d8643983b27c4bb6414194c942191d2fa7bcc3e2f8cede6199bb7"
+            }
+          ]
+        }
+      ],
+      "endedAt": 1790128186909
+    },
+    {
+      "id": "mudg37qp-0bdeee",
+      "scenario": "A-reject",
+      "status": "done",
+      "startedAt": 1790128164337,
+      "steps": [],
+      "channels": [],
+      "result": [
+        {
+          "pasar": "A: evaluator biner (reject)",
+          "klien_provider": "2.00 / 0",
+          "penentu": "alamat evaluator",
+          "terlihat": "harga, ambang, penalti (string)",
+          "gas": "330781",
+          "proving_ms": "-",
+          "txs": [
+            {
+              "label": "approve",
+              "hash": "0x5e390746b2ac5b809068a21be291311cab896259a512bb927a464c27e39b7f64"
+            },
+            {
+              "label": "createJob (syarat di calldata)",
+              "hash": "0x61b200ee7733cd13cfa1fe0e6f71a3d658e24b97c8a499517feb13c05245cf8a"
+            },
+            {
+              "label": "fund",
+              "hash": "0x75aaf1db19ca7e0f64484b68869180ddafe55b7eb83e1384c70ed1e26ebe072f"
+            },
+            {
+              "label": "submit (provider)",
+              "hash": "0x8d6d571ca4af08d5bd6014fe73df410ed3717ffbf5ed249c4b573266222c4453"
+            },
+            {
+              "label": "reject (evaluator = klien)",
+              "hash": "0xfeb9311e6c1a1598734399060a041d0450fb24879b6d103758d3385f72693d97"
+            }
+          ]
+        }
+      ],
+      "endedAt": 1790128164457
+    },
+    {
+      "id": "mudg364o-57d0c1",
+      "scenario": "A-complete",
+      "status": "done",
+      "startedAt": 1790128162248,
+      "steps": [],
+      "channels": [],
+      "result": [
+        {
+          "pasar": "A: evaluator biner (complete)",
+          "klien_provider": "0 / 2.00",
+          "penentu": "alamat evaluator",
+          "terlihat": "harga, ambang, penalti (string)",
+          "gas": "330854",
+          "proving_ms": "-",
+          "txs": [
+            {
+              "label": "approve",
+              "hash": "0xc7c858eed877464c7f1ed52f1968e58b16a05c830a04a806abe3360e44c92e19"
+            },
+            {
+              "label": "createJob (syarat di calldata)",
+              "hash": "0x6252d3da9405bde9eae43b9cecb21aaebac0c63211292d1f4b7142a934c7eebe"
+            },
+            {
+              "label": "fund",
+              "hash": "0xe5d3276421c8de3e1c74343e6f91c014c8a1ce00f32c7d0f39fa628b33b8c057"
+            },
+            {
+              "label": "submit (provider)",
+              "hash": "0x173c912de93052287c261ab1406eb06d02a89427d9c526b76c3cbc5b4cd9f6fa"
+            },
+            {
+              "label": "complete (evaluator = klien)",
+              "hash": "0x1c5dbe8b499b5c1ddc42fd35d7c945bacd23ddee6d01aae5ca66ec24af14adca"
+            }
+          ]
+        }
+      ],
+      "endedAt": 1790128162397
+    },
+    {
+      "id": "mudg32t2-660979",
+      "scenario": "B-cooperative",
+      "status": "done",
+      "startedAt": 1790128157942,
+      "steps": [],
+      "channels": [
+        "0x4d5bCCDb393F62712C0174F62db123c64216bc4F"
+      ],
+      "result": [
+        {
+          "pasar": "B: AegisClear kooperatif",
+          "klien_provider": "0.00 / 2.00",
+          "penentu": "dua tanda tangan",
+          "terlihat": "T, R, jumlah",
+          "gas": "163025",
+          "proving_ms": "-",
+          "txs": [
+            {
+              "label": "fund",
+              "hash": "0x9dca9167e20990b6cbd87591879a9e2187ea20cf3edc14b3bcc08d8753b54ba3"
+            },
+            {
+              "label": "closeCooperative",
+              "hash": "0x456c1613695442da042b5a7f7894c9dda06c4aed9983638435b5832079e6488d"
+            }
+          ]
+        }
+      ],
+      "endedAt": 1790128160318
+    },
+    {
+      "id": "mudg2zjn-faee38",
+      "scenario": "B-rollover",
+      "status": "done",
+      "startedAt": 1790128153715,
+      "steps": [],
+      "channels": [
+        "0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA"
+      ],
+      "result": [
+        {
+          "pasar": "B: AegisClear rollover (128 + 5 unit, 1 deposit)",
+          "klien_provider": "0.00 / 2.66",
+          "penentu": "dua tanda tangan ×2 (rollover + close)",
+          "terlihat": "T, R, epoch, jumlah",
+          "gas": "267485",
+          "proving_ms": "-",
+          "txs": [
+            {
+              "label": "fund",
+              "hash": "0xd8f4172e2ed4b01a7f890f0e031ec8b60b47866569f45768609f58e9b8fe4bc3"
+            },
+            {
+              "label": "rollover",
+              "hash": "0x32ed7aa74ba82f6367def540fa419caad2462a1c51bcd9499d4caa34335715b5"
+            },
+            {
+              "label": "closeCooperative",
+              "hash": "0xe2582239fcd90cea9de4af6cb02123259d1a5ce0fb418643c8625cf981aae27e"
+            }
+          ]
+        }
+      ],
+      "endedAt": 1790128157058
+    },
+    {
+      "id": "mudg1kzg-7066ea",
+      "scenario": "B-anchored-dispute",
+      "status": "done",
+      "startedAt": 1790128088188,
+      "steps": [],
+      "channels": [
+        "0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb"
+      ],
+      "result": [
+        {
+          "pasar": "B: AegisClear anchored (ack on-chain, sengketa)",
+          "klien_provider": "0.02 / 0.38",
+          "penentu": "bukti Groth16 atas R on-chain",
+          "terlihat": "hash daun, A per ack, payToClient",
+          "gas": "6766629",
+          "proving_ms": "3436",
+          "txs": [
+            {
+              "label": "fund",
+              "hash": "0x5d95db050545e1a9c4000f947bb162f400fb5fac026ac462b14a51549d1c16a4"
+            },
+            {
+              "label": "ack",
+              "hash": "0xbce87bc644de416b98bbf2eada77c0779a087f8f599285b6284eb888bb4c6efa"
+            },
+            {
+              "label": "ack",
+              "hash": "0x357f0ab73ced4a3bf067aed2d1576baa6a5007f9d5d80834b8f72f0ee79d2ba7"
+            },
+            {
+              "label": "ack",
+              "hash": "0x20fb6ae8ea0537a8d6c1b5bc2881f8c99e60e262fc6148cc9c92f3ea1757f6e0"
+            },
+            {
+              "label": "ack",
+              "hash": "0xfcf3ed248f421404585e35dc47d613fd5bf08d69a570e5f6dd18dc70f4524fe6"
+            },
+            {
+              "label": "ack",
+              "hash": "0xdfca98a9f64a3db0b1515afa09a7014a9306f8aa3180892bddee0919b34689f5"
+            },
+            {
+              "label": "ack",
+              "hash": "0x91cbff00359069353e5bdcb36f91780958bb2a3e094f050a08c862791f356b01"
+            },
+            {
+              "label": "ack",
+              "hash": "0xe32d321129e372e4fa705bdfa62b5249e1e75ed531a4bf9b014c31b8dfbbcd57"
+            },
+            {
+              "label": "ack",
+              "hash": "0x209d72f47374a4d38afb507908b14d9a0943617d35e0576abe95227f763e7b51"
+            },
+            {
+              "label": "ack",
+              "hash": "0x00dc7d748d0196e71afd8d7fb050c51c408d78a521942ebff73920eab565cb62"
+            },
+            {
+              "label": "ack",
+              "hash": "0xc919fc233b596ae5d8398d8d8646b1b7bb7ed408ee80e6edb6a36babbee458c3"
+            },
+            {
+              "label": "ack",
+              "hash": "0x49d416d678536fa5379f456eaacbbb46cbe1eef3ad7cbdd492c61ae0aaaec87a"
+            },
+            {
+              "label": "ack",
+              "hash": "0x92e7ec8c200481998c1240cec7947be2b5d17225e470b822984a7cf2e118dcb6"
+            },
+            {
+              "label": "ack",
+              "hash": "0xed084cb40faf8ba266af1e1789e748b7c46d92af474bfaec37917a135ddd54de"
+            },
+            {
+              "label": "ack",
+              "hash": "0xb830243efd8d66680c1e8c120ca370b137fc007ea7a85d9097e7dc43299e6aaf"
+            },
+            {
+              "label": "ack",
+              "hash": "0xe16773a9fb3c500f8350149e62a26bf09849714f4e8d52320ba33fa5270829a9"
+            },
+            {
+              "label": "ack",
+              "hash": "0x1d813491c84ead19dd297bd2f7c27c942a43493e7a3c23a4425c2554785b50da"
+            },
+            {
+              "label": "ack",
+              "hash": "0x8f5ded880c541659e762be11d693db351616d0af0948f157368898d9590cfaf7"
+            },
+            {
+              "label": "ack",
+              "hash": "0xfc09f9369924699ecb6e9f093159ce5584f6f452e3987554ad672cd8bc44af94"
+            },
+            {
+              "label": "ack",
+              "hash": "0x3d92da16c9c1ef154771af246c0b5c0986f86d288959f4cac1fad00be3681cf9"
+            },
+            {
+              "label": "ack",
+              "hash": "0x6b26b64d474e1ff343b262a2dab0ea83c196e29e6fdc5608a1f6609b49d30ca3"
+            },
+            {
+              "label": "startClose",
+              "hash": "0xb7b45223bf615a3ee0fd5a7754a1d239980408c3154e352a5fddad74cdb5dac3"
+            },
+            {
+              "label": "claimPenalty",
+              "hash": "0x5690068b30c2d27e8dffe2f02d32a6a7548d411cea1660153ae045f19f4a65f0"
+            },
+            {
+              "label": "settle",
+              "hash": "0x34f7fdf457b9c0dcfca4d52af22db5f693fdf40fa512b91fe6e085fcaae48f51"
+            }
+          ]
+        }
+      ],
+      "endedAt": 1790128153252
+    },
+    {
+      "id": "mudg1f4b-60a0fd",
+      "scenario": "B-dispute",
+      "status": "done",
+      "startedAt": 1790128080587,
+      "steps": [],
+      "channels": [
+        "0x1E12393dA190449B9CA32D1f280C4D45fB21C6C4"
+      ],
+      "result": [
+        {
+          "pasar": "B: AegisClear sengketa (bukti)",
+          "klien_provider": "0.07 / 1.93",
+          "penentu": "bukti Groth16",
+          "terlihat": "T, R, jumlah, payToClient",
+          "gas": "545726",
+          "proving_ms": "4682",
+          "txs": [
+            {
+              "label": "fund",
+              "hash": "0x0e1d433ffbaa8f1b78ed04c4958fc9cf043059e518a9fd0fd7ea3b7c47490495"
+            },
+            {
+              "label": "submitCheckpoint",
+              "hash": "0xe3a4370e5476df70b5a5417ce18f4c6693540d6c65402c794a8f93732b3855a2"
+            },
+            {
+              "label": "claimPenalty",
+              "hash": "0xd183a738af32b1054382bbbcc780279728d3e0334e638ee3bc953544011d5d2e"
+            },
+            {
+              "label": "settle",
+              "hash": "0xf46448fb5b4a68f9dea798c0708f1b3a10bcf2f1b9b607b372e0b0fe767669d6"
+            }
+          ]
+        }
+      ],
+      "endedAt": 1790128087859
+    }
+  ]
+}

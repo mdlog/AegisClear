@@ -1,0 +1,28 @@
+event: step
+data: {"phase":"escrow","label":"▶ A-complete — klien A 0x70997970C51812dc3A010C7d01b50e0d17dc79C8","i":0,"t":3}
+id: 0
+
+event: step
+data: {"phase":"escrow","label":"approve","txHash":"0xc7c858eed877464c7f1ed52f1968e58b16a05c830a04a806abe3360e44c92e19","gasUsed":"46330","i":1,"t":37}
+id: 1
+
+event: step
+data: {"phase":"escrow","label":"createJob (syarat di calldata)","txHash":"0x6252d3da9405bde9eae43b9cecb21aaebac0c63211292d1f4b7142a934c7eebe","gasUsed":"103827","i":2,"t":70}
+id: 2
+
+event: step
+data: {"phase":"escrow","label":"fund","txHash":"0xe5d3276421c8de3e1c74343e6f91c014c8a1ce00f32c7d0f39fa628b33b8c057","gasUsed":"103854","i":3,"t":95}
+id: 3
+
+event: step
+data: {"phase":"escrow","label":"submit (provider)","txHash":"0x173c912de93052287c261ab1406eb06d02a89427d9c526b76c3cbc5b4cd9f6fa","gasUsed":"30880","i":4,"t":129}
+id: 4
+
+event: step
+data: {"phase":"escrow","label":"complete (evaluator = klien)","txHash":"0x1c5dbe8b499b5c1ddc42fd35d7c945bacd23ddee6d01aae5ca66ec24af14adca","gasUsed":"45963","i":5,"t":148}
+id: 5
+
+event: done
+data: {"id":"mudg364o-57d0c1","scenario":"A-complete","status":"done","startedAt":1790128162248,"steps":[{"phase":"escrow","label":"▶ A-complete — klien A 0x70997970C51812dc3A010C7d01b50e0d17dc79C8","i":0,"t":3},{"phase":"escrow","label":"approve","txHash":"0xc7c858eed877464c7f1ed52f1968e58b16a05c830a04a806abe3360e44c92e19","gasUsed":"46330","i":1,"t":37},{"phase":"escrow","label":"createJob (syarat di calldata)","txHash":"0x6252d3da9405bde9eae43b9cecb21aaebac0c63211292d1f4b7142a934c7eebe","gasUsed":"103827","i":2,"t":70},{"phase":"escrow","label":"fund","txHash":"0xe5d3276421c8de3e1c74343e6f91c014c8a1ce00f32c7d0f39fa628b33b8c057","gasUsed":"103854","i":3,"t":95},{"phase":"escrow","label":"submit (provider)","txHash":"0x173c912de93052287c261ab1406eb06d02a89427d9c526b76c3cbc5b4cd9f6fa","gasUsed":"30880","i":4,"t":129},{"phase":"escrow","label":"complete (evaluator = klien)","txHash":"0x1c5dbe8b499b5c1ddc42fd35d7c945bacd23ddee6d01aae5ca66ec24af14adca","gasUsed":"45963","i":5,"t":148}],"channels":[],"result":[{"pasar":"A: evaluator biner (complete)","klien_provider":"0 / 2.00","penentu":"alamat evaluator","terlihat":"harga, ambang, penalti (string)","gas":"330854","proving_ms":"-","txs":[{"label":"approve","hash":"0xc7c858eed877464c7f1ed52f1968e58b16a05c830a04a806abe3360e44c92e19"},{"label":"createJob (syarat di calldata)","hash":"0x6252d3da9405bde9eae43b9cecb21aaebac0c63211292d1f4b7142a934c7eebe"},{"label":"fund","hash":"0xe5d3276421c8de3e1c74343e6f91c014c8a1ce00f32c7d0f39fa628b33b8c057"},{"label":"submit (provider)","hash":"0x173c912de93052287c261ab1406eb06d02a89427d9c526b76c3cbc5b4cd9f6fa"},{"label":"complete (evaluator = klien)","hash":"0x1c5dbe8b499b5c1ddc42fd35d7c945bacd23ddee6d01aae5ca66ec24af14adca"}]}],"endedAt":1790128162397}
+id: end
+

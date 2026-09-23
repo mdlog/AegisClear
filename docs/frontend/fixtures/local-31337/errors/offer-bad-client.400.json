@@ -1,0 +1,6 @@
+{
+  "httpStatus": 400,
+  "body": {
+    "error": "client must be A or B"
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "httpStatus": 200,
+  "body": {
+    "channel": "0x4d5bCCDb393F62712C0174F62db123c64216bc4F",
+    "factory": "0x202CCe504e04bEd6fC0521238dDf04Bc9E8E15aB",
+    "factoryName": "factory",
+    "client": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    "provider": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+    "termsCommitment": "0x1c822756468cd4abd6376beb8364a2a426beb813713fceafb597916bc44b747f",
+    "state": "SETTLED",
+    "seq": 100,
+    "epoch": 0,
+    "cumulativeAmount": "0",
+    "receiptsRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "budget": "0",
+    "deadline": 0,
+    "hasProof": false,
+    "payToClient": "0",
+    "openedTx": "0xc48b69f16d073a826aa046081504ac136427ca03f4f73513eacd490de1abb53f",
+    "openedBlock": "1360",
+    "runId": "mudg32t2-660979",
+    "mode": "co-signed",
+    "cfg": {
+      "client": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "provider": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+      "token": "0x8198f5d8F8CfFE8f9C413d98a0A55aEB8ab9FbB7",
+      "termsCommitment": "0x1c822756468cd4abd6376beb8364a2a426beb813713fceafb597916bc44b747f",
+      "challengeWindow": 120,
+      "responseWindow": 60,
+      "payoutClient": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "payoutProvider": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+      "salt": "0xebd5aa1546e964bb9f4ef295f473a94a2cd57e8e6a0561aa245bc0ee0b8b2cfd"
+    },
+    "events": [
+      {
+        "name": "Opened",
+        "args": {
+          "client": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+          "provider": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+          "termsCommitment": "0x1c822756468cd4abd6376beb8364a2a426beb813713fceafb597916bc44b747f",
+          "challengeWindow": "120"
+        },
+        "txHash": "0xc48b69f16d073a826aa046081504ac136427ca03f4f73513eacd490de1abb53f",
+        "blockNumber": "1360",
+        "gasUsed": "296351"
+      },
+      {
+        "name": "Settled",
+        "args": {
+          "seq": "100",
+          "cumulativeAmount": "0",
+          "penalty": "0",
+          "toProvider": "2000000",
+          "toClient": "3000000",
+          "cooperative": "true"
+        },
+        "txHash": "0x456c1613695442da042b5a7f7894c9dda06c4aed9983638435b5832079e6488d",
+        "blockNumber": "1361",
+        "gasUsed": "111448"
+      }
+    ]
+  }
+}

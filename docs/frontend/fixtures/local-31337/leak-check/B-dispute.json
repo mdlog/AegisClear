@@ -1,0 +1,18 @@
+{
+  "httpStatus": 200,
+  "body": [
+    {
+      "channel": "0x1E12393dA190449B9CA32D1f280C4D45fB21C6C4",
+      "txs": [
+        "0x02255944fb353c80ec528b5a3f165ed43ee45905873c67a6d5f32067ec672686",
+        "0x0e1d433ffbaa8f1b78ed04c4958fc9cf043059e518a9fd0fd7ea3b7c47490495",
+        "0xe3a4370e5476df70b5a5417ce18f4c6693540d6c65402c794a8f93732b3855a2",
+        "0xd183a738af32b1054382bbbcc780279728d3e0334e638ee3bc953544011d5d2e",
+        "0xf46448fb5b4a68f9dea798c0708f1b3a10bcf2f1b9b607b372e0b0fe767669d6"
+      ],
+      "leaks": 0,
+      "ambiguous": 0,
+      "details": []
+    }
+  ]
+}

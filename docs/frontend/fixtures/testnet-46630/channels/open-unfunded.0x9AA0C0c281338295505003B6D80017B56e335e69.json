@@ -1,0 +1,48 @@
+{
+  "httpStatus": 200,
+  "body": {
+    "channel": "0x9AA0C0c281338295505003B6D80017B56e335e69",
+    "factory": "0x52773ab546e78828DDAbC4F3dA13eaCb167941B6",
+    "factoryName": "factory",
+    "client": "0x3bE5635f7f90212fC3f640e279E3d7cb04c5fC29",
+    "provider": "0x90351bB1E85a17D5f70c62C0cC076D39D897076D",
+    "termsCommitment": "0x01ddf23fc2eab609b8ca635c36303dfd1ab83da110803ad355d797f8169e0587",
+    "state": "OPEN",
+    "seq": 0,
+    "epoch": 0,
+    "cumulativeAmount": "0",
+    "receiptsRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "budget": "1000000",
+    "deadline": 0,
+    "hasProof": false,
+    "payToClient": "0",
+    "openedTx": "0x7a93f47f722b2cd5aefe01db28ca73206b70ebb3efdccff5a136e3485fcd9934",
+    "openedBlock": "122031065",
+    "mode": "co-signed",
+    "cfg": {
+      "client": "0x3bE5635f7f90212fC3f640e279E3d7cb04c5fC29",
+      "provider": "0x90351bB1E85a17D5f70c62C0cC076D39D897076D",
+      "token": "0x5A9BC1441DE45D7a722339Bec093637bc5042382",
+      "termsCommitment": "0x01ddf23fc2eab609b8ca635c36303dfd1ab83da110803ad355d797f8169e0587",
+      "challengeWindow": 60,
+      "responseWindow": 30,
+      "payoutClient": "0x3bE5635f7f90212fC3f640e279E3d7cb04c5fC29",
+      "payoutProvider": "0x90351bB1E85a17D5f70c62C0cC076D39D897076D",
+      "salt": "0x570df750b9d50a225250bc9f3d3d67f3ac005993fd7ffe02b5537ecd6102f1e1"
+    },
+    "events": [
+      {
+        "name": "Opened",
+        "args": {
+          "client": "0x3bE5635f7f90212fC3f640e279E3d7cb04c5fC29",
+          "provider": "0x90351bB1E85a17D5f70c62C0cC076D39D897076D",
+          "termsCommitment": "0x01ddf23fc2eab609b8ca635c36303dfd1ab83da110803ad355d797f8169e0587",
+          "challengeWindow": "60"
+        },
+        "txHash": "0x7a93f47f722b2cd5aefe01db28ca73206b70ebb3efdccff5a136e3485fcd9934",
+        "blockNumber": "122031065",
+        "gasUsed": "314249"
+      }
+    ]
+  }
+}

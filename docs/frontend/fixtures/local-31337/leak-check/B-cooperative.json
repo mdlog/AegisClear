@@ -1,0 +1,16 @@
+{
+  "httpStatus": 200,
+  "body": [
+    {
+      "channel": "0x4d5bCCDb393F62712C0174F62db123c64216bc4F",
+      "txs": [
+        "0xc48b69f16d073a826aa046081504ac136427ca03f4f73513eacd490de1abb53f",
+        "0x9dca9167e20990b6cbd87591879a9e2187ea20cf3edc14b3bcc08d8753b54ba3",
+        "0x456c1613695442da042b5a7f7894c9dda06c4aed9983638435b5832079e6488d"
+      ],
+      "leaks": 0,
+      "ambiguous": 0,
+      "details": []
+    }
+  ]
+}

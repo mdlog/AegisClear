@@ -1,0 +1,45 @@
+{
+  "httpStatus": 200,
+  "body": {
+    "status": 402,
+    "body": {
+      "x402Version": 1,
+      "accepts": [
+        {
+          "scheme": "exact",
+          "network": "eip155:46630",
+          "asset": "0x5A9BC1441DE45D7a722339Bec093637bc5042382",
+          "payTo": "0x506c9e93A11c5Be8e86A9c8A4DEC4dE8297C7B2a",
+          "maxAmountRequired": "5000000",
+          "extra": {
+            "aegis": {
+              "config": {
+                "client": "0x4AD7A1FBB8330e834cf0a6Aa63ae576A13f827A4",
+                "provider": "0x90351bB1E85a17D5f70c62C0cC076D39D897076D",
+                "token": "0x5A9BC1441DE45D7a722339Bec093637bc5042382",
+                "termsCommitment": "0x0b23975af64086e8b3e726557b3baaaf3a3881d5a6d953a2db6e6d43159a7e0e",
+                "challengeWindow": 60,
+                "responseWindow": 30,
+                "payoutClient": "0x4AD7A1FBB8330e834cf0a6Aa63ae576A13f827A4",
+                "payoutProvider": "0x90351bB1E85a17D5f70c62C0cC076D39D897076D",
+                "salt": "0x1880c84e0a1c3450a9552751d9730c155207befd3d36e3277f27e75c694bcc3b"
+              },
+              "sigProvider": "0xb92eb0bef7ad1d9ded37b885f8ae08545e9a65ab1b54b5e0d6023ff0b892677139c8ff1493090a249e5b8407bf2f8edf3aa676738294effe66419903e4d3c0e21b",
+              "terms": {
+                "unitPrice": "20000",
+                "maxM1": "800",
+                "minM2": "90",
+                "penaltyBps": "5000",
+                "capBps": "3000",
+                "nonce": "11518787151740939191442341693456871327393711984559295478912875725933591494596"
+              },
+              "unitQty": "1",
+              "exitSig": "0x2962db089a5022dd6a7e9ba62aa7064675518bb72126704466253ea1a500a0054e7df378ff1311abcbafb7d3f48d30abad42dd3b2f23dee74a6989b5045d562c1c",
+              "anchored": false
+            }
+          }
+        }
+      ]
+    }
+  }
+}

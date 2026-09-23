@@ -1,0 +1,85 @@
+{
+  "httpStatus": 200,
+  "body": {
+    "channel": "0x4B6F3c6d3b6BD02FEa8155a74AfaA04D0f03bBd1",
+    "factory": "0x52773ab546e78828DDAbC4F3dA13eaCb167941B6",
+    "factoryName": "factory",
+    "client": "0x4AD7A1FBB8330e834cf0a6Aa63ae576A13f827A4",
+    "provider": "0x90351bB1E85a17D5f70c62C0cC076D39D897076D",
+    "termsCommitment": "0x2ba57dfd66de9b8f7ccc946b092862a39de45da9b464f7baedb131e8e00bbde0",
+    "state": "SETTLED",
+    "seq": 100,
+    "epoch": 0,
+    "cumulativeAmount": "2000000",
+    "receiptsRoot": "0x19f53dd3b775b0f76daebb5910cda7bcc95a8dee154adc607bb26e9990224055",
+    "budget": "0",
+    "deadline": 1789909132,
+    "hasProof": true,
+    "payToClient": "70000",
+    "openedTx": "0x44d9e5695145fe2138d8e560fb57c9170a840301ae645ed65902a2da16e49302",
+    "openedBlock": "122039555",
+    "mode": "co-signed",
+    "cfg": {
+      "client": "0x4AD7A1FBB8330e834cf0a6Aa63ae576A13f827A4",
+      "provider": "0x90351bB1E85a17D5f70c62C0cC076D39D897076D",
+      "token": "0x5A9BC1441DE45D7a722339Bec093637bc5042382",
+      "termsCommitment": "0x2ba57dfd66de9b8f7ccc946b092862a39de45da9b464f7baedb131e8e00bbde0",
+      "challengeWindow": 60,
+      "responseWindow": 30,
+      "payoutClient": "0x4AD7A1FBB8330e834cf0a6Aa63ae576A13f827A4",
+      "payoutProvider": "0x90351bB1E85a17D5f70c62C0cC076D39D897076D",
+      "salt": "0xe46b486b1fcb0d58e8c4f306df938e8c7ebc18aa1e5b4cae0050d906b45c3615"
+    },
+    "events": [
+      {
+        "name": "Opened",
+        "args": {
+          "client": "0x4AD7A1FBB8330e834cf0a6Aa63ae576A13f827A4",
+          "provider": "0x90351bB1E85a17D5f70c62C0cC076D39D897076D",
+          "termsCommitment": "0x2ba57dfd66de9b8f7ccc946b092862a39de45da9b464f7baedb131e8e00bbde0",
+          "challengeWindow": "60"
+        },
+        "txHash": "0x44d9e5695145fe2138d8e560fb57c9170a840301ae645ed65902a2da16e49302",
+        "blockNumber": "122039555",
+        "gasUsed": "310235"
+      },
+      {
+        "name": "CheckpointSubmitted",
+        "args": {
+          "seq": "100",
+          "cumulativeAmount": "2000000",
+          "receiptsRoot": "0x19f53dd3b775b0f76daebb5910cda7bcc95a8dee154adc607bb26e9990224055",
+          "deadline": "1789909132"
+        },
+        "txHash": "0x9301fe1fc8bec5507c7e10109c5c28a01df50882cc38ff734411a5a45adba69d",
+        "blockNumber": "122039919",
+        "gasUsed": "114159"
+      },
+      {
+        "name": "PenaltyClaimed",
+        "args": {
+          "by": "0x4AD7A1FBB8330e834cf0a6Aa63ae576A13f827A4",
+          "seq": "100",
+          "payToClient": "70000"
+        },
+        "txHash": "0xef6bcfbb54cfaf1fa39c6ac4ee3d97bf15a37a0b74e6268f8c5fe8287df1a04e",
+        "blockNumber": "122039951",
+        "gasUsed": "304432"
+      },
+      {
+        "name": "Settled",
+        "args": {
+          "seq": "100",
+          "cumulativeAmount": "2000000",
+          "penalty": "70000",
+          "toProvider": "1930000",
+          "toClient": "3070000",
+          "cooperative": "false"
+        },
+        "txHash": "0x176799443c4dcf3c29aadede1618067d620340d7ef3bbacc9c6e829dcfe034db",
+        "blockNumber": "122040216",
+        "gasUsed": "100077"
+      }
+    ]
+  }
+}

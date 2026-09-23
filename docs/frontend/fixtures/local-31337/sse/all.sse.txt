@@ -1,0 +1,200 @@
+event: step
+data: {"phase":"fund","label":"▶ B-cooperative — klien A 0x70997970C51812dc3A010C7d01b50e0d17dc79C8","i":0,"t":3}
+id: 0
+
+event: step
+data: {"phase":"fund","label":"402 diterima: payTo 0x3E110b43b9a89D7874d840167D7DdD5A13E4672a, deposit 5.00 USDG","channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":1,"t":46}
+id: 1
+
+event: step
+data: {"phase":"fund","label":"fund","txHash":"0x0f1317c68bf208a116dd1084606b7ce269ed6108b16e38633d1f6427bc8b5b40","gasUsed":"51577","channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":2,"t":46}
+id: 2
+
+event: step
+data: {"phase":"open","label":"provider membuka channel saat ack pertama (tx provider, lihat kolom channel)","channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":3,"t":46}
+id: 3
+
+event: step
+data: {"phase":"serve","label":"10/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":10,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":4,"t":4391}
+id: 4
+
+event: step
+data: {"phase":"serve","label":"20/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":20,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":5,"t":4667}
+id: 5
+
+event: step
+data: {"phase":"serve","label":"30/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":30,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":6,"t":4943}
+id: 6
+
+event: step
+data: {"phase":"serve","label":"40/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":40,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":7,"t":5217}
+id: 7
+
+event: step
+data: {"phase":"serve","label":"50/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":50,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":8,"t":5413}
+id: 8
+
+event: step
+data: {"phase":"serve","label":"60/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":60,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":9,"t":5650}
+id: 9
+
+event: step
+data: {"phase":"serve","label":"70/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":70,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":10,"t":5920}
+id: 10
+
+event: step
+data: {"phase":"serve","label":"80/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":80,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":11,"t":6163}
+id: 11
+
+event: step
+data: {"phase":"serve","label":"90/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":90,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":12,"t":6374}
+id: 12
+
+event: step
+data: {"phase":"serve","label":"100/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":100,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":13,"t":6564}
+id: 13
+
+event: step
+data: {"phase":"ack","label":"ack terakhir dikirim (POST /ack)","channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":14,"t":6567}
+id: 14
+
+event: step
+data: {"phase":"close","label":"closeCooperative","txHash":"0x15eefd1659bba162b1ab5e3cb262b8e57f135b184786aef8985a7f60a77dbd32","gasUsed":"111448","channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":15,"t":6589}
+id: 15
+
+event: step
+data: {"phase":"fund","label":"▶ B-dispute — klien B 0x90F79bf6EB2c4f870365E785982E1f101E93b906","i":16,"t":6595}
+id: 16
+
+event: step
+data: {"phase":"fund","label":"402 diterima: payTo 0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC, deposit 5.00 USDG","channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":17,"t":6645}
+id: 17
+
+event: step
+data: {"phase":"fund","label":"fund","txHash":"0x72c05ccd26f985dbf93bb912d6b3b6fbc6f59a2ff0c75c6f9ba0d5694421224b","gasUsed":"51577","channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":18,"t":6645}
+id: 18
+
+event: step
+data: {"phase":"open","label":"provider membuka channel saat ack pertama (tx provider, lihat kolom channel)","channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":19,"t":6645}
+id: 19
+
+event: step
+data: {"phase":"serve","label":"10/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":10,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":20,"t":6979}
+id: 20
+
+event: step
+data: {"phase":"serve","label":"20/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":20,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":21,"t":7182}
+id: 21
+
+event: step
+data: {"phase":"serve","label":"30/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":30,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":22,"t":7371}
+id: 22
+
+event: step
+data: {"phase":"serve","label":"40/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":40,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":23,"t":7575}
+id: 23
+
+event: step
+data: {"phase":"serve","label":"50/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":50,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":24,"t":7870}
+id: 24
+
+event: step
+data: {"phase":"serve","label":"60/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":60,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":25,"t":8111}
+id: 25
+
+event: step
+data: {"phase":"serve","label":"70/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":70,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":26,"t":8330}
+id: 26
+
+event: step
+data: {"phase":"serve","label":"80/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":80,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":27,"t":8524}
+id: 27
+
+event: step
+data: {"phase":"serve","label":"90/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":90,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":28,"t":8718}
+id: 28
+
+event: step
+data: {"phase":"serve","label":"100/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":100,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":29,"t":8912}
+id: 29
+
+event: step
+data: {"phase":"ack","label":"ack terakhir dikirim (POST /ack)","channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":30,"t":8915}
+id: 30
+
+event: step
+data: {"phase":"dispute","label":"sengketa: submit checkpoint co-signed tertinggi, lalu bukti penalti","channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":31,"t":8915}
+id: 31
+
+event: step
+data: {"phase":"dispute","label":"submitCheckpoint","txHash":"0xcd1f42f610b00d37e704f819850d3956e1f691263bf985f936e85b059dd737b1","gasUsed":"103124","channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":32,"t":12209}
+id: 32
+
+event: step
+data: {"phase":"dispute","label":"claimPenalty","txHash":"0x0ae0bc2071c1dc2cee25cf3096e5ae68e6ae8413e3ae5ae63ba934b5c28a03ae","gasUsed":"293903","channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":33,"t":12209}
+id: 33
+
+event: step
+data: {"phase":"prove","label":"bukti Groth16: payToClient 0.07 USDG","detail":"3184 ms proving","channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":34,"t":12209}
+id: 34
+
+event: step
+data: {"phase":"wait","label":"Anvil: evm_increaseTime(119) + evm_mine","i":35,"t":12215}
+id: 35
+
+event: step
+data: {"phase":"settle","label":"settle","txHash":"0xa0d19115178d8643983b27c4bb6414194c942191d2fa7bcc3e2f8cede6199bb7","gasUsed":"97098","channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":36,"t":16245}
+id: 36
+
+event: step
+data: {"phase":"escrow","label":"▶ A-complete — klien A 0x70997970C51812dc3A010C7d01b50e0d17dc79C8","i":37,"t":16253}
+id: 37
+
+event: step
+data: {"phase":"escrow","label":"approve","txHash":"0x9713041a405e234385115b4e3cabc020fb9b2545991142f0ffe488eebd9ab261","gasUsed":"46330","i":38,"t":16276}
+id: 38
+
+event: step
+data: {"phase":"escrow","label":"createJob (syarat di calldata)","txHash":"0x9e55914045768b3eeebfd96a57d29e22123f43a34d377d227a55da9f3b38429e","gasUsed":"103827","i":39,"t":16295}
+id: 39
+
+event: step
+data: {"phase":"escrow","label":"fund","txHash":"0x9e9281bcb7aacb52e1becb2cf93ba237ed4c0ac28d5e0105d17955abce3b4b7e","gasUsed":"103854","i":40,"t":16315}
+id: 40
+
+event: step
+data: {"phase":"escrow","label":"submit (provider)","txHash":"0x59688a7472f9167b6dc70669e0a84a8d8ced1d76f55dc684f1a0a6951e7149df","gasUsed":"30880","i":41,"t":16335}
+id: 41
+
+event: step
+data: {"phase":"escrow","label":"complete (evaluator = klien)","txHash":"0x2ba63048d5513fd7aba60e567ec281ca91ee72893cc1b0740a8ad255ed6a182e","gasUsed":"45963","i":42,"t":16354}
+id: 42
+
+event: step
+data: {"phase":"escrow","label":"▶ A-reject — klien B 0x90F79bf6EB2c4f870365E785982E1f101E93b906","i":43,"t":16357}
+id: 43
+
+event: step
+data: {"phase":"escrow","label":"approve","txHash":"0xa82406c6bb9e9152f51c33c6eb87237030b714789f92a164cf8228ce0865265d","gasUsed":"46330","i":44,"t":16379}
+id: 44
+
+event: step
+data: {"phase":"escrow","label":"createJob (syarat di calldata)","txHash":"0x0f70a09ac74942eb08ec32df64d95e221dc60d954e646815711115592a58692c","gasUsed":"103827","i":45,"t":16398}
+id: 45
+
+event: step
+data: {"phase":"escrow","label":"fund","txHash":"0x0f21e3152ad3ac67e11b381d5f5a2f6189a5087344069aa4fec465e4bd45df4b","gasUsed":"103854","i":46,"t":20416}
+id: 46
+
+event: step
+data: {"phase":"escrow","label":"submit (provider)","txHash":"0x73b5d86c0e0478d138a7702313e1717a7246656283a93f418bbd740a33ba3981","gasUsed":"30880","i":47,"t":20437}
+id: 47
+
+event: step
+data: {"phase":"escrow","label":"reject (evaluator = klien)","txHash":"0x78e39fd204fa540739d0472089784054299122b57d2ca2fc5f5daa7e7c532492","gasUsed":"45890","i":48,"t":20456}
+id: 48
+
+event: done
+data: {"id":"mudg39dg-1815b0","scenario":"all","status":"done","startedAt":1790128166452,"steps":[{"phase":"fund","label":"▶ B-cooperative — klien A 0x70997970C51812dc3A010C7d01b50e0d17dc79C8","i":0,"t":3},{"phase":"fund","label":"402 diterima: payTo 0x3E110b43b9a89D7874d840167D7DdD5A13E4672a, deposit 5.00 USDG","channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":1,"t":46},{"phase":"fund","label":"fund","txHash":"0x0f1317c68bf208a116dd1084606b7ce269ed6108b16e38633d1f6427bc8b5b40","gasUsed":"51577","channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":2,"t":46},{"phase":"open","label":"provider membuka channel saat ack pertama (tx provider, lihat kolom channel)","channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":3,"t":46},{"phase":"serve","label":"10/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":10,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":4,"t":4391},{"phase":"serve","label":"20/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":20,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":5,"t":4667},{"phase":"serve","label":"30/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":30,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":6,"t":4943},{"phase":"serve","label":"40/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":40,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":7,"t":5217},{"phase":"serve","label":"50/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":50,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":8,"t":5413},{"phase":"serve","label":"60/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":60,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":9,"t":5650},{"phase":"serve","label":"70/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":70,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":10,"t":5920},{"phase":"serve","label":"80/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":80,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":11,"t":6163},{"phase":"serve","label":"90/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":90,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":12,"t":6374},{"phase":"serve","label":"100/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":100,"total":100},"channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":13,"t":6564},{"phase":"ack","label":"ack terakhir dikirim (POST /ack)","channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":14,"t":6567},{"phase":"close","label":"closeCooperative","txHash":"0x15eefd1659bba162b1ab5e3cb262b8e57f135b184786aef8985a7f60a77dbd32","gasUsed":"111448","channel":"0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","i":15,"t":6589},{"phase":"fund","label":"▶ B-dispute — klien B 0x90F79bf6EB2c4f870365E785982E1f101E93b906","i":16,"t":6595},{"phase":"fund","label":"402 diterima: payTo 0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC, deposit 5.00 USDG","channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":17,"t":6645},{"phase":"fund","label":"fund","txHash":"0x72c05ccd26f985dbf93bb912d6b3b6fbc6f59a2ff0c75c6f9ba0d5694421224b","gasUsed":"51577","channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":18,"t":6645},{"phase":"open","label":"provider membuka channel saat ack pertama (tx provider, lihat kolom channel)","channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":19,"t":6645},{"phase":"serve","label":"10/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":10,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":20,"t":6979},{"phase":"serve","label":"20/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":20,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":21,"t":7182},{"phase":"serve","label":"30/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":30,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":22,"t":7371},{"phase":"serve","label":"40/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":40,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":23,"t":7575},{"phase":"serve","label":"50/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":50,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":24,"t":7870},{"phase":"serve","label":"60/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":60,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":25,"t":8111},{"phase":"serve","label":"70/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":70,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":26,"t":8330},{"phase":"serve","label":"80/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":80,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":27,"t":8524},{"phase":"serve","label":"90/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":90,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":28,"t":8718},{"phase":"serve","label":"100/100 unit dilayani & di-ack (checkpoint co-signed)","progress":{"done":100,"total":100},"channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":29,"t":8912},{"phase":"ack","label":"ack terakhir dikirim (POST /ack)","channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":30,"t":8915},{"phase":"dispute","label":"sengketa: submit checkpoint co-signed tertinggi, lalu bukti penalti","channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":31,"t":8915},{"phase":"dispute","label":"submitCheckpoint","txHash":"0xcd1f42f610b00d37e704f819850d3956e1f691263bf985f936e85b059dd737b1","gasUsed":"103124","channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":32,"t":12209},{"phase":"dispute","label":"claimPenalty","txHash":"0x0ae0bc2071c1dc2cee25cf3096e5ae68e6ae8413e3ae5ae63ba934b5c28a03ae","gasUsed":"293903","channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":33,"t":12209},{"phase":"prove","label":"bukti Groth16: payToClient 0.07 USDG","detail":"3184 ms proving","channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":34,"t":12209},{"phase":"wait","label":"Anvil: evm_increaseTime(119) + evm_mine","i":35,"t":12215},{"phase":"settle","label":"settle","txHash":"0xa0d19115178d8643983b27c4bb6414194c942191d2fa7bcc3e2f8cede6199bb7","gasUsed":"97098","channel":"0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC","i":36,"t":16245},{"phase":"escrow","label":"▶ A-complete — klien A 0x70997970C51812dc3A010C7d01b50e0d17dc79C8","i":37,"t":16253},{"phase":"escrow","label":"approve","txHash":"0x9713041a405e234385115b4e3cabc020fb9b2545991142f0ffe488eebd9ab261","gasUsed":"46330","i":38,"t":16276},{"phase":"escrow","label":"createJob (syarat di calldata)","txHash":"0x9e55914045768b3eeebfd96a57d29e22123f43a34d377d227a55da9f3b38429e","gasUsed":"103827","i":39,"t":16295},{"phase":"escrow","label":"fund","txHash":"0x9e9281bcb7aacb52e1becb2cf93ba237ed4c0ac28d5e0105d17955abce3b4b7e","gasUsed":"103854","i":40,"t":16315},{"phase":"escrow","label":"submit (provider)","txHash":"0x59688a7472f9167b6dc70669e0a84a8d8ced1d76f55dc684f1a0a6951e7149df","gasUsed":"30880","i":41,"t":16335},{"phase":"escrow","label":"complete (evaluator = klien)","txHash":"0x2ba63048d5513fd7aba60e567ec281ca91ee72893cc1b0740a8ad255ed6a182e","gasUsed":"45963","i":42,"t":16354},{"phase":"escrow","label":"▶ A-reject — klien B 0x90F79bf6EB2c4f870365E785982E1f101E93b906","i":43,"t":16357},{"phase":"escrow","label":"approve","txHash":"0xa82406c6bb9e9152f51c33c6eb87237030b714789f92a164cf8228ce0865265d","gasUsed":"46330","i":44,"t":16379},{"phase":"escrow","label":"createJob (syarat di calldata)","txHash":"0x0f70a09ac74942eb08ec32df64d95e221dc60d954e646815711115592a58692c","gasUsed":"103827","i":45,"t":16398},{"phase":"escrow","label":"fund","txHash":"0x0f21e3152ad3ac67e11b381d5f5a2f6189a5087344069aa4fec465e4bd45df4b","gasUsed":"103854","i":46,"t":20416},{"phase":"escrow","label":"submit (provider)","txHash":"0x73b5d86c0e0478d138a7702313e1717a7246656283a93f418bbd740a33ba3981","gasUsed":"30880","i":47,"t":20437},{"phase":"escrow","label":"reject (evaluator = klien)","txHash":"0x78e39fd204fa540739d0472089784054299122b57d2ca2fc5f5daa7e7c532492","gasUsed":"45890","i":48,"t":20456}],"channels":["0x3E110b43b9a89D7874d840167D7DdD5A13E4672a","0xa7DfeabF6536a89FCC10221F5ADc4e1759ff57eC"],"result":[{"pasar":"A: evaluator biner (complete)","klien_provider":"0 / 2.00","penentu":"alamat evaluator","terlihat":"harga, ambang, penalti (string)","gas":"330854","proving_ms":"-","txs":[{"label":"approve","hash":"0x9713041a405e234385115b4e3cabc020fb9b2545991142f0ffe488eebd9ab261"},{"label":"createJob (syarat di calldata)","hash":"0x9e55914045768b3eeebfd96a57d29e22123f43a34d377d227a55da9f3b38429e"},{"label":"fund","hash":"0x9e9281bcb7aacb52e1becb2cf93ba237ed4c0ac28d5e0105d17955abce3b4b7e"},{"label":"submit (provider)","hash":"0x59688a7472f9167b6dc70669e0a84a8d8ced1d76f55dc684f1a0a6951e7149df"},{"label":"complete (evaluator = klien)","hash":"0x2ba63048d5513fd7aba60e567ec281ca91ee72893cc1b0740a8ad255ed6a182e"}]},{"pasar":"A: evaluator biner (reject)","klien_provider":"2.00 / 0","penentu":"alamat evaluator","terlihat":"harga, ambang, penalti (string)","gas":"330781","proving_ms":"-","txs":[{"label":"approve","hash":"0xa82406c6bb9e9152f51c33c6eb87237030b714789f92a164cf8228ce0865265d"},{"label":"createJob (syarat di calldata)","hash":"0x0f70a09ac74942eb08ec32df64d95e221dc60d954e646815711115592a58692c"},{"label":"fund","hash":"0x0f21e3152ad3ac67e11b381d5f5a2f6189a5087344069aa4fec465e4bd45df4b"},{"label":"submit (provider)","hash":"0x73b5d86c0e0478d138a7702313e1717a7246656283a93f418bbd740a33ba3981"},{"label":"reject (evaluator = klien)","hash":"0x78e39fd204fa540739d0472089784054299122b57d2ca2fc5f5daa7e7c532492"}]},{"pasar":"B: AegisClear kooperatif","klien_provider":"0.00 / 2.00","penentu":"dua tanda tangan","terlihat":"T, R, jumlah","gas":"163025","proving_ms":"-","txs":[{"label":"fund","hash":"0x0f1317c68bf208a116dd1084606b7ce269ed6108b16e38633d1f6427bc8b5b40"},{"label":"closeCooperative","hash":"0x15eefd1659bba162b1ab5e3cb262b8e57f135b184786aef8985a7f60a77dbd32"}]},{"pasar":"B: AegisClear sengketa (bukti)","klien_provider":"0.07 / 1.93","penentu":"bukti Groth16","terlihat":"T, R, jumlah, payToClient","gas":"545702","proving_ms":"3184","txs":[{"label":"fund","hash":"0x72c05ccd26f985dbf93bb912d6b3b6fbc6f59a2ff0c75c6f9ba0d5694421224b"},{"label":"submitCheckpoint","hash":"0xcd1f42f610b00d37e704f819850d3956e1f691263bf985f936e85b059dd737b1"},{"label":"claimPenalty","hash":"0x0ae0bc2071c1dc2cee25cf3096e5ae68e6ae8413e3ae5ae63ba934b5c28a03ae"},{"label":"settle","hash":"0xa0d19115178d8643983b27c4bb6414194c942191d2fa7bcc3e2f8cede6199bb7"}]}],"endedAt":1790128186909}
+id: end
+

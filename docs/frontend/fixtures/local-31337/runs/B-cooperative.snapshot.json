@@ -1,0 +1,190 @@
+{
+  "httpStatus": 200,
+  "body": {
+    "id": "mudg32t2-660979",
+    "scenario": "B-cooperative",
+    "status": "done",
+    "startedAt": 1790128157942,
+    "steps": [
+      {
+        "phase": "fund",
+        "label": "▶ B-cooperative — klien A 0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "i": 0,
+        "t": 3
+      },
+      {
+        "phase": "fund",
+        "label": "402 diterima: payTo 0x4d5bCCDb393F62712C0174F62db123c64216bc4F, deposit 5.00 USDG",
+        "channel": "0x4d5bCCDb393F62712C0174F62db123c64216bc4F",
+        "i": 1,
+        "t": 101
+      },
+      {
+        "phase": "fund",
+        "label": "fund",
+        "txHash": "0x9dca9167e20990b6cbd87591879a9e2187ea20cf3edc14b3bcc08d8753b54ba3",
+        "gasUsed": "51577",
+        "channel": "0x4d5bCCDb393F62712C0174F62db123c64216bc4F",
+        "i": 2,
+        "t": 101
+      },
+      {
+        "phase": "open",
+        "label": "provider membuka channel saat ack pertama (tx provider, lihat kolom channel)",
+        "channel": "0x4d5bCCDb393F62712C0174F62db123c64216bc4F",
+        "i": 3,
+        "t": 101
+      },
+      {
+        "phase": "serve",
+        "label": "10/100 unit dilayani & di-ack (checkpoint co-signed)",
+        "progress": {
+          "done": 10,
+          "total": 100
+        },
+        "channel": "0x4d5bCCDb393F62712C0174F62db123c64216bc4F",
+        "i": 4,
+        "t": 418
+      },
+      {
+        "phase": "serve",
+        "label": "20/100 unit dilayani & di-ack (checkpoint co-signed)",
+        "progress": {
+          "done": 20,
+          "total": 100
+        },
+        "channel": "0x4d5bCCDb393F62712C0174F62db123c64216bc4F",
+        "i": 5,
+        "t": 668
+      },
+      {
+        "phase": "serve",
+        "label": "30/100 unit dilayani & di-ack (checkpoint co-signed)",
+        "progress": {
+          "done": 30,
+          "total": 100
+        },
+        "channel": "0x4d5bCCDb393F62712C0174F62db123c64216bc4F",
+        "i": 6,
+        "t": 872
+      },
+      {
+        "phase": "serve",
+        "label": "40/100 unit dilayani & di-ack (checkpoint co-signed)",
+        "progress": {
+          "done": 40,
+          "total": 100
+        },
+        "channel": "0x4d5bCCDb393F62712C0174F62db123c64216bc4F",
+        "i": 7,
+        "t": 1065
+      },
+      {
+        "phase": "serve",
+        "label": "50/100 unit dilayani & di-ack (checkpoint co-signed)",
+        "progress": {
+          "done": 50,
+          "total": 100
+        },
+        "channel": "0x4d5bCCDb393F62712C0174F62db123c64216bc4F",
+        "i": 8,
+        "t": 1256
+      },
+      {
+        "phase": "serve",
+        "label": "60/100 unit dilayani & di-ack (checkpoint co-signed)",
+        "progress": {
+          "done": 60,
+          "total": 100
+        },
+        "channel": "0x4d5bCCDb393F62712C0174F62db123c64216bc4F",
+        "i": 9,
+        "t": 1448
+      },
+      {
+        "phase": "serve",
+        "label": "70/100 unit dilayani & di-ack (checkpoint co-signed)",
+        "progress": {
+          "done": 70,
+          "total": 100
+        },
+        "channel": "0x4d5bCCDb393F62712C0174F62db123c64216bc4F",
+        "i": 10,
+        "t": 1640
+      },
+      {
+        "phase": "serve",
+        "label": "80/100 unit dilayani & di-ack (checkpoint co-signed)",
+        "progress": {
+          "done": 80,
+          "total": 100
+        },
+        "channel": "0x4d5bCCDb393F62712C0174F62db123c64216bc4F",
+        "i": 11,
+        "t": 1835
+      },
+      {
+        "phase": "serve",
+        "label": "90/100 unit dilayani & di-ack (checkpoint co-signed)",
+        "progress": {
+          "done": 90,
+          "total": 100
+        },
+        "channel": "0x4d5bCCDb393F62712C0174F62db123c64216bc4F",
+        "i": 12,
+        "t": 2029
+      },
+      {
+        "phase": "serve",
+        "label": "100/100 unit dilayani & di-ack (checkpoint co-signed)",
+        "progress": {
+          "done": 100,
+          "total": 100
+        },
+        "channel": "0x4d5bCCDb393F62712C0174F62db123c64216bc4F",
+        "i": 13,
+        "t": 2330
+      },
+      {
+        "phase": "ack",
+        "label": "ack terakhir dikirim (POST /ack)",
+        "channel": "0x4d5bCCDb393F62712C0174F62db123c64216bc4F",
+        "i": 14,
+        "t": 2334
+      },
+      {
+        "phase": "close",
+        "label": "closeCooperative",
+        "txHash": "0x456c1613695442da042b5a7f7894c9dda06c4aed9983638435b5832079e6488d",
+        "gasUsed": "111448",
+        "channel": "0x4d5bCCDb393F62712C0174F62db123c64216bc4F",
+        "i": 15,
+        "t": 2369
+      }
+    ],
+    "channels": [
+      "0x4d5bCCDb393F62712C0174F62db123c64216bc4F"
+    ],
+    "result": [
+      {
+        "pasar": "B: AegisClear kooperatif",
+        "klien_provider": "0.00 / 2.00",
+        "penentu": "dua tanda tangan",
+        "terlihat": "T, R, jumlah",
+        "gas": "163025",
+        "proving_ms": "-",
+        "txs": [
+          {
+            "label": "fund",
+            "hash": "0x9dca9167e20990b6cbd87591879a9e2187ea20cf3edc14b3bcc08d8753b54ba3"
+          },
+          {
+            "label": "closeCooperative",
+            "hash": "0x456c1613695442da042b5a7f7894c9dda06c4aed9983638435b5832079e6488d"
+          }
+        ]
+      }
+    ],
+    "endedAt": 1790128160318
+  }
+}

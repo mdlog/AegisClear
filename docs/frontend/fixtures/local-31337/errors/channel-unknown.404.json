@@ -1,0 +1,6 @@
+{
+  "httpStatus": 404,
+  "body": {
+    "error": "unknown channel"
+  }
+}

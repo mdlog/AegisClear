@@ -1,0 +1,326 @@
+{
+  "httpStatus": 200,
+  "body": {
+    "channel": "0xAD30BC162CCd7cB7680760b4a6181186A28d879c",
+    "factory": "0xa53eC39546f5Fb743A02dF412F290c2A435E2B76",
+    "factoryName": "factoryAnchored",
+    "client": "0xd4B72f6e5111ADE077B2f15F00a4f7954d8E9402",
+    "provider": "0x90351bB1E85a17D5f70c62C0cC076D39D897076D",
+    "termsCommitment": "0x013122582fcd2bcd68d62586d537129a77421044898ab339a57abf349d55ce8c",
+    "state": "SETTLED",
+    "seq": 20,
+    "epoch": 0,
+    "cumulativeAmount": "400000",
+    "receiptsRoot": "0x116a341c01342c4a02c08f72f5c4534e7e54330828cbc8e11667288d15ba5531",
+    "budget": "0",
+    "deadline": 1789909289,
+    "hasProof": true,
+    "payToClient": "20000",
+    "openedTx": "0x049c9fa67dd6510dd8bcff0b9624a384caff190e9b69aada6932c9d80d0b26ea",
+    "openedBlock": "122040338",
+    "mode": "anchored",
+    "cfg": {
+      "client": "0xd4B72f6e5111ADE077B2f15F00a4f7954d8E9402",
+      "provider": "0x90351bB1E85a17D5f70c62C0cC076D39D897076D",
+      "token": "0x5A9BC1441DE45D7a722339Bec093637bc5042382",
+      "termsCommitment": "0x013122582fcd2bcd68d62586d537129a77421044898ab339a57abf349d55ce8c",
+      "challengeWindow": 60,
+      "responseWindow": 30,
+      "payoutClient": "0xd4B72f6e5111ADE077B2f15F00a4f7954d8E9402",
+      "payoutProvider": "0x90351bB1E85a17D5f70c62C0cC076D39D897076D",
+      "salt": "0x09c2eb50101034e2640958acc4127d19b092e05fe3fc6605d5b2a07a6de2b385"
+    },
+    "events": [
+      {
+        "name": "Opened",
+        "args": {
+          "client": "0xd4B72f6e5111ADE077B2f15F00a4f7954d8E9402",
+          "provider": "0x90351bB1E85a17D5f70c62C0cC076D39D897076D",
+          "termsCommitment": "0x013122582fcd2bcd68d62586d537129a77421044898ab339a57abf349d55ce8c",
+          "challengeWindow": "60"
+        },
+        "txHash": "0x049c9fa67dd6510dd8bcff0b9624a384caff190e9b69aada6932c9d80d0b26ea",
+        "blockNumber": "122040338",
+        "gasUsed": "308476"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "0",
+          "leaf": "0x24f90cda7da8fc31d63c525cf8206539aaeb0e986bbf1572d061f568338a6f95",
+          "cumulativeAmount": "20000",
+          "root": "0x139b18443fa7ccf8208c01b2cc464608754e328fed886afdf051732da84c3141"
+        },
+        "txHash": "0xa253b3404aaf35f47b843a79d19bf9b6cf6a20b597b444c900335a77a9dc5bec",
+        "blockNumber": "122040352",
+        "gasUsed": "349751"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "1",
+          "leaf": "0x005b96308789b558a49220ad3b4ddd8daa0cb3a4b4b776a8d081bc37ee12accc",
+          "cumulativeAmount": "40000",
+          "root": "0x249c3fc42dd8f457ac8e96f77536c50ebfaea8a323858224d42c689455151f73"
+        },
+        "txHash": "0x220d955123ae3f2694441c2d8f1699c1cb10a9a57825ae174f8e589e611d2971",
+        "blockNumber": "122040367",
+        "gasUsed": "209843"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "2",
+          "leaf": "0x0bcd548e7a5a40591d43920e9553cb68eb63daebcbbf559d46b2aa9a44febc48",
+          "cumulativeAmount": "60000",
+          "root": "0x1c62f9f99cb5039f55be6fe9f86eee391a910587a566ade18f0d3be331907ee5"
+        },
+        "txHash": "0x0a265b60ffcdd416cbe31f37aa972ba29fcc2af2efc746c61bc905c34383c506",
+        "blockNumber": "122040381",
+        "gasUsed": "209857"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "3",
+          "leaf": "0x1be67810f138531f014ee73e662de4bff6537c67887395ac857a3105707dd0e0",
+          "cumulativeAmount": "80000",
+          "root": "0x05a20b0c9874d69753754fd91c70803c3a085265c59bbb2377d0ac749a3591a7"
+        },
+        "txHash": "0xd399ae83b1e4e2ee2f6c15c1823b0e722b4fbd01f15d227ab7f3459eb5744881",
+        "blockNumber": "122040399",
+        "gasUsed": "207164"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "4",
+          "leaf": "0x2f074d6c2fa3bfd54b9c64a306bcfd8cc790fdd13ae2932374bc35b0e313ae45",
+          "cumulativeAmount": "100000",
+          "root": "0x18750c3f252bb7b157b8f8aa3253384e32fddd8a2ab1cffc8981fbc038dc7b7f"
+        },
+        "txHash": "0x655d079bb1a19fac478f7538c2c0b5268c6b1c0ece5d1bab84cc7ecdf75365d3",
+        "blockNumber": "122040418",
+        "gasUsed": "209890"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "5",
+          "leaf": "0x123ebe2f212a2aa76b55e76e26f07b6b936d2ca8f41ef46764021a39aea1aecb",
+          "cumulativeAmount": "120000",
+          "root": "0x1e0718db0ecd071bb9257965b2ee0d30b7c59df9229160354c4b8c313d9568b7"
+        },
+        "txHash": "0xa894d7d1dc01776b518c505d9d5990a2b1810f1bdad7fc66a267be7c9f2ea5ca",
+        "blockNumber": "122040435",
+        "gasUsed": "206873"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "6",
+          "leaf": "0x2ee56be58ab3c9b6ed79d561f8148be3f67477599c6ada0706df18251035721b",
+          "cumulativeAmount": "140000",
+          "root": "0x1cce86cb6fe881520367f5c352c7630c659c9b92391d367b69e6b250aabf3e23"
+        },
+        "txHash": "0x0a15064912e6a5a2dbc9c0d17a3afcf20c09d115eec62ee21cd56d8eb00c5110",
+        "blockNumber": "122040447",
+        "gasUsed": "207039"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "7",
+          "leaf": "0x065c42dbe46319432119ba4d7418a0e86dce7d59eb07cb2e62a1432bccb9fce0",
+          "cumulativeAmount": "160000",
+          "root": "0x206673f68e4052b059c88a44fc72286737db92852b77a7383fc4a19445de4c0a"
+        },
+        "txHash": "0xb3060204c0422177c6ddfb4c0899ae40c3289e20ff92c2a989a4df59c66c946b",
+        "blockNumber": "122040462",
+        "gasUsed": "203990"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "8",
+          "leaf": "0x2d6c8bc2d26f0f74824990d773df08a8b5ed3a3393dcc4f3e636bad582d89fb8",
+          "cumulativeAmount": "180000",
+          "root": "0x28cd84d46a69459153ba507c4a5d3e80537f7df4ffa2fc98426a7228b1c81caf"
+        },
+        "txHash": "0x233a8ce8fa9054fcdb68da0d5c65c391e233aced63d16f9878dbf89bc99339f3",
+        "blockNumber": "122040477",
+        "gasUsed": "210018"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "9",
+          "leaf": "0x10366ce096e0d8ddbe9427dd6e8319fe99f39604a36d9b4686959d09863cbe17",
+          "cumulativeAmount": "200000",
+          "root": "0x1a5e9851f2fdb30a75751fa56293daef28c8eaaacb06d21d223541dbac1f5bd5"
+        },
+        "txHash": "0x64c4f65c6e114fcc5fbf9a78056bd2f033ad18988b9dfe0c4d155454d9a65eef",
+        "blockNumber": "122040487",
+        "gasUsed": "206933"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "10",
+          "leaf": "0x070b8abe8561eed42258e4214df8c3591844e87f7af813f011c6faaa11e13fb1",
+          "cumulativeAmount": "220000",
+          "root": "0x09e1ab233a0924f57dd7bf0382f40ccb32cd143b7eb418f33bd96d828bbe6396"
+        },
+        "txHash": "0x7442ec1e2f18bf576f9fa33d359ae600206333aee9afb99aa87713649c73f6da",
+        "blockNumber": "122040505",
+        "gasUsed": "206884"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "11",
+          "leaf": "0x1c01553f82ab9fb00becd70af886da9d15bce4b23b3c11ac3c882dc544bd0bd8",
+          "cumulativeAmount": "240000",
+          "root": "0x1d8fcdba9c1ed1056f901d661f827825e0794c6a00d2ad358d0d3d62237f704d"
+        },
+        "txHash": "0x22910f28b3fa23aa3ee358924702ce9583ac087d9edded68fac09e1287fa9fba",
+        "blockNumber": "122040528",
+        "gasUsed": "203970"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "12",
+          "leaf": "0x1c26c2617175a126c3a36e5161fd29bbe98fc6ec8ef274d8f220c5997a2135da",
+          "cumulativeAmount": "260000",
+          "root": "0x02ec8483a8f9e074e84fe615b20ab2942278d5e9f599093d303b989f6441302f"
+        },
+        "txHash": "0x22df3e8497ef8a116962e0451b02ffa52c255797d27efc9b7bc1a09ec1f8d31e",
+        "blockNumber": "122040547",
+        "gasUsed": "206971"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "13",
+          "leaf": "0x0cb85d20b44b0fadb57a813948cb61199e030e8e191b2c6ce4ef4cf24b32849f",
+          "cumulativeAmount": "280000",
+          "root": "0x20df1f9e8b920273e6f724e32538693ffb09690647c0b95853b1b7d3f41dccf9"
+        },
+        "txHash": "0xee4e21a2afb5c7cc200debf66e25ba93669b3697b8968b419fbbb994f255edda",
+        "blockNumber": "122040570",
+        "gasUsed": "203872"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "14",
+          "leaf": "0x18f2612814be7adef74cbc0ad61919f35c03f584d04119ef9d1e7f007f003759",
+          "cumulativeAmount": "300000",
+          "root": "0x0b9f5117f642fec92ad90532a201ac232250859a97e413f9803f6404238e34f4"
+        },
+        "txHash": "0xefb3d6fb2b0384826b9a42cb7fe82e1c8aaf5839f607a7741be54259357ef8e9",
+        "blockNumber": "122040587",
+        "gasUsed": "204036"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "15",
+          "leaf": "0x24f33098fbd59535adca97c992ad80f0259cd02f11305e4ebf01558bf728cac2",
+          "cumulativeAmount": "320000",
+          "root": "0x0d975b878c3d984a233003c31340fdb17f4f39293fc8f068787482f321174a3d"
+        },
+        "txHash": "0x9e8eacd64915a45831afe887b1e6730fbb4e765c6564e98a705589d5d483c218",
+        "blockNumber": "122040605",
+        "gasUsed": "201020"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "16",
+          "leaf": "0x09fc72ace32a15ba7e4a1ec7be26b96fb3be465ee46176498813968276eaa63f",
+          "cumulativeAmount": "340000",
+          "root": "0x2f20563f1c8e656690d7306d9299604948bf2d61d17b72158c726687c4b92459"
+        },
+        "txHash": "0x021ff0ce945347532f18700cbc7088e91154556f69e88a083d61c3a94919c1a9",
+        "blockNumber": "122040624",
+        "gasUsed": "210087"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "17",
+          "leaf": "0x2d7b45bebfa29528ecf7f3b3fd7ffe6a6b8ff12e386e1336bab03566c5da9887",
+          "cumulativeAmount": "360000",
+          "root": "0x2ceb55b2de61b7c33927aebfa5749e31a478ef373fdb858b3dd636bf71a30e4b"
+        },
+        "txHash": "0xe94066b0203d9a76c34853be3344e8bd16fd5c01196863704e99e16d1125f7ae",
+        "blockNumber": "122040637",
+        "gasUsed": "206908"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "18",
+          "leaf": "0x17c55802499030ba52357a591b729c5de660f9fc78c480d7707f59cc76de4733",
+          "cumulativeAmount": "380000",
+          "root": "0x0e5c6d67893562e10ce74a63c6bacbef7eab8a519d10db3285f0e0556d24417c"
+        },
+        "txHash": "0x7b837fdbb27af4eeb5e03069837687b30bf94d513422ed793065d7915ba133bc",
+        "blockNumber": "122040651",
+        "gasUsed": "206831"
+      },
+      {
+        "name": "Acked",
+        "args": {
+          "seq": "19",
+          "leaf": "0x2606838becb7b1bda202301e1824f4cf23dca2e9a45f93c85bb172403bd355a9",
+          "cumulativeAmount": "400000",
+          "root": "0x116a341c01342c4a02c08f72f5c4534e7e54330828cbc8e11667288d15ba5531"
+        },
+        "txHash": "0x5f87de1537af47edb09bef91254fa555fec2cc57e2e0b966da1a4505e858581a",
+        "blockNumber": "122040666",
+        "gasUsed": "204158"
+      },
+      {
+        "name": "CloseStarted",
+        "args": {
+          "by": "0xd4B72f6e5111ADE077B2f15F00a4f7954d8E9402",
+          "seq": "20",
+          "cumulativeAmount": "400000",
+          "receiptsRoot": "0x116a341c01342c4a02c08f72f5c4534e7e54330828cbc8e11667288d15ba5531",
+          "deadline": "1789909289"
+        },
+        "txHash": "0x95e86f359287effaffcbd73046cc69d2c3499a61396899f135959fe56319a8c5",
+        "blockNumber": "122040675",
+        "gasUsed": "63108"
+      },
+      {
+        "name": "PenaltyClaimed",
+        "args": {
+          "by": "0xd4B72f6e5111ADE077B2f15F00a4f7954d8E9402",
+          "seq": "20",
+          "payToClient": "20000"
+        },
+        "txHash": "0xd8826e763a1f77b5743a2475acb33286fbca774826901e9be795564294cc00ab",
+        "blockNumber": "122040707",
+        "gasUsed": "304420"
+      },
+      {
+        "name": "Settled",
+        "args": {
+          "seq": "20",
+          "cumulativeAmount": "400000",
+          "penalty": "20000",
+          "toProvider": "380000",
+          "toClient": "4620000",
+          "cooperative": "false"
+        },
+        "txHash": "0x20fd4439326ac04bc297200833773bbc29298d8d4cc962c38f56bfd2cfcb9495",
+        "blockNumber": "122040984",
+        "gasUsed": "100077"
+      }
+    ]
+  }
+}

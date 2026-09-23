@@ -1,0 +1,75 @@
+{
+  "httpStatus": 200,
+  "body": {
+    "channel": "0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA",
+    "factory": "0x202CCe504e04bEd6fC0521238dDf04Bc9E8E15aB",
+    "factoryName": "factory",
+    "client": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+    "provider": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+    "termsCommitment": "0x1d4f4a77289f89d991ea01c2177a44e86fc6809a6e1d804dc24b229414aec65c",
+    "state": "SETTLED",
+    "seq": 5,
+    "epoch": 1,
+    "cumulativeAmount": "0",
+    "receiptsRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "budget": "0",
+    "deadline": 0,
+    "hasProof": false,
+    "payToClient": "0",
+    "openedTx": "0x38a5e6df0e066d6a6162afe4112d37920c0674c8f46a0a4eb1568bbc1d909546",
+    "openedBlock": "1356",
+    "runId": "mudg2zjn-faee38",
+    "mode": "co-signed",
+    "cfg": {
+      "client": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+      "provider": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+      "token": "0x8198f5d8F8CfFE8f9C413d98a0A55aEB8ab9FbB7",
+      "termsCommitment": "0x1d4f4a77289f89d991ea01c2177a44e86fc6809a6e1d804dc24b229414aec65c",
+      "challengeWindow": 120,
+      "responseWindow": 60,
+      "payoutClient": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+      "payoutProvider": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+      "salt": "0x5a948f4b322f5c2b4e41e273f91ea06a7407b21c3cc8401d674b45cf8148d0f6"
+    },
+    "events": [
+      {
+        "name": "Opened",
+        "args": {
+          "client": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+          "provider": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+          "termsCommitment": "0x1d4f4a77289f89d991ea01c2177a44e86fc6809a6e1d804dc24b229414aec65c",
+          "challengeWindow": "120"
+        },
+        "txHash": "0x38a5e6df0e066d6a6162afe4112d37920c0674c8f46a0a4eb1568bbc1d909546",
+        "blockNumber": "1356",
+        "gasUsed": "296351"
+      },
+      {
+        "name": "RolledOver",
+        "args": {
+          "newEpoch": "1",
+          "closedSeq": "128",
+          "toProvider": "2560000",
+          "remaining": "2440000"
+        },
+        "txHash": "0x32ed7aa74ba82f6367def540fa419caad2462a1c51bcd9499d4caa34335715b5",
+        "blockNumber": "1357",
+        "gasUsed": "124384"
+      },
+      {
+        "name": "Settled",
+        "args": {
+          "seq": "5",
+          "cumulativeAmount": "0",
+          "penalty": "0",
+          "toProvider": "100000",
+          "toClient": "2340000",
+          "cooperative": "true"
+        },
+        "txHash": "0xe2582239fcd90cea9de4af6cb02123259d1a5ce0fb418643c8625cf981aae27e",
+        "blockNumber": "1358",
+        "gasUsed": "91524"
+      }
+    ]
+  }
+}

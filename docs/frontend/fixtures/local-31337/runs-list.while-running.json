@@ -1,0 +1,15 @@
+{
+  "httpStatus": 200,
+  "body": [
+    {
+      "id": "mudg1f4b-60a0fd",
+      "scenario": "B-dispute",
+      "status": "running",
+      "startedAt": 1790128080587,
+      "steps": [],
+      "channels": [
+        "0x1E12393dA190449B9CA32D1f280C4D45fB21C6C4"
+      ]
+    }
+  ]
+}

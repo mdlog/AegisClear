@@ -1,0 +1,136 @@
+event: step
+data: {"phase":"fund","label":"▶ B-anchored-dispute — klien A 0x70997970C51812dc3A010C7d01b50e0d17dc79C8","i":0,"t":8}
+id: 0
+
+event: step
+data: {"phase":"fund","label":"402 diterima: payTo 0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb, deposit 5.00 USDG","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":1,"t":99}
+id: 1
+
+event: step
+data: {"phase":"fund","label":"fund","txHash":"0x5d95db050545e1a9c4000f947bb162f400fb5fac026ac462b14a51549d1c16a4","gasUsed":"51577","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":2,"t":99}
+id: 2
+
+event: step
+data: {"phase":"open","label":"provider membuka channel saat ack pertama (tx provider, lihat kolom channel)","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":3,"t":99}
+id: 3
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0xbce87bc644de416b98bbf2eada77c0779a087f8f599285b6284eb888bb4c6efa","gasUsed":"449142","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":4,"t":204}
+id: 4
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0x357f0ab73ced4a3bf067aed2d1576baa6a5007f9d5d80834b8f72f0ee79d2ba7","gasUsed":"309379","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":5,"t":253}
+id: 5
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0x20fb6ae8ea0537a8d6c1b5bc2881f8c99e60e262fc6148cc9c92f3ea1757f6e0","gasUsed":"309367","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":6,"t":317}
+id: 6
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0xfcf3ed248f421404585e35dc47d613fd5bf08d69a570e5f6dd18dc70f4524fe6","gasUsed":"306404","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":7,"t":385}
+id: 7
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0xdfca98a9f64a3db0b1515afa09a7014a9306f8aa3180892bddee0919b34689f5","gasUsed":"309344","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":8,"t":4454}
+id: 8
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0x91cbff00359069353e5bdcb36f91780958bb2a3e094f050a08c862791f356b01","gasUsed":"306393","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":9,"t":8505}
+id: 9
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0xe32d321129e372e4fa705bdfa62b5249e1e75ed531a4bf9b014c31b8dfbbcd57","gasUsed":"306369","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":10,"t":12572}
+id: 10
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0x209d72f47374a4d38afb507908b14d9a0943617d35e0576abe95227f763e7b51","gasUsed":"303394","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":11,"t":12641}
+id: 11
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0x00dc7d748d0196e71afd8d7fb050c51c408d78a521942ebff73920eab565cb62","gasUsed":"309333","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":12,"t":16711}
+id: 12
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0xc919fc233b596ae5d8398d8d8646b1b7bb7ed408ee80e6edb6a36babbee458c3","gasUsed":"306370","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":13,"t":20777}
+id: 13
+
+event: step
+data: {"phase":"serve","label":"10/20 unit dilayani & di-ack on-chain","progress":{"done":10,"total":20},"channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":14,"t":20777}
+id: 14
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0x49d416d678536fa5379f456eaacbbb46cbe1eef3ad7cbdd492c61ae0aaaec87a","gasUsed":"306346","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":15,"t":24844}
+id: 15
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0x92e7ec8c200481998c1240cec7947be2b5d17225e470b822984a7cf2e118dcb6","gasUsed":"303383","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":16,"t":28912}
+id: 16
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0xed084cb40faf8ba266af1e1789e748b7c46d92af474bfaec37917a135ddd54de","gasUsed":"306311","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":17,"t":32981}
+id: 17
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0xb830243efd8d66680c1e8c120ca370b137fc007ea7a85d9097e7dc43299e6aaf","gasUsed":"303360","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":18,"t":37048}
+id: 18
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0xe16773a9fb3c500f8350149e62a26bf09849714f4e8d52320ba33fa5270829a9","gasUsed":"303312","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":19,"t":41113}
+id: 19
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0x1d813491c84ead19dd297bd2f7c27c942a43493e7a3c23a4425c2554785b50da","gasUsed":"300361","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":20,"t":45190}
+id: 20
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0x8f5ded880c541659e762be11d693db351616d0af0948f157368898d9590cfaf7","gasUsed":"309310","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":21,"t":49256}
+id: 21
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0xfc09f9369924699ecb6e9f093159ce5584f6f452e3987554ad672cd8bc44af94","gasUsed":"306347","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":22,"t":53322}
+id: 22
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0x3d92da16c9c1ef154771af246c0b5c0986f86d288959f4cac1fad00be3681cf9","gasUsed":"306323","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":23,"t":53391}
+id: 23
+
+event: step
+data: {"phase":"ack","label":"ack","txHash":"0x6b26b64d474e1ff343b262a2dab0ea83c196e29e6fdc5608a1f6609b49d30ca3","gasUsed":"303360","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":24,"t":57438}
+id: 24
+
+event: step
+data: {"phase":"serve","label":"20/20 unit dilayani & di-ack on-chain","progress":{"done":20,"total":20},"channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":25,"t":57438}
+id: 25
+
+event: step
+data: {"phase":"ack","label":"ack terakhir dikirim (POST /ack)","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":26,"t":57438}
+id: 26
+
+event: step
+data: {"phase":"dispute","label":"sengketa: submit checkpoint co-signed tertinggi, lalu bukti penalti","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":27,"t":57438}
+id: 27
+
+event: step
+data: {"phase":"dispute","label":"startClose","txHash":"0xb7b45223bf615a3ee0fd5a7754a1d239980408c3154e352a5fddad74cdb5dac3","gasUsed":"60155","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":28,"t":64996}
+id: 28
+
+event: step
+data: {"phase":"dispute","label":"claimPenalty","txHash":"0x5690068b30c2d27e8dffe2f02d32a6a7548d411cea1660153ae045f19f4a65f0","gasUsed":"293891","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":29,"t":64996}
+id: 29
+
+event: step
+data: {"phase":"prove","label":"bukti Groth16: payToClient 0.02 USDG","detail":"3436 ms proving","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":30,"t":64996}
+id: 30
+
+event: step
+data: {"phase":"wait","label":"Anvil: evm_increaseTime(114) + evm_mine","i":31,"t":65008}
+id: 31
+
+event: step
+data: {"phase":"settle","label":"settle","txHash":"0x34f7fdf457b9c0dcfca4d52af22db5f693fdf40fa512b91fe6e085fcaae48f51","gasUsed":"97098","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":32,"t":65058}
+id: 32
+
+event: done
+data: {"id":"mudg1kzg-7066ea","scenario":"B-anchored-dispute","status":"done","startedAt":1790128088188,"steps":[{"phase":"fund","label":"▶ B-anchored-dispute — klien A 0x70997970C51812dc3A010C7d01b50e0d17dc79C8","i":0,"t":8},{"phase":"fund","label":"402 diterima: payTo 0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb, deposit 5.00 USDG","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":1,"t":99},{"phase":"fund","label":"fund","txHash":"0x5d95db050545e1a9c4000f947bb162f400fb5fac026ac462b14a51549d1c16a4","gasUsed":"51577","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":2,"t":99},{"phase":"open","label":"provider membuka channel saat ack pertama (tx provider, lihat kolom channel)","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":3,"t":99},{"phase":"ack","label":"ack","txHash":"0xbce87bc644de416b98bbf2eada77c0779a087f8f599285b6284eb888bb4c6efa","gasUsed":"449142","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":4,"t":204},{"phase":"ack","label":"ack","txHash":"0x357f0ab73ced4a3bf067aed2d1576baa6a5007f9d5d80834b8f72f0ee79d2ba7","gasUsed":"309379","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":5,"t":253},{"phase":"ack","label":"ack","txHash":"0x20fb6ae8ea0537a8d6c1b5bc2881f8c99e60e262fc6148cc9c92f3ea1757f6e0","gasUsed":"309367","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":6,"t":317},{"phase":"ack","label":"ack","txHash":"0xfcf3ed248f421404585e35dc47d613fd5bf08d69a570e5f6dd18dc70f4524fe6","gasUsed":"306404","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":7,"t":385},{"phase":"ack","label":"ack","txHash":"0xdfca98a9f64a3db0b1515afa09a7014a9306f8aa3180892bddee0919b34689f5","gasUsed":"309344","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":8,"t":4454},{"phase":"ack","label":"ack","txHash":"0x91cbff00359069353e5bdcb36f91780958bb2a3e094f050a08c862791f356b01","gasUsed":"306393","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":9,"t":8505},{"phase":"ack","label":"ack","txHash":"0xe32d321129e372e4fa705bdfa62b5249e1e75ed531a4bf9b014c31b8dfbbcd57","gasUsed":"306369","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":10,"t":12572},{"phase":"ack","label":"ack","txHash":"0x209d72f47374a4d38afb507908b14d9a0943617d35e0576abe95227f763e7b51","gasUsed":"303394","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":11,"t":12641},{"phase":"ack","label":"ack","txHash":"0x00dc7d748d0196e71afd8d7fb050c51c408d78a521942ebff73920eab565cb62","gasUsed":"309333","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":12,"t":16711},{"phase":"ack","label":"ack","txHash":"0xc919fc233b596ae5d8398d8d8646b1b7bb7ed408ee80e6edb6a36babbee458c3","gasUsed":"306370","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":13,"t":20777},{"phase":"serve","label":"10/20 unit dilayani & di-ack on-chain","progress":{"done":10,"total":20},"channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":14,"t":20777},{"phase":"ack","label":"ack","txHash":"0x49d416d678536fa5379f456eaacbbb46cbe1eef3ad7cbdd492c61ae0aaaec87a","gasUsed":"306346","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":15,"t":24844},{"phase":"ack","label":"ack","txHash":"0x92e7ec8c200481998c1240cec7947be2b5d17225e470b822984a7cf2e118dcb6","gasUsed":"303383","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":16,"t":28912},{"phase":"ack","label":"ack","txHash":"0xed084cb40faf8ba266af1e1789e748b7c46d92af474bfaec37917a135ddd54de","gasUsed":"306311","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":17,"t":32981},{"phase":"ack","label":"ack","txHash":"0xb830243efd8d66680c1e8c120ca370b137fc007ea7a85d9097e7dc43299e6aaf","gasUsed":"303360","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":18,"t":37048},{"phase":"ack","label":"ack","txHash":"0xe16773a9fb3c500f8350149e62a26bf09849714f4e8d52320ba33fa5270829a9","gasUsed":"303312","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":19,"t":41113},{"phase":"ack","label":"ack","txHash":"0x1d813491c84ead19dd297bd2f7c27c942a43493e7a3c23a4425c2554785b50da","gasUsed":"300361","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":20,"t":45190},{"phase":"ack","label":"ack","txHash":"0x8f5ded880c541659e762be11d693db351616d0af0948f157368898d9590cfaf7","gasUsed":"309310","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":21,"t":49256},{"phase":"ack","label":"ack","txHash":"0xfc09f9369924699ecb6e9f093159ce5584f6f452e3987554ad672cd8bc44af94","gasUsed":"306347","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":22,"t":53322},{"phase":"ack","label":"ack","txHash":"0x3d92da16c9c1ef154771af246c0b5c0986f86d288959f4cac1fad00be3681cf9","gasUsed":"306323","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":23,"t":53391},{"phase":"ack","label":"ack","txHash":"0x6b26b64d474e1ff343b262a2dab0ea83c196e29e6fdc5608a1f6609b49d30ca3","gasUsed":"303360","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":24,"t":57438},{"phase":"serve","label":"20/20 unit dilayani & di-ack on-chain","progress":{"done":20,"total":20},"channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":25,"t":57438},{"phase":"ack","label":"ack terakhir dikirim (POST /ack)","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":26,"t":57438},{"phase":"dispute","label":"sengketa: submit checkpoint co-signed tertinggi, lalu bukti penalti","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":27,"t":57438},{"phase":"dispute","label":"startClose","txHash":"0xb7b45223bf615a3ee0fd5a7754a1d239980408c3154e352a5fddad74cdb5dac3","gasUsed":"60155","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":28,"t":64996},{"phase":"dispute","label":"claimPenalty","txHash":"0x5690068b30c2d27e8dffe2f02d32a6a7548d411cea1660153ae045f19f4a65f0","gasUsed":"293891","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":29,"t":64996},{"phase":"prove","label":"bukti Groth16: payToClient 0.02 USDG","detail":"3436 ms proving","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":30,"t":64996},{"phase":"wait","label":"Anvil: evm_increaseTime(114) + evm_mine","i":31,"t":65008},{"phase":"settle","label":"settle","txHash":"0x34f7fdf457b9c0dcfca4d52af22db5f693fdf40fa512b91fe6e085fcaae48f51","gasUsed":"97098","channel":"0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb","i":32,"t":65058}],"channels":["0x98C1c9F39Df66B46cA0486c277fc6F60AeD8bCDb"],"result":[{"pasar":"B: AegisClear anchored (ack on-chain, sengketa)","klien_provider":"0.02 / 0.38","penentu":"bukti Groth16 atas R on-chain","terlihat":"hash daun, A per ack, payToClient","gas":"6766629","proving_ms":"3436","txs":[{"label":"fund","hash":"0x5d95db050545e1a9c4000f947bb162f400fb5fac026ac462b14a51549d1c16a4"},{"label":"ack","hash":"0xbce87bc644de416b98bbf2eada77c0779a087f8f599285b6284eb888bb4c6efa"},{"label":"ack","hash":"0x357f0ab73ced4a3bf067aed2d1576baa6a5007f9d5d80834b8f72f0ee79d2ba7"},{"label":"ack","hash":"0x20fb6ae8ea0537a8d6c1b5bc2881f8c99e60e262fc6148cc9c92f3ea1757f6e0"},{"label":"ack","hash":"0xfcf3ed248f421404585e35dc47d613fd5bf08d69a570e5f6dd18dc70f4524fe6"},{"label":"ack","hash":"0xdfca98a9f64a3db0b1515afa09a7014a9306f8aa3180892bddee0919b34689f5"},{"label":"ack","hash":"0x91cbff00359069353e5bdcb36f91780958bb2a3e094f050a08c862791f356b01"},{"label":"ack","hash":"0xe32d321129e372e4fa705bdfa62b5249e1e75ed531a4bf9b014c31b8dfbbcd57"},{"label":"ack","hash":"0x209d72f47374a4d38afb507908b14d9a0943617d35e0576abe95227f763e7b51"},{"label":"ack","hash":"0x00dc7d748d0196e71afd8d7fb050c51c408d78a521942ebff73920eab565cb62"},{"label":"ack","hash":"0xc919fc233b596ae5d8398d8d8646b1b7bb7ed408ee80e6edb6a36babbee458c3"},{"label":"ack","hash":"0x49d416d678536fa5379f456eaacbbb46cbe1eef3ad7cbdd492c61ae0aaaec87a"},{"label":"ack","hash":"0x92e7ec8c200481998c1240cec7947be2b5d17225e470b822984a7cf2e118dcb6"},{"label":"ack","hash":"0xed084cb40faf8ba266af1e1789e748b7c46d92af474bfaec37917a135ddd54de"},{"label":"ack","hash":"0xb830243efd8d66680c1e8c120ca370b137fc007ea7a85d9097e7dc43299e6aaf"},{"label":"ack","hash":"0xe16773a9fb3c500f8350149e62a26bf09849714f4e8d52320ba33fa5270829a9"},{"label":"ack","hash":"0x1d813491c84ead19dd297bd2f7c27c942a43493e7a3c23a4425c2554785b50da"},{"label":"ack","hash":"0x8f5ded880c541659e762be11d693db351616d0af0948f157368898d9590cfaf7"},{"label":"ack","hash":"0xfc09f9369924699ecb6e9f093159ce5584f6f452e3987554ad672cd8bc44af94"},{"label":"ack","hash":"0x3d92da16c9c1ef154771af246c0b5c0986f86d288959f4cac1fad00be3681cf9"},{"label":"ack","hash":"0x6b26b64d474e1ff343b262a2dab0ea83c196e29e6fdc5608a1f6609b49d30ca3"},{"label":"startClose","hash":"0xb7b45223bf615a3ee0fd5a7754a1d239980408c3154e352a5fddad74cdb5dac3"},{"label":"claimPenalty","hash":"0x5690068b30c2d27e8dffe2f02d32a6a7548d411cea1660153ae045f19f4a65f0"},{"label":"settle","hash":"0x34f7fdf457b9c0dcfca4d52af22db5f693fdf40fa512b91fe6e085fcaae48f51"}]}],"endedAt":1790128153252}
+id: end
+

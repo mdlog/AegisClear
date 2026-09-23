@@ -1,0 +1,91 @@
+{
+  "httpStatus": 200,
+  "body": {
+    "id": "mudg37qp-0bdeee",
+    "scenario": "A-reject",
+    "status": "done",
+    "startedAt": 1790128164337,
+    "steps": [
+      {
+        "phase": "escrow",
+        "label": "▶ A-reject — klien B 0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+        "i": 0,
+        "t": 3
+      },
+      {
+        "phase": "escrow",
+        "label": "approve",
+        "txHash": "0x5e390746b2ac5b809068a21be291311cab896259a512bb927a464c27e39b7f64",
+        "gasUsed": "46330",
+        "i": 1,
+        "t": 30
+      },
+      {
+        "phase": "escrow",
+        "label": "createJob (syarat di calldata)",
+        "txHash": "0x61b200ee7733cd13cfa1fe0e6f71a3d658e24b97c8a499517feb13c05245cf8a",
+        "gasUsed": "103827",
+        "i": 2,
+        "t": 51
+      },
+      {
+        "phase": "escrow",
+        "label": "fund",
+        "txHash": "0x75aaf1db19ca7e0f64484b68869180ddafe55b7eb83e1384c70ed1e26ebe072f",
+        "gasUsed": "103854",
+        "i": 3,
+        "t": 76
+      },
+      {
+        "phase": "escrow",
+        "label": "submit (provider)",
+        "txHash": "0x8d6d571ca4af08d5bd6014fe73df410ed3717ffbf5ed249c4b573266222c4453",
+        "gasUsed": "30880",
+        "i": 4,
+        "t": 102
+      },
+      {
+        "phase": "escrow",
+        "label": "reject (evaluator = klien)",
+        "txHash": "0xfeb9311e6c1a1598734399060a041d0450fb24879b6d103758d3385f72693d97",
+        "gasUsed": "45890",
+        "i": 5,
+        "t": 120
+      }
+    ],
+    "channels": [],
+    "result": [
+      {
+        "pasar": "A: evaluator biner (reject)",
+        "klien_provider": "2.00 / 0",
+        "penentu": "alamat evaluator",
+        "terlihat": "harga, ambang, penalti (string)",
+        "gas": "330781",
+        "proving_ms": "-",
+        "txs": [
+          {
+            "label": "approve",
+            "hash": "0x5e390746b2ac5b809068a21be291311cab896259a512bb927a464c27e39b7f64"
+          },
+          {
+            "label": "createJob (syarat di calldata)",
+            "hash": "0x61b200ee7733cd13cfa1fe0e6f71a3d658e24b97c8a499517feb13c05245cf8a"
+          },
+          {
+            "label": "fund",
+            "hash": "0x75aaf1db19ca7e0f64484b68869180ddafe55b7eb83e1384c70ed1e26ebe072f"
+          },
+          {
+            "label": "submit (provider)",
+            "hash": "0x8d6d571ca4af08d5bd6014fe73df410ed3717ffbf5ed249c4b573266222c4453"
+          },
+          {
+            "label": "reject (evaluator = klien)",
+            "hash": "0xfeb9311e6c1a1598734399060a041d0450fb24879b6d103758d3385f72693d97"
+          }
+        ]
+      }
+    ],
+    "endedAt": 1790128164457
+  }
+}

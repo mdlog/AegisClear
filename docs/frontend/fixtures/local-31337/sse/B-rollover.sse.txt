@@ -1,0 +1,68 @@
+event: step
+data: {"phase":"fund","label":"▶ B-rollover — klien B 0x90F79bf6EB2c4f870365E785982E1f101E93b906","i":0,"t":1}
+id: 0
+
+event: step
+data: {"phase":"fund","label":"fund","txHash":"0xd8f4172e2ed4b01a7f890f0e031ec8b60b47866569f45768609f58e9b8fe4bc3","gasUsed":"51577","channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":1,"t":52}
+id: 1
+
+event: step
+data: {"phase":"fund","label":"402 diterima: payTo 0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA, deposit 5.00 USDG","channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":2,"t":52}
+id: 2
+
+event: step
+data: {"phase":"serve","label":"16/128 unit epoch 0","progress":{"done":16,"total":133},"channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":3,"t":593}
+id: 3
+
+event: step
+data: {"phase":"serve","label":"32/128 unit epoch 0","progress":{"done":32,"total":133},"channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":4,"t":1021}
+id: 4
+
+event: step
+data: {"phase":"serve","label":"48/128 unit epoch 0","progress":{"done":48,"total":133},"channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":5,"t":1330}
+id: 5
+
+event: step
+data: {"phase":"serve","label":"64/128 unit epoch 0","progress":{"done":64,"total":133},"channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":6,"t":1643}
+id: 6
+
+event: step
+data: {"phase":"serve","label":"80/128 unit epoch 0","progress":{"done":80,"total":133},"channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":7,"t":1955}
+id: 7
+
+event: step
+data: {"phase":"serve","label":"96/128 unit epoch 0","progress":{"done":96,"total":133},"channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":8,"t":2286}
+id: 8
+
+event: step
+data: {"phase":"serve","label":"112/128 unit epoch 0","progress":{"done":112,"total":133},"channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":9,"t":2735}
+id: 9
+
+event: step
+data: {"phase":"serve","label":"128/128 unit epoch 0","progress":{"done":128,"total":133},"channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":10,"t":3097}
+id: 10
+
+event: step
+data: {"phase":"close","label":"epoch 0 penuh (MAX_SEQ 128) → rollover: bayar 2,56 USDG, sisa jadi budget epoch 1","channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":11,"t":3100}
+id: 11
+
+event: step
+data: {"phase":"close","label":"rollover","txHash":"0x32ed7aa74ba82f6367def540fa419caad2462a1c51bcd9499d4caa34335715b5","gasUsed":"124384","channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":12,"t":3168}
+id: 12
+
+event: step
+data: {"phase":"serve","label":"epoch 1 dimulai: seq kembali ke 0, deposit tidak diulang","channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":13,"t":3168}
+id: 13
+
+event: step
+data: {"phase":"serve","label":"133/133 unit dilayani (5 di epoch 1)","progress":{"done":133,"total":133},"channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":14,"t":3306}
+id: 14
+
+event: step
+data: {"phase":"close","label":"closeCooperative","txHash":"0xe2582239fcd90cea9de4af6cb02123259d1a5ce0fb418643c8625cf981aae27e","gasUsed":"91524","channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":15,"t":3339}
+id: 15
+
+event: done
+data: {"id":"mudg2zjn-faee38","scenario":"B-rollover","status":"done","startedAt":1790128153715,"steps":[{"phase":"fund","label":"▶ B-rollover — klien B 0x90F79bf6EB2c4f870365E785982E1f101E93b906","i":0,"t":1},{"phase":"fund","label":"fund","txHash":"0xd8f4172e2ed4b01a7f890f0e031ec8b60b47866569f45768609f58e9b8fe4bc3","gasUsed":"51577","channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":1,"t":52},{"phase":"fund","label":"402 diterima: payTo 0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA, deposit 5.00 USDG","channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":2,"t":52},{"phase":"serve","label":"16/128 unit epoch 0","progress":{"done":16,"total":133},"channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":3,"t":593},{"phase":"serve","label":"32/128 unit epoch 0","progress":{"done":32,"total":133},"channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":4,"t":1021},{"phase":"serve","label":"48/128 unit epoch 0","progress":{"done":48,"total":133},"channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":5,"t":1330},{"phase":"serve","label":"64/128 unit epoch 0","progress":{"done":64,"total":133},"channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":6,"t":1643},{"phase":"serve","label":"80/128 unit epoch 0","progress":{"done":80,"total":133},"channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":7,"t":1955},{"phase":"serve","label":"96/128 unit epoch 0","progress":{"done":96,"total":133},"channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":8,"t":2286},{"phase":"serve","label":"112/128 unit epoch 0","progress":{"done":112,"total":133},"channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":9,"t":2735},{"phase":"serve","label":"128/128 unit epoch 0","progress":{"done":128,"total":133},"channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":10,"t":3097},{"phase":"close","label":"epoch 0 penuh (MAX_SEQ 128) → rollover: bayar 2,56 USDG, sisa jadi budget epoch 1","channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":11,"t":3100},{"phase":"close","label":"rollover","txHash":"0x32ed7aa74ba82f6367def540fa419caad2462a1c51bcd9499d4caa34335715b5","gasUsed":"124384","channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":12,"t":3168},{"phase":"serve","label":"epoch 1 dimulai: seq kembali ke 0, deposit tidak diulang","channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":13,"t":3168},{"phase":"serve","label":"133/133 unit dilayani (5 di epoch 1)","progress":{"done":133,"total":133},"channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":14,"t":3306},{"phase":"close","label":"closeCooperative","txHash":"0xe2582239fcd90cea9de4af6cb02123259d1a5ce0fb418643c8625cf981aae27e","gasUsed":"91524","channel":"0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA","i":15,"t":3339}],"channels":["0xb78ad9eefC7ecdcD659f51bc740eC7657144aebA"],"result":[{"pasar":"B: AegisClear rollover (128 + 5 unit, 1 deposit)","klien_provider":"0.00 / 2.66","penentu":"dua tanda tangan ×2 (rollover + close)","terlihat":"T, R, epoch, jumlah","gas":"267485","proving_ms":"-","txs":[{"label":"fund","hash":"0xd8f4172e2ed4b01a7f890f0e031ec8b60b47866569f45768609f58e9b8fe4bc3"},{"label":"rollover","hash":"0x32ed7aa74ba82f6367def540fa419caad2462a1c51bcd9499d4caa34335715b5"},{"label":"closeCooperative","hash":"0xe2582239fcd90cea9de4af6cb02123259d1a5ce0fb418643c8625cf981aae27e"}]}],"endedAt":1790128157058}
+id: end
+
